@@ -1118,6 +1118,26 @@ class BridgeSecurityTest {
         insideFile.delete()
         allowedDir.deleteRecursively()
     }
+
+    @Test
+    fun `path validator accepts files inside any allowed root`() {
+        val legacyDir = Files.createTempDirectory("iris-legacy-allowed").toFile()
+        val runtimeDir = Files.createTempDirectory("iris-runtime-allowed").toFile()
+        val runtimeFile = Files.createTempFile(runtimeDir.toPath(), "iris-runtime", ".png").toFile().apply { writeText("x") }
+        val validator = BridgeImagePathValidator(listOf(legacyDir.absolutePath, runtimeDir.absolutePath))
+
+        val validated = validator.validate(listOf(runtimeFile.absolutePath))
+
+        assertEquals(listOf(runtimeFile.canonicalPath), validated)
+        runtimeFile.delete()
+        legacyDir.deleteRecursively()
+        runtimeDir.deleteRecursively()
+    }
+
+    @Test
+    fun `default path validator allows native runtime reply image root`() {
+        assertTrue(BridgeImagePathValidator.DEFAULT_ALLOWED_IMAGE_ROOTS.contains("/data/iris/reply-images"))
+    }
 }
 
 private class FakeChatRoom

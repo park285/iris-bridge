@@ -45,23 +45,36 @@ internal class BridgePeerIdentityValidator(
 }
 
 internal class BridgeImagePathValidator(
-    rootPath: String = DEFAULT_ALLOWED_IMAGE_ROOT,
+    rootPaths: Collection<String> = DEFAULT_ALLOWED_IMAGE_ROOTS,
 ) {
-    private val allowedRoot = File(rootPath).canonicalFile
+    constructor(rootPath: String) : this(listOf(rootPath))
+
+    private val allowedRoots = rootPaths.map { rootPath -> File(rootPath).canonicalFile }
 
     fun validate(imagePaths: List<String>): List<String> {
         require(imagePaths.isNotEmpty()) { "no image paths" }
         return imagePaths.map { path ->
             val imageFile = File(path).canonicalFile
             require(imageFile.isFile) { "image file not found: $path" }
-            require(imageFile.path.startsWith("${allowedRoot.path}${File.separator}")) {
+            require(imageFile.isUnderAllowedRoot()) {
                 "image path is outside allowed root: $path"
             }
             imageFile.path
         }
     }
 
+    private fun File.isUnderAllowedRoot(): Boolean =
+        allowedRoots.any { allowedRoot ->
+            path.startsWith("${allowedRoot.path}${File.separator}")
+        }
+
     companion object {
-        private const val DEFAULT_ALLOWED_IMAGE_ROOT = "/sdcard/Android/data/com.kakao.talk/files/iris-outbox-images"
+        internal const val LEGACY_OUTBOX_IMAGE_ROOT = "/sdcard/Android/data/com.kakao.talk/files/iris-outbox-images"
+        internal const val RUNTIME_REPLY_IMAGE_ROOT = "/data/iris/reply-images"
+        internal val DEFAULT_ALLOWED_IMAGE_ROOTS =
+            listOf(
+                LEGACY_OUTBOX_IMAGE_ROOT,
+                RUNTIME_REPLY_IMAGE_ROOT,
+            )
     }
 }
