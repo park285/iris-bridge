@@ -30,6 +30,7 @@ local.properties
 
 # Nested module build outputs
 **/build/
+/imagebridge-protocol/bin/
 
 # Ops snapshots (local-only)
 docs/current-staging-split.md
