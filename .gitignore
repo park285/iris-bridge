@@ -58,13 +58,15 @@ docs/closeout-*.tar.gz
 /.github/*
 !/.github/workflows/
 !/.github/workflows/closeout-replay.yml
-/docs/
+/docs/*
+!/docs/auth-contract.md
+!/docs/evidence-index.md
+!/docs/executive-closeout.md
 /artifacts/
 /AGENTS.md
 /CLAUDE.md
 /review.txt
 /scripts/closeout_facts.py
-/scripts/export-closeout-packet.sh
 /scripts/replay_closeout.sh
 /scripts/verify-all.sh
 /scripts/verify-iris-skill-sync.sh
