@@ -54,7 +54,9 @@ docs/closeout-*.tar.gz
 *-review-request-*.tar.gz
 
 # Internal-only paths
-/.github/
+/.github/*
+!/.github/workflows/
+!/.github/workflows/closeout-replay.yml
 /docs/
 /artifacts/
 /AGENTS.md
