@@ -1,5 +1,6 @@
 package party.qwer.iris.imagebridge.runtime
 
+import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntrospector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

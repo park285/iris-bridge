@@ -10,6 +10,15 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
+import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_MARKDOWN_INGRESS
+import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_MARKDOWN_REQUEST
+import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_MARKDOWN_REUSE
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
+import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
 import java.lang.reflect.Method
 import java.util.concurrent.atomic.AtomicBoolean
 

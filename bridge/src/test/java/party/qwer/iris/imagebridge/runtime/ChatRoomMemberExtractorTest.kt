@@ -1,6 +1,7 @@
 package party.qwer.iris.imagebridge.runtime
 
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberExtractor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
