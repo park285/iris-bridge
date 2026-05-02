@@ -1,17 +1,17 @@
 [versions]
-agp = "9.1.0"
-kotlin = "2.3.20"
+agp = "9.2.0"
+kotlin = "2.3.21"
 kotlinxCoroutines = "1.10.2"
-kotlinxSerializationJson = "1.10.0"
-ktorVersion = "3.4.1"
+kotlinxSerializationJson = "1.11.0"
+ktorVersion = "3.4.3"
 
 ktlint = "14.2.0"
 xposedApi = "82"
 slf4j = "2.0.17"
 okhttp = "5.3.2"
-orgJson = "20250107"
-robolectric = "4.16"
-sqliteJdbc = "3.47.2.0"
+orgJson = "20251224"
+robolectric = "4.16.1"
+sqliteJdbc = "3.53.0.0"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
