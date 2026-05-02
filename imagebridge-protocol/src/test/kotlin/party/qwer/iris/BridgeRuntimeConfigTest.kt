@@ -19,6 +19,7 @@ class BridgeRuntimeConfigTest {
         assertEquals("bridge-secret", resolution.token)
         assertEquals(BridgeTokenSource.ENV_FALLBACK, resolution.source)
         assertEquals("/tmp/missing.json", resolution.configPath)
+        assertEquals("/data/iris/reply-images", resolution.replyImageDir)
     }
 
     @Test
@@ -86,5 +87,37 @@ class BridgeRuntimeConfigTest {
             IrisRuntimePathPolicy.resolve(emptyMap()).configPath,
             BridgeBootstrapConfigResolver.resolve(env = emptyMap(), fileReader = { null }).configPath,
         )
+    }
+
+    @Test
+    fun `prefers config reply image directory over env path policy`() {
+        val resolution =
+            BridgeBootstrapConfigResolver.resolve(
+                env =
+                    mapOf(
+                        "IRIS_DATA_DIR" to "/env/iris",
+                        "IRIS_CONFIG_PATH" to "/tmp/config.json",
+                    ),
+                fileReader = {
+                    """
+                    {
+                      "replyImageDir": "/config/iris/images"
+                    }
+                    """.trimIndent()
+                },
+            )
+
+        assertEquals("/config/iris/images", resolution.replyImageDir)
+    }
+
+    @Test
+    fun `falls back to runtime path policy when config reply image directory is blank`() {
+        val resolution =
+            BridgeBootstrapConfigResolver.resolve(
+                env = mapOf("IRIS_DATA_DIR" to "/env/iris"),
+                fileReader = { """{"replyImageDir":"   "}""" },
+            )
+
+        assertEquals("/env/iris/reply-images", resolution.replyImageDir)
     }
 }

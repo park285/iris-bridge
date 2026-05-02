@@ -11,7 +11,7 @@ import java.io.OutputStream
 
 object ImageBridgeProtocol {
     const val PROTOCOL_VERSION = 1
-    const val SOCKET_NAME = "iris-image-bridge"
+    const val SOCKET_NAME = IrisRuntimePathPolicy.DEFAULT_IMAGE_BRIDGE_SOCKET_NAME
     const val ACTION_SEND_IMAGE = "send_image"
     const val ACTION_HEALTH = "health"
     const val ACTION_INSPECT_CHATROOM = "inspect_chatroom"
@@ -165,6 +165,15 @@ object ImageBridgeProtocol {
         val bridgeBusy: Long = 0,
         val bridgeShuttingDown: Long = 0,
         val timeout: Long = 0,
+        val missingRequestId: Long = 0,
+        val rejectedClient: Long = 0,
+        val activeClient: Long = 0,
+        val queuedClient: Long = 0,
+        val lastSendRequestId: String? = null,
+        val lastSendStartedAtEpochMs: Long? = null,
+        val lastSendCompletedAtEpochMs: Long? = null,
+        val lastSendDurationMs: Long? = null,
+        val lastSendErrorCode: String? = null,
     )
 
     fun writeFrame(

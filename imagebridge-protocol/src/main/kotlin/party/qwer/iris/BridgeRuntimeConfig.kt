@@ -13,6 +13,7 @@ private val bridgeRuntimeConfigJson =
 @Serializable
 private data class BridgeRuntimeConfigSnapshot(
     val bridgeToken: String = "",
+    val replyImageDir: String = "",
 )
 
 enum class BridgeTokenSource {
@@ -25,6 +26,7 @@ data class BridgeTokenResolution(
     val token: String,
     val source: BridgeTokenSource,
     val configPath: String,
+    val replyImageDir: String,
 )
 
 object BridgeBootstrapConfigResolver {
@@ -33,22 +35,30 @@ object BridgeBootstrapConfigResolver {
         fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
     ): BridgeTokenResolution {
         val configPath = IrisRuntimePathPolicy.resolve(env).configPath
+        val paths = IrisRuntimePathPolicy.resolve(env)
         val envToken =
             env["IRIS_BRIDGE_TOKEN"]
                 ?.trim()
                 .orEmpty()
-        val configToken =
+        val configSnapshot =
             runCatching {
                 fileReader(configPath)
             }.getOrNull()
-                ?.let(::decodeBridgeToken)
+                ?.let(::decodeBridgeRuntimeConfig)
+        val configToken = configSnapshot?.bridgeToken?.trim().orEmpty()
+        val replyImageDir =
+            configSnapshot
+                ?.replyImageDir
+                ?.trim()
                 .orEmpty()
+                .ifBlank { paths.replyImageDir }
         return when {
             configToken.isNotBlank() ->
                 BridgeTokenResolution(
                     token = configToken,
                     source = BridgeTokenSource.CONFIG_FILE,
                     configPath = configPath,
+                    replyImageDir = replyImageDir,
                 )
 
             envToken.isNotBlank() ->
@@ -56,6 +66,7 @@ object BridgeBootstrapConfigResolver {
                     token = envToken,
                     source = BridgeTokenSource.ENV_FALLBACK,
                     configPath = configPath,
+                    replyImageDir = replyImageDir,
                 )
 
             else ->
@@ -63,6 +74,7 @@ object BridgeBootstrapConfigResolver {
                     token = "",
                     source = BridgeTokenSource.NONE,
                     configPath = configPath,
+                    replyImageDir = replyImageDir,
                 )
         }
     }
@@ -73,13 +85,21 @@ fun resolveBridgeToken(
     fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
 ): String = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).token
 
+fun resolveBridgeReplyImageDir(
+    env: Map<String, String> = System.getenv(),
+    fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
+): String = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).replyImageDir
+
 internal fun decodeBridgeToken(rawConfig: String): String =
-    runCatching {
-        bridgeRuntimeConfigJson.decodeFromString<BridgeRuntimeConfigSnapshot>(rawConfig)
-    }.getOrNull()
+    decodeBridgeRuntimeConfig(rawConfig)
         ?.bridgeToken
         ?.trim()
         .orEmpty()
+
+private fun decodeBridgeRuntimeConfig(rawConfig: String): BridgeRuntimeConfigSnapshot? =
+    runCatching {
+        bridgeRuntimeConfigJson.decodeFromString<BridgeRuntimeConfigSnapshot>(rawConfig)
+    }.getOrNull()
 
 private fun readBridgeRuntimeConfigFile(path: String): String? =
     runCatching {
