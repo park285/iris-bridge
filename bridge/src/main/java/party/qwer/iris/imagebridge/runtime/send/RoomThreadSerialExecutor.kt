@@ -13,7 +13,7 @@ internal class RoomThreadSerialExecutor(
 ) {
     private val locks = Array(stripeCount.coerceAtLeast(1)) { ReentrantLock() }
 
-    fun <T> execute(
+    fun <T> executeSynchronously(
         roomId: Long,
         threadId: Long?,
         block: () -> T,

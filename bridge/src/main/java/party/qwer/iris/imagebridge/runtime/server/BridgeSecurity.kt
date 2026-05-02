@@ -5,6 +5,25 @@ import party.qwer.iris.resolveBridgeReplyImageDir
 import java.io.File
 import java.nio.file.Files
 
+internal data class ValidatedBridgeImagePath(
+    val canonicalPath: String,
+    private val allowedRoots: List<File>,
+    private val sizeBytes: Long,
+    private val lastModifiedEpochMs: Long,
+) {
+    fun revalidate(): String {
+        val file = File(canonicalPath)
+        require(!Files.isSymbolicLink(file.toPath())) { "image path must not be a symbolic link: $canonicalPath" }
+        val current = file.canonicalFile
+        require(current.isFile) { "image file not found: $canonicalPath" }
+        require(current.isUnderAllowedRoot(allowedRoots)) { "image path is outside allowed root: $canonicalPath" }
+        require(current.length() == sizeBytes && current.lastModified() == lastModifiedEpochMs) {
+            "image file changed before send: $canonicalPath"
+        }
+        return current.path
+    }
+}
+
 internal class BridgePeerIdentityValidator(
     private val allowedUids: Set<Int>,
 ) {
@@ -55,7 +74,7 @@ internal class BridgeImagePathValidator(
 
     private val allowedRoots = rootPaths.map { rootPath -> File(rootPath).canonicalFile }
 
-    fun validate(imagePaths: List<String>): List<String> {
+    fun validate(imagePaths: List<String>): List<ValidatedBridgeImagePath> {
         require(imagePaths.isNotEmpty()) { "no image paths" }
         require(imagePaths.size <= maxPathCount) { "too many image paths: ${imagePaths.size}" }
         return imagePaths.map { path ->
@@ -66,17 +85,17 @@ internal class BridgeImagePathValidator(
             require(!Files.isSymbolicLink(rawFile.toPath())) { "image path must not be a symbolic link: $path" }
             val imageFile = rawFile.canonicalFile
             require(imageFile.isFile) { "image file not found: $path" }
-            require(imageFile.isUnderAllowedRoot()) {
+            require(imageFile.isUnderAllowedRoot(allowedRoots)) {
                 "image path is outside allowed root: $path"
             }
-            imageFile.path
+            ValidatedBridgeImagePath(
+                canonicalPath = imageFile.path,
+                allowedRoots = allowedRoots,
+                sizeBytes = imageFile.length(),
+                lastModifiedEpochMs = imageFile.lastModified(),
+            )
         }
     }
-
-    private fun File.isUnderAllowedRoot(): Boolean =
-        allowedRoots.any { allowedRoot ->
-            path.startsWith("${allowedRoot.path}${File.separator}")
-        }
 
     companion object {
         internal const val LEGACY_OUTBOX_IMAGE_ROOT = "/sdcard/Android/data/com.kakao.talk/files/iris-outbox-images"
@@ -98,3 +117,8 @@ internal class BridgeImagePathValidator(
         ): List<String> = listOf(resolveBridgeReplyImageDir(env = env, fileReader = fileReader))
     }
 }
+
+private fun File.isUnderAllowedRoot(allowedRoots: List<File>): Boolean =
+    allowedRoots.any { allowedRoot ->
+        path.startsWith("${allowedRoot.path}${File.separator}")
+    }

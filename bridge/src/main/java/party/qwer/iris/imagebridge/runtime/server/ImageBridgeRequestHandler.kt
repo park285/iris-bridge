@@ -65,7 +65,7 @@ internal class ImageBridgeRequestHandler(
             }
         val startedAtEpochMs = System.currentTimeMillis()
         metrics.recordSendStart(imageRequest.requestId, startedAtEpochMs)
-        serialExecutor.execute(imageRequest.roomId, imageRequest.threadId) {
+        serialExecutor.executeSynchronously(imageRequest.roomId, imageRequest.threadId) {
             imageSender(imageRequest)
         }
         val completedAtEpochMs = System.currentTimeMillis()

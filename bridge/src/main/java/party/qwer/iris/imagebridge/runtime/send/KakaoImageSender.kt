@@ -21,7 +21,7 @@ internal class KakaoImageSender(
     fun send(request: ImageSendRequest) {
         send(
             roomId = request.roomId,
-            imagePaths = request.imagePaths,
+            imagePaths = request.imagePaths.map { it.revalidate() },
             threadId = request.threadId,
             threadScope = request.threadScope,
             requestId = request.requestId,

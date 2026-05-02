@@ -73,16 +73,11 @@ class ImageBridgeRequestHandlerTest {
                 ),
             )
 
-        assertEquals(
-            ImageSendRequest(
-                roomId = 123L,
-                imagePaths = listOf(file.canonicalPath),
-                threadId = 55L,
-                threadScope = 3,
-                requestId = "req-1",
-            ),
-            captured,
-        )
+        assertEquals(123L, captured?.roomId)
+        assertEquals(listOf(file.canonicalPath), captured?.imagePaths?.map { it.canonicalPath })
+        assertEquals(55L, captured?.threadId)
+        assertEquals(3, captured?.threadScope)
+        assertEquals("req-1", captured?.requestId)
         assertEquals("sent", response.status)
         val health = handler.handle(healthRequest())
         assertEquals(1, health.metrics?.sendSuccess)
@@ -999,7 +994,7 @@ class RoomThreadSerialExecutorTest {
         try {
             val first =
                 pool.submit<Unit> {
-                    executor.execute(roomId = 1L, threadId = 10L) {
+                    executor.executeSynchronously(roomId = 1L, threadId = 10L) {
                         firstStarted.countDown()
                         releaseFirst.await(3, TimeUnit.SECONDS)
                     }
@@ -1007,7 +1002,7 @@ class RoomThreadSerialExecutorTest {
             val second =
                 pool.submit<Unit> {
                     firstStarted.await(3, TimeUnit.SECONDS)
-                    executor.execute(roomId = 1L, threadId = 10L) {
+                    executor.executeSynchronously(roomId = 1L, threadId = 10L) {
                         secondRan.set(true)
                     }
                 }
@@ -1033,7 +1028,7 @@ class RoomThreadSerialExecutorTest {
         try {
             val first =
                 pool.submit<Unit> {
-                    executor.execute(roomId = 1L, threadId = 10L) {
+                    executor.executeSynchronously(roomId = 1L, threadId = 10L) {
                         firstStarted.countDown()
                         releaseFirst.await(3, TimeUnit.SECONDS)
                     }
@@ -1041,7 +1036,7 @@ class RoomThreadSerialExecutorTest {
             val second =
                 pool.submit<Unit> {
                     firstStarted.await(3, TimeUnit.SECONDS)
-                    executor.execute(roomId = 1L, threadId = 11L) {
+                    executor.executeSynchronously(roomId = 1L, threadId = 11L) {
                         secondRan.set(true)
                     }
                 }
@@ -1060,7 +1055,7 @@ class RoomThreadSerialExecutorTest {
         val executor = RoomThreadSerialExecutor(stripeCount = 8)
 
         repeat(100) { index ->
-            executor.execute(roomId = index.toLong(), threadId = index.toLong()) {}
+            executor.executeSynchronously(roomId = index.toLong(), threadId = index.toLong()) {}
         }
 
         assertEquals(8, executor.lockCountForTest())
@@ -1224,7 +1219,7 @@ class BridgeSecurityTest {
 
         val validated = validator.validate(listOf(insideFile.absolutePath))
 
-        assertEquals(listOf(insideFile.canonicalPath), validated)
+        assertEquals(listOf(insideFile.canonicalPath), validated.map { it.canonicalPath })
         insideFile.delete()
         allowedDir.deleteRecursively()
     }
@@ -1238,7 +1233,7 @@ class BridgeSecurityTest {
 
         val validated = validator.validate(listOf(runtimeFile.absolutePath))
 
-        assertEquals(listOf(runtimeFile.canonicalPath), validated)
+        assertEquals(listOf(runtimeFile.canonicalPath), validated.map { it.canonicalPath })
         runtimeFile.delete()
         legacyDir.deleteRecursively()
         runtimeDir.deleteRecursively()
@@ -1316,6 +1311,81 @@ class BridgeSecurityTest {
             }
 
         assertTrue(error.message?.contains("symbolic link") == true)
+        allowedDir.deleteRecursively()
+    }
+
+    @Test
+    fun `validated path rejects changed file before send`() {
+        val allowedDir = Files.createTempDirectory("iris-allowed").toFile()
+        val image = Files.createTempFile(allowedDir.toPath(), "iris-image", ".png").toFile().apply { writeText("x") }
+        val validator = BridgeImagePathValidator(allowedDir.absolutePath)
+        val validated = validator.validate(listOf(image.absolutePath)).single()
+
+        Thread.sleep(2)
+        image.writeText("changed")
+
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                validated.revalidate()
+            }
+
+        assertTrue(error.message?.contains("changed before send") == true)
+        allowedDir.deleteRecursively()
+    }
+
+    @Test
+    fun `kakao image sender receives canonical path only`() {
+        val allowedDir = Files.createTempDirectory("iris-allowed").toFile()
+        val image = Files.createTempFile(allowedDir.toPath(), "iris-image", ".png").toFile().apply { writeText("x") }
+        val validated = BridgeImagePathValidator(allowedDir.absolutePath).validate(listOf(image.absolutePath))
+        val sent = mutableListOf<String>()
+        val sender =
+            KakaoImageSender(
+                chatRoomResolver = { Any() },
+                sendInvocationFactory =
+                    object : KakaoSendInvoker {
+                        override fun sendSingle(
+                            chatRoom: Any,
+                            imagePath: String,
+                            threadId: Long?,
+                            threadScope: Int?,
+                        ) {
+                            sent += imagePath
+                        }
+
+                        override fun sendMultiple(
+                            chatRoom: Any,
+                            imagePaths: List<String>,
+                            threadId: Long?,
+                            threadScope: Int?,
+                        ) {
+                            sent += imagePaths
+                        }
+
+                        override fun sendThreaded(
+                            roomId: Long,
+                            chatRoom: Any,
+                            imagePaths: List<String>,
+                            threadId: Long,
+                            threadScope: Int,
+                        ) {
+                            sent += imagePaths
+                        }
+                    },
+                logInfo = { _, _ -> },
+            )
+
+        sender.send(
+            ImageSendRequest(
+                roomId = 1L,
+                imagePaths = validated,
+                threadId = null,
+                threadScope = null,
+                requestId = "req-canonical",
+            ),
+        )
+
+        assertEquals(listOf(image.canonicalPath), sent)
         allowedDir.deleteRecursively()
     }
 }
