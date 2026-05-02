@@ -61,6 +61,8 @@ docs/closeout-*.tar.gz
 /docs/*
 !/docs/
 !/docs/agent-reference.md
+!/docs/executive-closeout.md
+!/docs/evidence-index.md
 !/docs/iris_rust_uds_transition_docs/
 !/docs/iris_rust_uds_transition_docs/**
 /artifacts/
