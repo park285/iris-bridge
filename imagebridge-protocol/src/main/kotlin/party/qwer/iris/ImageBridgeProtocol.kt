@@ -21,6 +21,15 @@ object ImageBridgeProtocol {
     const val STATUS_FAILED = "failed"
     const val STATUS_OK = "ok"
     const val MAX_FRAME_SIZE = 1_048_576
+    const val ERROR_UNSUPPORTED_PROTOCOL = "UNSUPPORTED_PROTOCOL"
+    const val ERROR_UNAUTHORIZED = "UNAUTHORIZED"
+    const val ERROR_BAD_REQUEST = "BAD_REQUEST"
+    const val ERROR_PATH_VALIDATION = "PATH_VALIDATION_FAILED"
+    const val ERROR_BRIDGE_BUSY = "BRIDGE_BUSY"
+    const val ERROR_BRIDGE_SHUTTING_DOWN = "BRIDGE_SHUTTING_DOWN"
+    const val ERROR_SEND_FAILED = "SEND_FAILED"
+    const val ERROR_TIMEOUT = "TIMEOUT"
+    const val ERROR_INTERNAL = "INTERNAL_ERROR"
 
     private val serializerJson =
         Json {
@@ -132,6 +141,8 @@ object ImageBridgeProtocol {
     data class ImageBridgeResponse(
         val status: String,
         val error: String? = null,
+        val errorCode: String? = null,
+        val requestId: String? = null,
         val running: Boolean? = null,
         val specReady: Boolean? = null,
         val checkedAtEpochMs: Long? = null,
@@ -142,6 +153,18 @@ object ImageBridgeProtocol {
         val inspectionJson: String? = null,
         val memberSnapshot: ChatRoomMembersSnapshot? = null,
         val capabilities: ImageBridgeCapabilities? = null,
+        val metrics: ImageBridgeMetrics? = null,
+    )
+
+    @Serializable
+    data class ImageBridgeMetrics(
+        val sendSuccess: Long = 0,
+        val sendFailure: Long = 0,
+        val pathValidationFailure: Long = 0,
+        val unauthorizedClient: Long = 0,
+        val bridgeBusy: Long = 0,
+        val bridgeShuttingDown: Long = 0,
+        val timeout: Long = 0,
     )
 
     fun writeFrame(
@@ -223,12 +246,22 @@ object ImageBridgeProtocol {
             preferredMemberPlan = preferredMemberPlan,
         )
 
-    fun buildSuccessResponse(): ImageBridgeResponse = ImageBridgeResponse(status = STATUS_SENT)
+    fun buildSuccessResponse(requestId: String? = null): ImageBridgeResponse =
+        ImageBridgeResponse(
+            status = STATUS_SENT,
+            requestId = requestId,
+        )
 
-    fun buildFailureResponse(error: String): ImageBridgeResponse =
+    fun buildFailureResponse(
+        error: String,
+        errorCode: String? = null,
+        requestId: String? = null,
+    ): ImageBridgeResponse =
         ImageBridgeResponse(
             status = STATUS_FAILED,
             error = error,
+            errorCode = errorCode,
+            requestId = requestId,
         )
 
     private fun writeFramePayload(

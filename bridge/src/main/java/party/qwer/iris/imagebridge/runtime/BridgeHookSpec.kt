@@ -20,6 +20,7 @@ internal data class ImageBridgeHealthSnapshot(
     val specStatus: BridgeSpecStatus,
     val discoverySnapshot: BridgeDiscoverySnapshot,
     val capabilities: ImageBridgeCapabilitiesSnapshot = ImageBridgeCapabilitiesSnapshot(),
+    val metrics: party.qwer.iris.ImageBridgeProtocol.ImageBridgeMetrics? = null,
     val restartCount: Int,
     val lastCrashMessage: String?,
 )
@@ -178,6 +179,20 @@ internal fun ImageBridgeHealthSnapshot.toJson(): JSONObject =
                 )
             },
         )
+        metrics?.let { snapshot ->
+            put(
+                "metrics",
+                JSONObject().apply {
+                    put("sendSuccess", snapshot.sendSuccess)
+                    put("sendFailure", snapshot.sendFailure)
+                    put("pathValidationFailure", snapshot.pathValidationFailure)
+                    put("unauthorizedClient", snapshot.unauthorizedClient)
+                    put("bridgeBusy", snapshot.bridgeBusy)
+                    put("bridgeShuttingDown", snapshot.bridgeShuttingDown)
+                    put("timeout", snapshot.timeout)
+                },
+            )
+        }
     }
 
 internal fun ImageBridgeHealthSnapshot.toProtocolResponse(): party.qwer.iris.ImageBridgeProtocol.ImageBridgeResponse =
@@ -232,4 +247,5 @@ internal fun ImageBridgeHealthSnapshot.toProtocolResponse(): party.qwer.iris.Ima
                         reason = capabilities.snapshotChatRoomMembers.reason,
                     ),
             ),
+        metrics = metrics,
     )
