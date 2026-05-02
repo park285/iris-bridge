@@ -59,9 +59,6 @@ docs/closeout-*.tar.gz
 !/.github/workflows/
 !/.github/workflows/closeout-replay.yml
 /docs/*
-!/docs/auth-contract.md
-!/docs/evidence-index.md
-!/docs/executive-closeout.md
 /artifacts/
 /AGENTS.md
 /CLAUDE.md
