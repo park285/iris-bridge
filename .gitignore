@@ -69,6 +69,7 @@ docs/closeout-*.tar.gz
 /reivew.md
 /newreview.md
 /newreview_todolist_kr.md
+/iris_llm_todo_workplan_*/
 /iris_remediation_diff_guide_*.md
 /iris_rust_runtime_issue_remediation_plan_kr.md
 /scripts/closeout_facts.py
