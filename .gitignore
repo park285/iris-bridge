@@ -33,8 +33,8 @@ __pycache__/
 **/build/
 /imagebridge-protocol/bin/
 
-# Ops snapshots (local-only)
-docs/current-staging-split.md
+# Docs are local-only and must not be published.
+/docs/
 
 # Backup files
 *.backup
@@ -58,13 +58,6 @@ docs/closeout-*.tar.gz
 /.github/*
 !/.github/workflows/
 !/.github/workflows/closeout-replay.yml
-/docs/*
-!/docs/
-!/docs/agent-reference.md
-!/docs/executive-closeout.md
-!/docs/evidence-index.md
-!/docs/iris_rust_uds_transition_docs/
-!/docs/iris_rust_uds_transition_docs/**
 /artifacts/
 /AGENTS.md
 /CLAUDE.md
