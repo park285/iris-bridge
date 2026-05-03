@@ -33,8 +33,11 @@ __pycache__/
 **/build/
 /imagebridge-protocol/bin/
 
-# Docs are local-only and must not be published.
-/docs/
+# Docs are local-only by default. Release evidence docs below are published.
+/docs/*
+!/docs/legacy_kotlin_decommission_closeout.md
+!/docs/legacy_kotlin_coverage_map.md
+!/docs/testing_surface_policy.md
 
 # Backup files
 *.backup
