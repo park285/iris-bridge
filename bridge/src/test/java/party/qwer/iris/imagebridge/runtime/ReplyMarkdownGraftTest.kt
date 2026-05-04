@@ -51,7 +51,7 @@ class ReplyMarkdownPendingContextStoreTest {
     }
 
     @Test
-    fun `duplicate contexts are matched in fifo order`() {
+    fun `message fallback drops stale duplicate contexts and uses newest capture`() {
         val store = ReplyMarkdownPendingContextStore()
         val first =
             ReplyMarkdownPendingContext(
@@ -75,8 +75,8 @@ class ReplyMarkdownPendingContextStoreTest {
         store.remember(first)
         store.remember(second)
 
-        assertEquals(first, store.match(roomId = 9L, messageText = "same"))
         assertEquals(second, store.match(roomId = 9L, messageText = "same"))
+        assertNull(store.match(roomId = 9L, messageText = "same"))
     }
 
     @Test
@@ -301,6 +301,23 @@ class ReplyMarkdownSendingLogAccessTest {
 
         assertEquals("session-1", ReplyMarkdownSendingLogAccess.readAttachmentSessionId(log))
     }
+
+    @Test
+    fun `reads session id from renamed attachment field`() {
+        val log = FakeSendingLogWithRenamedAttachmentField("""{"callingPkg":"com.kakao.talk","irisSessionId":"session-2"}""")
+
+        assertEquals("session-2", ReplyMarkdownSendingLogAccess.readAttachmentSessionId(log))
+    }
+
+    @Test
+    fun `reads session id from nested attachment object`() {
+        val log =
+            FakeSendingLogWithNestedAttachmentField(
+                FakeAttachmentPayload("""{"callingPkg":"com.kakao.talk","irisSessionId":"session-3"}"""),
+            )
+
+        assertEquals("session-3", ReplyMarkdownSendingLogAccess.readAttachmentSessionId(log))
+    }
 }
 
 class ReplyMarkdownRequestSelectorTest {
@@ -360,6 +377,18 @@ private class FakeSendingLogWithFields {
 private class FakeSendingLogWithAttachmentField(
     @Suppress("PropertyName")
     var G: String,
+)
+
+private class FakeSendingLogWithRenamedAttachmentField(
+    var attachmentPayload: String,
+)
+
+private class FakeSendingLogWithNestedAttachmentField(
+    var attachmentPayload: FakeAttachmentPayload,
+)
+
+private class FakeAttachmentPayload(
+    var raw: String,
 )
 
 private class FakeMarkdownChatRoom

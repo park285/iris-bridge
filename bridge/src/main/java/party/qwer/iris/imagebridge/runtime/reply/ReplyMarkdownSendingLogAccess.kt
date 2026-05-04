@@ -1,6 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.reply
 
 import org.json.JSONObject
+import java.lang.reflect.Modifier
 
 internal object ReplyMarkdownSendingLogAccess {
     fun readRoomId(sendingLog: Any): Long? =
@@ -63,7 +64,9 @@ internal object ReplyMarkdownSendingLogAccess {
         }
     }
 
-    private fun readAttachmentText(sendingLog: Any): String? =
+    private fun readAttachmentText(sendingLog: Any): String? = readKnownAttachmentText(sendingLog) ?: readAttachmentTextFromFields(sendingLog)
+
+    private fun readKnownAttachmentText(sendingLog: Any): String? =
         runCatching {
             val attachment =
                 sendingLog
@@ -71,20 +74,48 @@ internal object ReplyMarkdownSendingLogAccess {
                     .getDeclaredField("G")
                     .apply { isAccessible = true }
                     .get(sendingLog)
-            when (attachment) {
-                null -> null
-                is String -> attachment
-                else ->
-                    attachment
-                        .javaClass
-                        .declaredFields
-                        .asSequence()
-                        .onEach { field -> field.isAccessible = true }
-                        .mapNotNull { field -> field.get(attachment) as? String }
-                        .firstOrNull { candidate -> candidate.contains("irisSessionId") || candidate.contains("callingPkg") }
-                        ?: attachment.toString()
-            }
+            attachmentTextCandidate(attachment)
         }.getOrNull()
+
+    private fun readAttachmentTextFromFields(source: Any): String? =
+        source
+            .javaClass
+            .declaredFields
+            .asSequence()
+            .filterNot { field -> Modifier.isStatic(field.modifiers) }
+            .mapNotNull { field ->
+                runCatching {
+                    field.isAccessible = true
+                    attachmentTextCandidate(field.get(source))
+                }.getOrNull()
+            }.firstOrNull()
+
+    private fun attachmentTextCandidate(value: Any?): String? =
+        when (value) {
+            null -> null
+            is String -> value.takeIf(::isAttachmentText)
+            is CharSequence -> value.toString().takeIf(::isAttachmentText)
+            else -> stringFieldCandidate(value) ?: value.toString().takeIf(::isAttachmentText)
+        }
+
+    private fun stringFieldCandidate(source: Any): String? =
+        source
+            .javaClass
+            .declaredFields
+            .asSequence()
+            .filterNot { field -> Modifier.isStatic(field.modifiers) }
+            .mapNotNull { field ->
+                runCatching {
+                    field.isAccessible = true
+                    when (val value = field.get(source)) {
+                        is String -> value
+                        is CharSequence -> value.toString()
+                        else -> null
+                    }
+                }.getOrNull()
+            }.firstOrNull(::isAttachmentText)
+
+    private fun isAttachmentText(value: String): Boolean = value.contains("irisSessionId") || value.contains("callingPkg")
 
     private fun extractSessionId(attachmentText: String): String? =
         runCatching {

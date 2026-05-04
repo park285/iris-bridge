@@ -41,9 +41,9 @@ internal class ReplyMarkdownPendingContextStore(
         pruneExpiredLocked()
         if (sessionId != null) {
             findAndRemoveBySessionIdLocked(roomId, sessionId)?.let { return it }
-            return findAndRemoveByMessageLocked(roomId, messageText, sessionlessOnly = true)
+            return findAndRemoveLatestByMessageLocked(roomId, messageText, sessionlessOnly = true)
         }
-        return findAndRemoveByMessageLocked(roomId, messageText, sessionlessOnly = false)
+        return findAndRemoveLatestByMessageLocked(roomId, messageText, sessionlessOnly = false)
     }
 
     private fun findAndRemoveBySessionIdLocked(
@@ -61,12 +61,13 @@ internal class ReplyMarkdownPendingContextStore(
         return null
     }
 
-    private fun findAndRemoveByMessageLocked(
+    private fun findAndRemoveLatestByMessageLocked(
         roomId: Long,
         messageText: String,
         sessionlessOnly: Boolean,
     ): ReplyMarkdownPendingContext? {
         val iterator = entries.iterator()
+        var latest: ReplyMarkdownPendingContext? = null
         while (iterator.hasNext()) {
             val entry = iterator.next()
             if (entry.context.roomId != roomId || entry.context.messageText != messageText) {
@@ -75,10 +76,10 @@ internal class ReplyMarkdownPendingContextStore(
             if (sessionlessOnly && entry.context.sessionId != null) {
                 continue
             }
+            latest = entry.context
             iterator.remove()
-            return entry.context
         }
-        return null
+        return latest
     }
 
     @Synchronized
