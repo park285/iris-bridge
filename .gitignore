@@ -37,6 +37,9 @@ __pycache__/
 /docs/*
 !/docs/legacy_kotlin_decommission_closeout.md
 !/docs/legacy_kotlin_coverage_map.md
+!/docs/http2-multiplexing.md
+!/docs/read-model.md
+!/docs/stats.md
 !/docs/testing_surface_policy.md
 !/docs/testing/
 !/docs/testing/*.md
@@ -70,7 +73,9 @@ docs/closeout-*.tar.gz
 /reivew.md
 /newreview.md
 /newreview_todolist_kr.md
+/iris_code_level_remediation_pack/
 /iris_llm_todo_workplan_*/
+/iris_subagent_workpack_ascii/
 /iris_remediation_diff_guide_*.md
 /iris_rust_runtime_issue_remediation_plan_kr.md
 /scripts/closeout_facts.py
