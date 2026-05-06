@@ -18,6 +18,8 @@ import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionIngressCapture
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionSendingLogAccess
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
 import java.lang.reflect.Method
@@ -32,6 +34,7 @@ class IrisBridgeModule : IXposedHookLoadPackage {
 
         private val markdownHooksInstalled = AtomicBoolean(false)
         private val markdownPendingContexts = ReplyMarkdownPendingContextStore()
+        private val mentionPendingContexts = ReplyMentionPendingContextStore()
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -112,26 +115,30 @@ class IrisBridgeModule : IXposedHookLoadPackage {
     ) {
         try {
             val companionClass = Class.forName(MARKDOWN_REQUEST_COMPANION, false, classLoader)
-            val injectMethod =
-                selectReplyMarkdownRequestHookMethod(
+            val injectMethods =
+                selectReplyMarkdownRequestHookMethods(
                     companionClass,
                     registry?.chatRoomClass,
                     registry?.writeTypeClass,
                     registry?.listenerClass,
-                )
-                    ?: error("reply-markdown request hook target not found")
-            XposedBridge.hookMethod(
-                injectMethod,
+                ).ifEmpty { error("reply-markdown request hook target not found") }
+            val hook =
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         val sendingLog = param.args.getOrNull(1) ?: return
                         val roomId = ReplyMarkdownSendingLogAccess.readRoomId(sendingLog) ?: return
                         val messageText = ReplyMarkdownSendingLogAccess.readMessageText(sendingLog) ?: return
+                        val currentSessionId = ReplyMarkdownSendingLogAccess.readAttachmentSessionId(sendingLog)
+                        val mentionContext = mentionPendingContexts.match(roomId, messageText, currentSessionId)
                         val mentionInjected =
-                            runCatching { ReplyMentionSendingLogAccess.injectMentionAttachment(sendingLog) }
-                                .onFailure { error ->
-                                    Log.e(TAG, "reply mention attachment injection failed room=$roomId", error)
-                                }.getOrDefault(false)
+                            runCatching {
+                                ReplyMentionSendingLogAccess.injectMentionAttachment(
+                                    sendingLog,
+                                    mentionContext?.attachmentText,
+                                )
+                            }.onFailure { error ->
+                                Log.e(TAG, "reply mention attachment injection failed room=$roomId", error)
+                            }.getOrDefault(false)
                         val sessionId = ReplyMarkdownSendingLogAccess.readAttachmentSessionId(sendingLog)
                         val context =
                             markdownPendingContexts.match(roomId, messageText, sessionId)
@@ -158,8 +165,11 @@ class IrisBridgeModule : IXposedHookLoadPackage {
                             Log.e(TAG, "reply-markdown request injection failed room=${context.roomId}", error)
                         }
                     }
-                },
-            )
+                }
+            injectMethods.forEach { injectMethod ->
+                XposedBridge.hookMethod(injectMethod, hook)
+            }
+            Log.i(TAG, "reply-markdown request hooks installed: ${injectMethods.joinToString { it.name }}")
             BridgeDiscovery.markInstalled(HOOK_REPLY_MARKDOWN_REQUEST)
         } catch (error: Throwable) {
             BridgeDiscovery.markInstallError(HOOK_REPLY_MARKDOWN_REQUEST, error.message ?: error.javaClass.name)
@@ -171,6 +181,12 @@ class IrisBridgeModule : IXposedHookLoadPackage {
         intent: Intent?,
         hookName: String,
     ) {
+        ReplyMentionIngressCapture.capture(intent, mentionPendingContexts) { context ->
+            BridgeDiscovery.recordHook(
+                hookName,
+                "room=${context.roomId} mention=true text=${context.messageText.take(32)}",
+            )
+        }
         ReplyMarkdownIngressCapture.capture(intent, markdownPendingContexts) { context ->
             BridgeDiscovery.recordHook(
                 hookName,
@@ -187,24 +203,49 @@ internal fun selectReplyMarkdownRequestHookMethodForTest(
     listenerClass: Class<*>?,
 ): Method? = selectReplyMarkdownRequestHookMethod(companionClass, chatRoomClass, writeTypeClass, listenerClass)
 
+internal fun selectReplyMarkdownRequestHookMethodsForTest(
+    companionClass: Class<*>,
+    chatRoomClass: Class<*>?,
+    writeTypeClass: Class<*>?,
+    listenerClass: Class<*>?,
+): List<Method> = selectReplyMarkdownRequestHookMethods(companionClass, chatRoomClass, writeTypeClass, listenerClass)
+
 private fun selectReplyMarkdownRequestHookMethod(
     companionClass: Class<*>,
     chatRoomClass: Class<*>?,
     writeTypeClass: Class<*>?,
     listenerClass: Class<*>?,
-): Method? =
-    companionClass.methods.firstOrNull { method ->
-        method.name == "u" &&
+): Method? = selectReplyMarkdownRequestHookMethods(companionClass, chatRoomClass, writeTypeClass, listenerClass).firstOrNull()
+
+private fun selectReplyMarkdownRequestHookMethods(
+    companionClass: Class<*>,
+    chatRoomClass: Class<*>?,
+    writeTypeClass: Class<*>?,
+    listenerClass: Class<*>?,
+): List<Method> =
+    companionClass.methods
+        .asSequence()
+        .filter { method ->
             method.parameterCount == 5 &&
-            method.parameterTypes[4] == Boolean::class.javaPrimitiveType &&
-            (
-                chatRoomClass == null ||
-                    writeTypeClass == null ||
-                    listenerClass == null ||
-                    (
-                        method.parameterTypes[0].isAssignableFrom(chatRoomClass) &&
-                            method.parameterTypes[2] == writeTypeClass &&
-                            method.parameterTypes[3] == listenerClass
-                    )
-            )
+                method.parameterTypes[4] == Boolean::class.javaPrimitiveType &&
+                matchesReplyMarkdownRequestTypes(method, chatRoomClass, writeTypeClass, listenerClass)
+        }.sortedWith(
+            compareBy<Method> { if (it.name == "u") 0 else 1 }
+                .thenBy { it.name }
+                .thenBy { it.toGenericString() },
+        ).toList()
+
+private fun matchesReplyMarkdownRequestTypes(
+    method: Method,
+    chatRoomClass: Class<*>?,
+    writeTypeClass: Class<*>?,
+    listenerClass: Class<*>?,
+): Boolean {
+    if (chatRoomClass == null || writeTypeClass == null || listenerClass == null) {
+        return method.name == "u"
     }
+    val parameterTypes = method.parameterTypes
+    return parameterTypes[0].isAssignableFrom(chatRoomClass) &&
+        parameterTypes[2].isAssignableFrom(writeTypeClass) &&
+        parameterTypes[3].isAssignableFrom(listenerClass)
+}

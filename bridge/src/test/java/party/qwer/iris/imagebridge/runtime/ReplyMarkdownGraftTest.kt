@@ -6,6 +6,9 @@ import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContext
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionBridgeExtras
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContext
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionSendingLogAccess
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -267,6 +270,81 @@ class ReplyMarkdownBridgeExtrasTest {
     }
 }
 
+class ReplyMentionPendingContextStoreTest {
+    @Test
+    fun `match removes first exact room and message mention context`() {
+        var now = 1_000L
+        val store = ReplyMentionPendingContextStore(clock = { now })
+        val context =
+            ReplyMentionPendingContext(
+                roomId = 7L,
+                messageText = "@홍길동 테스트",
+                attachmentText = """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
+                createdAtEpochMs = now,
+            )
+
+        store.remember(context)
+
+        assertEquals(context, store.match(roomId = 7L, messageText = "@홍길동 테스트"))
+        assertNull(store.match(roomId = 7L, messageText = "@홍길동 테스트"))
+    }
+
+    @Test
+    fun `session specific mention match ignores message drift`() {
+        val store = ReplyMentionPendingContextStore()
+        val context =
+            ReplyMentionPendingContext(
+                roomId = 9L,
+                messageText = "@홍길동\n\n테스트",
+                attachmentText = """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
+                sessionId = "session-1",
+                createdAtEpochMs = 1L,
+            )
+
+        store.remember(context)
+
+        assertEquals(context, store.match(roomId = 9L, messageText = "@홍길동 테스트", sessionId = "session-1"))
+    }
+}
+
+class ReplyMentionBridgeExtrasTest {
+    @Test
+    fun `extract pending mention context reads nested message and attachment`() {
+        val context =
+            ReplyMentionBridgeExtras.extractPendingContext(
+                ReplyMentionBridgeExtras.Snapshot(
+                    sessionId = "session-1",
+                    fallbackRoomId = 18478615493603057L,
+                    createdAtEpochMs = 99L,
+                    nestedMessageText = "@홍길동 테스트",
+                    nestedAttachmentText = """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
+                ),
+                nowEpochMs = 5L,
+            )
+
+        assertNotNull(context)
+        assertEquals(18478615493603057L, context.roomId)
+        assertEquals("@홍길동 테스트", context.messageText)
+        assertEquals("session-1", context.sessionId)
+        assertEquals(99L, context.createdAtEpochMs)
+        val mention = JSONObject(context.attachmentText).getJSONArray("mentions").getJSONObject(0)
+        assertEquals(123456789L, mention.getLong("user_id"))
+    }
+
+    @Test
+    fun `extract pending mention context skips attachment without mentions`() {
+        assertNull(
+            ReplyMentionBridgeExtras.extractPendingContext(
+                ReplyMentionBridgeExtras.Snapshot(
+                    fallbackRoomId = 1L,
+                    messageText = "hello",
+                    attachmentText = """{"callingPkg":"com.kakao.talk","markdown":true}""",
+                ),
+            ),
+        )
+    }
+}
+
 class ReplyMarkdownSendingLogAccessTest {
     @Test
     fun `reads sending log room and message`() {
@@ -336,20 +414,39 @@ class ReplyMarkdownSendingLogAccessTest {
         assertEquals(1, mention.getJSONArray("at").getInt(0))
         assertEquals(3, mention.getInt("len"))
     }
+
+    @Test
+    fun `injects pending mention attachment into stripped sending log attachment`() {
+        val log = FakeSendingLogWithAttachmentField("""{"callingPkg":"com.kakao.talk","markdown":true}""")
+
+        assertTrue(
+            ReplyMentionSendingLogAccess.injectMentionAttachment(
+                log,
+                """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
+            ),
+        )
+
+        val attachment = JSONObject(log.G)
+        assertTrue(attachment.getBoolean("markdown"))
+        val mention = attachment.getJSONArray("mentions").getJSONObject(0)
+        assertEquals(123456789L, mention.getLong("user_id"))
+        assertEquals(1, mention.getJSONArray("at").getInt(0))
+        assertEquals(3, mention.getInt("len"))
+    }
 }
 
 class ReplyMarkdownRequestSelectorTest {
     @Test
-    fun `selector prefers request method with expected parameter types`() {
+    fun `selector returns request methods with expected parameter types`() {
         val selected =
-            selectReplyMarkdownRequestHookMethodForTest(
+            selectReplyMarkdownRequestHookMethodsForTest(
                 FakeRequestCompanion::class.java,
                 chatRoomClass = FakeMarkdownChatRoom::class.java,
                 writeTypeClass = FakeMarkdownWriteType::class.java,
                 listenerClass = FakeMarkdownListener::class.java,
             )
 
-        assertNotNull(selected)
+        assertEquals(listOf("u", "v"), selected.map { it.name })
         assertEquals(
             listOf(
                 FakeMarkdownChatRoom::class.java,
@@ -358,8 +455,23 @@ class ReplyMarkdownRequestSelectorTest {
                 FakeMarkdownListener::class.java,
                 Boolean::class.javaPrimitiveType,
             ),
-            selected.parameterTypes.toList(),
+            selected.first().parameterTypes.toList(),
         )
+        assertTrue(selected.none { method -> method.parameterTypes[0] == FakeMarkdownOtherChatRoom::class.java })
+    }
+
+    @Test
+    fun `selector falls back to obfuscated u method when registry types are unavailable`() {
+        val selected =
+            selectReplyMarkdownRequestHookMethodForTest(
+                FakeRequestCompanion::class.java,
+                chatRoomClass = null,
+                writeTypeClass = null,
+                listenerClass = null,
+            )
+
+        assertNotNull(selected)
+        assertEquals("u", selected.name)
     }
 }
 
@@ -428,6 +540,14 @@ private class FakeRequestCompanion {
     ) = Unit
 
     fun u(
+        chatRoom: FakeMarkdownChatRoom,
+        sendingLog: Any,
+        writeType: FakeMarkdownWriteType,
+        listener: FakeMarkdownListener,
+        immediate: Boolean,
+    ) = Unit
+
+    fun v(
         chatRoom: FakeMarkdownChatRoom,
         sendingLog: Any,
         writeType: FakeMarkdownWriteType,
