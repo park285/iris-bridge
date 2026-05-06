@@ -1,14 +1,17 @@
 package party.qwer.iris.imagebridge.runtime
 
+import org.json.JSONObject
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownBridgeExtras
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContext
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionSendingLogAccess
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ReplyMarkdownPendingContextStoreTest {
     @Test
@@ -317,6 +320,21 @@ class ReplyMarkdownSendingLogAccessTest {
             )
 
         assertEquals("session-3", ReplyMarkdownSendingLogAccess.readAttachmentSessionId(log))
+    }
+
+    @Test
+    fun `injects mention attachment without pending thread context`() {
+        val log =
+            FakeSendingLogWithAttachmentField(
+                """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
+            )
+
+        assertTrue(ReplyMentionSendingLogAccess.injectMentionAttachment(log))
+
+        val mention = JSONObject(log.G).getJSONArray("mentions").getJSONObject(0)
+        assertEquals(123456789L, mention.getLong("user_id"))
+        assertEquals(1, mention.getJSONArray("at").getInt(0))
+        assertEquals(3, mention.getInt("len"))
     }
 }
 

@@ -18,6 +18,7 @@ import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionSendingLogAccess
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
 import java.lang.reflect.Method
 import java.util.concurrent.atomic.AtomicBoolean
@@ -126,8 +127,23 @@ class IrisBridgeModule : IXposedHookLoadPackage {
                         val sendingLog = param.args.getOrNull(1) ?: return
                         val roomId = ReplyMarkdownSendingLogAccess.readRoomId(sendingLog) ?: return
                         val messageText = ReplyMarkdownSendingLogAccess.readMessageText(sendingLog) ?: return
+                        val mentionInjected =
+                            runCatching { ReplyMentionSendingLogAccess.injectMentionAttachment(sendingLog) }
+                                .onFailure { error ->
+                                    Log.e(TAG, "reply mention attachment injection failed room=$roomId", error)
+                                }.getOrDefault(false)
                         val sessionId = ReplyMarkdownSendingLogAccess.readAttachmentSessionId(sendingLog)
-                        val context = markdownPendingContexts.match(roomId, messageText, sessionId) ?: return
+                        val context =
+                            markdownPendingContexts.match(roomId, messageText, sessionId)
+                                ?: run {
+                                    if (mentionInjected) {
+                                        BridgeDiscovery.recordHook(
+                                            HOOK_REPLY_MARKDOWN_REQUEST,
+                                            "room=$roomId mention=true",
+                                        )
+                                    }
+                                    return
+                                }
                         runCatching {
                             ReplyMarkdownSendingLogAccess.writeThreadMetadata(
                                 sendingLog = sendingLog,
@@ -136,7 +152,7 @@ class IrisBridgeModule : IXposedHookLoadPackage {
                             )
                             BridgeDiscovery.recordHook(
                                 HOOK_REPLY_MARKDOWN_REQUEST,
-                                "room=${context.roomId} threadId=${context.threadId} scope=${context.threadScope}",
+                                "room=${context.roomId} threadId=${context.threadId} scope=${context.threadScope} mention=$mentionInjected",
                             )
                         }.onFailure { error ->
                             Log.e(TAG, "reply-markdown request injection failed room=${context.roomId}", error)

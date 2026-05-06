@@ -35,6 +35,17 @@ internal object ReplyMarkdownSendingLogAccess {
             sendingLog,
         )?.let(::extractSessionId)
 
+    fun readAttachmentText(sendingLog: Any): String? = readKnownAttachmentText(sendingLog) ?: readAttachmentTextFromFields(sendingLog)
+
+    fun writeAttachmentText(
+        sendingLog: Any,
+        attachmentText: String,
+    ) {
+        if (writeKnownAttachmentText(sendingLog, attachmentText)) return
+        if (writeAttachmentTextToFields(sendingLog, attachmentText)) return
+        error("reply attachment field not writable")
+    }
+
     fun writeThreadMetadata(
         sendingLog: Any,
         threadId: Long,
@@ -63,8 +74,6 @@ internal object ReplyMarkdownSendingLogAccess {
             threadField.set(sendingLog, threadIdValue)
         }
     }
-
-    private fun readAttachmentText(sendingLog: Any): String? = readKnownAttachmentText(sendingLog) ?: readAttachmentTextFromFields(sendingLog)
 
     private fun readKnownAttachmentText(sendingLog: Any): String? =
         runCatching {
@@ -98,6 +107,53 @@ internal object ReplyMarkdownSendingLogAccess {
             else -> stringFieldCandidate(value) ?: value.toString().takeIf(::isAttachmentText)
         }
 
+    private fun writeKnownAttachmentText(
+        sendingLog: Any,
+        attachmentText: String,
+    ): Boolean =
+        runCatching {
+            val field =
+                sendingLog
+                    .javaClass
+                    .getDeclaredField("G")
+                    .apply { isAccessible = true }
+            writeAttachmentField(field, sendingLog, attachmentText)
+        }.getOrDefault(false)
+
+    private fun writeAttachmentTextToFields(
+        source: Any,
+        attachmentText: String,
+    ): Boolean =
+        source
+            .javaClass
+            .declaredFields
+            .asSequence()
+            .filterNot { field -> Modifier.isStatic(field.modifiers) }
+            .any { field ->
+                runCatching {
+                    field.isAccessible = true
+                    val value = field.get(source)
+                    when {
+                        attachmentTextCandidate(value) != null -> writeAttachmentField(field, source, attachmentText)
+                        else -> false
+                    }
+                }.getOrDefault(false)
+            }
+
+    private fun writeAttachmentField(
+        field: java.lang.reflect.Field,
+        source: Any,
+        attachmentText: String,
+    ): Boolean {
+        val type = field.type
+        if (type.isAssignableFrom(String::class.java) || type == CharSequence::class.java || type == Any::class.java) {
+            field.set(source, attachmentText)
+            return true
+        }
+        val value = field.get(source) ?: return false
+        return writeStringFieldCandidate(value, attachmentText)
+    }
+
     private fun stringFieldCandidate(source: Any): String? =
         source
             .javaClass
@@ -115,7 +171,35 @@ internal object ReplyMarkdownSendingLogAccess {
                 }.getOrNull()
             }.firstOrNull(::isAttachmentText)
 
-    private fun isAttachmentText(value: String): Boolean = value.contains("irisSessionId") || value.contains("callingPkg")
+    private fun writeStringFieldCandidate(
+        source: Any,
+        attachmentText: String,
+    ): Boolean =
+        source
+            .javaClass
+            .declaredFields
+            .asSequence()
+            .filterNot { field -> Modifier.isStatic(field.modifiers) }
+            .any { field ->
+                runCatching {
+                    field.isAccessible = true
+                    val value = field.get(source)
+                    val text =
+                        when (value) {
+                            is String -> value
+                            is CharSequence -> value.toString()
+                            else -> null
+                        }
+                    if (text?.let(::isAttachmentText) == true) {
+                        field.set(source, attachmentText)
+                        true
+                    } else {
+                        false
+                    }
+                }.getOrDefault(false)
+            }
+
+    private fun isAttachmentText(value: String): Boolean = value.contains("irisSessionId") || value.contains("callingPkg") || value.contains("\"mentions\"")
 
     private fun extractSessionId(attachmentText: String): String? =
         runCatching {
