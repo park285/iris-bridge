@@ -151,7 +151,22 @@ internal object ReplyMarkdownSendingLogAccess {
             return true
         }
         val value = field.get(source) ?: return false
+        if (value is JSONObject) {
+            copyJsonObjectKeys(JSONObject(attachmentText), value)
+            return true
+        }
         return writeStringFieldCandidate(value, attachmentText)
+    }
+
+    private fun copyJsonObjectKeys(
+        source: JSONObject,
+        target: JSONObject,
+    ) {
+        val keys = source.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            target.put(key, source.get(key))
+        }
     }
 
     private fun stringFieldCandidate(source: Any): String? =

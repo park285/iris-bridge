@@ -401,6 +401,24 @@ class ReplyMarkdownSendingLogAccessTest {
     }
 
     @Test
+    fun `injects pending mention attachment into json object sending log attachment`() {
+        val log = FakeSendingLogWithJsonAttachmentField(JSONObject("""{"callingPkg":"com.kakao.talk","markdown":true}"""))
+
+        assertTrue(
+            ReplyMentionSendingLogAccess.injectMentionAttachment(
+                log,
+                """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
+            ),
+        )
+
+        assertTrue(log.attachmentPayload.getBoolean("markdown"))
+        val mention = log.attachmentPayload.getJSONArray("mentions").getJSONObject(0)
+        assertEquals(123456789L, mention.getLong("user_id"))
+        assertEquals(1, mention.getJSONArray("at").getInt(0))
+        assertEquals(3, mention.getInt("len"))
+    }
+
+    @Test
     fun `injects mention attachment without pending thread context`() {
         val log =
             FakeSendingLogWithAttachmentField(
@@ -515,6 +533,10 @@ private class FakeSendingLogWithRenamedAttachmentField(
 
 private class FakeSendingLogWithNestedAttachmentField(
     var attachmentPayload: FakeAttachmentPayload,
+)
+
+private class FakeSendingLogWithJsonAttachmentField(
+    var attachmentPayload: JSONObject,
 )
 
 private class FakeAttachmentPayload(
