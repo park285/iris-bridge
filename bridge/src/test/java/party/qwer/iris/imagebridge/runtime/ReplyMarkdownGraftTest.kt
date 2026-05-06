@@ -451,6 +451,23 @@ class ReplyMarkdownSendingLogAccessTest {
         assertEquals(1, mention.getJSONArray("at").getInt(0))
         assertEquals(3, mention.getInt("len"))
     }
+
+    @Test
+    fun `injects pending mention attachment when ShareManager text log has no attachment`() {
+        val log = FakeSendingLogWithNullableAttachmentField(null)
+
+        assertTrue(
+            ReplyMentionSendingLogAccess.injectMentionAttachment(
+                log,
+                """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":"text-user","at":[1],"len":3}]}""",
+            ),
+        )
+
+        val attachment = JSONObject(assertNotNull(log.G))
+        val mention = attachment.getJSONArray("mentions").getJSONObject(0)
+        assertEquals("text-user", mention.getString("user_id"))
+        assertEquals("com.kakao.talk", attachment.getString("callingPkg"))
+    }
 }
 
 class ReplyMarkdownRequestSelectorTest {
@@ -525,6 +542,11 @@ private class FakeSendingLogWithFields {
 private class FakeSendingLogWithAttachmentField(
     @Suppress("PropertyName")
     var G: String,
+)
+
+private class FakeSendingLogWithNullableAttachmentField(
+    @Suppress("PropertyName")
+    var G: String?,
 )
 
 private class FakeSendingLogWithRenamedAttachmentField(

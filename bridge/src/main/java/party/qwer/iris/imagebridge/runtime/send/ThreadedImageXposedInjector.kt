@@ -7,21 +7,20 @@ import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_INJECT
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
-import party.qwer.iris.imagebridge.runtime.selectReplyMarkdownRequestHookMethodForTest
 import java.lang.reflect.Method
 import java.util.concurrent.atomic.AtomicBoolean
+
+internal data class ThreadedImagePendingContext(
+    val roomId: Long,
+    val threadId: Long,
+    val threadScope: Int,
+)
 
 internal object ThreadedImageXposedInjector {
     private const val TAG = "IrisBridge"
     private const val REQUEST_COMPANION_CLASS = "com.kakao.talk.manager.send.ChatSendingLogRequest\$a"
     private val installed = AtomicBoolean(false)
-    private val pendingContext = ThreadLocal<PendingContext?>()
-
-    private data class PendingContext(
-        val roomId: Long,
-        val threadId: Long,
-        val threadScope: Int,
-    )
+    private val pendingContext = ThreadLocal<ThreadedImagePendingContext?>()
 
     internal data class InjectHookBinding(
         val method: Method,
@@ -61,28 +60,7 @@ internal object ThreadedImageXposedInjector {
         var anyInstalled = false
         bindings.forEach { binding ->
             runCatching {
-                XposedBridge.hookMethod(
-                    binding.method,
-                    object : XC_MethodHook() {
-                        override fun beforeHookedMethod(param: MethodHookParam) {
-                            val context = pendingContext.get() ?: return
-                            val sendingLog = param.args.getOrNull(binding.sendingLogArgIndex) ?: return
-                            runCatching {
-                                ReplyMarkdownSendingLogAccess.writeThreadMetadata(
-                                    sendingLog = sendingLog,
-                                    threadId = context.threadId,
-                                    threadScope = context.threadScope,
-                                )
-                                BridgeDiscovery.recordHook(
-                                    HOOK_SEND_THREADED_INJECT,
-                                    "source=${binding.source} room=${context.roomId} threadId=${context.threadId} scope=${context.threadScope}",
-                                )
-                            }.onFailure { error ->
-                                Log.e(TAG, "thread metadata injection failed room=${context.roomId} source=${binding.source}", error)
-                            }
-                        }
-                    },
-                )
+                XposedBridge.hookMethod(binding.method, createThreadedImageInjectHook(binding, pendingContext, TAG))
                 anyInstalled = true
             }.onFailure { error ->
                 runCatching { Log.e(TAG, "threaded image inject hook install failed source=${binding.source}", error) }
@@ -102,7 +80,7 @@ internal object ThreadedImageXposedInjector {
         threadScope: Int,
         block: () -> T,
     ): T {
-        pendingContext.set(PendingContext(roomId, threadId, threadScope))
+        pendingContext.set(ThreadedImagePendingContext(roomId, threadId, threadScope))
         return try {
             block()
         } finally {
@@ -111,96 +89,36 @@ internal object ThreadedImageXposedInjector {
     }
 }
 
-internal fun selectThreadedImageInjectBindingsForTest(
-    requestCompanionClass: Class<*>?,
-    chatMediaSenderClass: Class<*>,
-    chatRoomClass: Class<*>,
-    writeTypeClass: Class<*>,
-    listenerClass: Class<*>,
-): List<ThreadedImageXposedInjector.InjectHookBinding> =
-    selectThreadedImageInjectBindings(
-        requestCompanionClass = requestCompanionClass,
-        chatMediaSenderClass = chatMediaSenderClass,
-        chatRoomClass = chatRoomClass,
-        writeTypeClass = writeTypeClass,
-        listenerClass = listenerClass,
-    )
-
-internal fun selectThreadedImageInjectMethodForTest(
-    chatMediaSenderClass: Class<*>,
-    writeTypeClass: Class<*>,
-    listenerClass: Class<*>,
-): Method =
-    selectLegacyThreadedImageInjectMethod(
-        chatMediaSenderClass = chatMediaSenderClass,
-        writeTypeClass = writeTypeClass,
-        listenerClass = listenerClass,
-    )
-
-private fun selectThreadedImageInjectBindings(
-    requestCompanionClass: Class<*>?,
-    chatMediaSenderClass: Class<*>,
-    chatRoomClass: Class<*>,
-    writeTypeClass: Class<*>,
-    listenerClass: Class<*>,
-): List<ThreadedImageXposedInjector.InjectHookBinding> {
-    val bindings = mutableListOf<ThreadedImageXposedInjector.InjectHookBinding>()
-    requestCompanionClass?.let { companionClass ->
-        selectReplyMarkdownRequestHookMethodForTest(
-            companionClass = companionClass,
-            chatRoomClass = chatRoomClass,
-            writeTypeClass = writeTypeClass,
-            listenerClass = listenerClass,
-        )?.let { method ->
-            bindings +=
-                ThreadedImageXposedInjector.InjectHookBinding(
-                    method = method,
-                    sendingLogArgIndex = 1,
-                    source = "request",
-                )
+private fun createThreadedImageInjectHook(
+    binding: ThreadedImageXposedInjector.InjectHookBinding,
+    pendingContext: ThreadLocal<ThreadedImagePendingContext?>,
+    tag: String,
+): XC_MethodHook =
+    object : XC_MethodHook() {
+        override fun beforeHookedMethod(param: MethodHookParam) {
+            val context = pendingContext.get() ?: return
+            val sendingLog = param.args.getOrNull(binding.sendingLogArgIndex) ?: return
+            injectThreadMetadata(tag, binding, sendingLog, context)
         }
     }
-    bindings +=
-        ThreadedImageXposedInjector.InjectHookBinding(
-            method =
-                selectLegacyThreadedImageInjectMethod(
-                    chatMediaSenderClass = chatMediaSenderClass,
-                    writeTypeClass = writeTypeClass,
-                    listenerClass = listenerClass,
-                ),
-            sendingLogArgIndex = 0,
-            source = "legacy",
+
+private fun injectThreadMetadata(
+    tag: String,
+    binding: ThreadedImageXposedInjector.InjectHookBinding,
+    sendingLog: Any,
+    context: ThreadedImagePendingContext,
+) {
+    runCatching {
+        ReplyMarkdownSendingLogAccess.writeThreadMetadata(
+            sendingLog = sendingLog,
+            threadId = context.threadId,
+            threadScope = context.threadScope,
         )
-    return bindings
-}
-
-private fun selectLegacyThreadedImageInjectMethod(
-    chatMediaSenderClass: Class<*>,
-    writeTypeClass: Class<*>,
-    listenerClass: Class<*>,
-): Method =
-    KakaoClassRegistry.selectMethodCandidateForTest(
-        label = "ChatMediaSender threaded inject on ${chatMediaSenderClass.name}",
-        candidates =
-            collectMethodsInHierarchy(chatMediaSenderClass).filter { method ->
-                !java.lang.reflect.Modifier
-                    .isStatic(method.modifiers) &&
-                    method.parameterCount == 3 &&
-                    method.parameterTypes[1] == writeTypeClass &&
-                    method.parameterTypes[2] == listenerClass
-            },
-        preferredNames = setOf("A"),
-    )
-
-private fun collectMethodsInHierarchy(clazz: Class<*>): List<Method> {
-    val methods = mutableListOf<Method>()
-    var current: Class<*>? = clazz
-    while (current != null && current != Any::class.java) {
-        current.declaredMethods.forEach { method ->
-            runCatching { method.isAccessible = true }
-            methods += method
-        }
-        current = current.superclass
+        BridgeDiscovery.recordHook(
+            HOOK_SEND_THREADED_INJECT,
+            "source=${binding.source} room=${context.roomId} threadId=${context.threadId} scope=${context.threadScope}",
+        )
+    }.onFailure { error ->
+        Log.e(tag, "thread metadata injection failed room=${context.roomId} source=${binding.source}", error)
     }
-    return methods
 }

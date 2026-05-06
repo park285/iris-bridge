@@ -8,7 +8,7 @@ import kotlin.test.assertNotNull
 
 class ReplyAttachmentProtocolTest {
     @Test
-    fun `builds markdown attachment with mentions and session id`() {
+    fun `builds markdown attachment with mentions without private session metadata`() {
         val attachment =
             assertNotNull(
                 ReplyAttachmentProtocol.build(
@@ -22,7 +22,7 @@ class ReplyAttachmentProtocolTest {
         assertEquals("com.kakao.talk", json.getString("callingPkg"))
         assertEquals(true, json.getBoolean("markdown"))
         assertEquals(true, json.getBoolean("f"))
-        assertEquals("req-1", json.getString("irisSessionId"))
+        assertFalse(json.has("irisSessionId"))
         assertEquals(1, json.getJSONArray("mentions").length())
     }
 
@@ -32,16 +32,19 @@ class ReplyAttachmentProtocolTest {
     }
 
     @Test
-    fun `ignores malformed mentions metadata`() {
-        val attachment =
-            assertNotNull(
-                ReplyAttachmentProtocol.build(
-                    markdown = false,
-                    mentionsJson = "not-json",
-                    sessionId = "req-2",
-                ),
-            )
+    fun `returns null when only session id is present`() {
+        assertEquals(null, ReplyAttachmentProtocol.build(markdown = false, mentionsJson = null, sessionId = "req-plain"))
+    }
 
-        assertFalse(JSONObject(attachment).has("mentions"))
+    @Test
+    fun `ignores malformed mentions metadata`() {
+        assertEquals(
+            null,
+            ReplyAttachmentProtocol.build(
+                markdown = false,
+                mentionsJson = "not-json",
+                sessionId = "req-2",
+            ),
+        )
     }
 }

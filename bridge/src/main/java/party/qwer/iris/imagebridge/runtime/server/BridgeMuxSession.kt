@@ -23,6 +23,7 @@ internal class BridgeMuxSession(
     private val closed = AtomicBoolean(false)
     private val inFlight = AtomicInteger(0)
     private val writeLock = Any()
+    private val writer = BridgeMuxSessionWriter(client, writeLock, ::close)
 
     fun run() {
         metrics.recordClientStart()
@@ -32,14 +33,14 @@ internal class BridgeMuxSession(
                 when (frame.type) {
                     ImageBridgeMuxProtocol.TYPE_REQUEST -> dispatchRequest(frame)
                     ImageBridgeMuxProtocol.TYPE_PING ->
-                        writeFrame(
+                        writer.writeFrame(
                             ImageBridgeMuxFrame(
                                 type = ImageBridgeMuxProtocol.TYPE_PONG,
                                 correlationId = frame.correlationId,
                             ),
                         )
                     ImageBridgeMuxProtocol.TYPE_CANCEL -> Unit
-                    else -> writeProtocolFailure(frame.correlationId, "unsupported mux frame type: ${frame.type}")
+                    else -> writer.writeProtocolFailure(frame.correlationId, "unsupported mux frame type: ${frame.type}")
                 }
             }
         } catch (error: Exception) {
@@ -56,13 +57,13 @@ internal class BridgeMuxSession(
         val correlationId = frame.correlationId
         val request = frame.request
         if (correlationId.isNullOrBlank() || request == null) {
-            writeProtocolFailure(correlationId, "malformed mux request frame")
+            writer.writeProtocolFailure(correlationId, "malformed mux request frame")
             return
         }
         if (inFlight.incrementAndGet() > maxInFlight) {
             inFlight.decrementAndGet()
             metrics.recordBridgeBusy()
-            writeResponse(
+            writer.writeResponse(
                 correlationId,
                 bridgeFailureResponse(
                     error = "bridge busy",
@@ -74,25 +75,12 @@ internal class BridgeMuxSession(
         }
         try {
             executor.execute {
-                try {
-                    writeResponse(correlationId, handler.handle(request))
-                } catch (error: Exception) {
-                    writeResponse(
-                        correlationId,
-                        bridgeFailureResponse(
-                            error = error.message ?: "internal error",
-                            errorCode = ImageBridgeProtocol.ERROR_INTERNAL,
-                            requestId = request.requestId,
-                        ),
-                    )
-                } finally {
-                    inFlight.decrementAndGet()
-                }
+                handleAcceptedRequest(correlationId, request)
             }
         } catch (error: RejectedExecutionException) {
             inFlight.decrementAndGet()
             metrics.recordBridgeBusy()
-            writeResponse(
+            writer.writeResponse(
                 correlationId,
                 bridgeFailureResponse(
                     error = "bridge busy",
@@ -103,39 +91,41 @@ internal class BridgeMuxSession(
         }
     }
 
-    private fun writeResponse(
+    private fun handleAcceptedRequest(
+        correlationId: String,
+        request: ImageBridgeProtocol.ImageBridgeRequest,
+    ) {
+        try {
+            writeResponseOrClose(correlationId, handleRequestSafely(request))
+        } finally {
+            inFlight.decrementAndGet()
+        }
+    }
+
+    private fun handleRequestSafely(
+        request: ImageBridgeProtocol.ImageBridgeRequest,
+    ): ImageBridgeProtocol.ImageBridgeResponse =
+        try {
+            handler.handle(request)
+        } catch (error: Exception) {
+            bridgeFailureResponse(
+                error = error.message ?: "internal error",
+                errorCode = ImageBridgeProtocol.ERROR_INTERNAL,
+                requestId = request.requestId,
+            )
+        }
+
+    private fun writeResponseOrClose(
         correlationId: String,
         response: ImageBridgeProtocol.ImageBridgeResponse,
     ) {
-        writeFrame(
-            ImageBridgeMuxFrame(
-                type = ImageBridgeMuxProtocol.TYPE_RESPONSE,
-                correlationId = correlationId,
-                response = response,
-            ),
-        )
-    }
-
-    private fun writeProtocolFailure(
-        correlationId: String?,
-        message: String,
-    ) {
-        if (correlationId.isNullOrBlank()) {
+        try {
+            writer.writeResponse(correlationId, response)
+        } catch (error: Exception) {
+            if (!closed.get() && isRunning()) {
+                logError(TAG, "bridge mux response write failed", error)
+            }
             close()
-            return
-        }
-        writeResponse(
-            correlationId,
-            bridgeFailureResponse(
-                error = message,
-                errorCode = ImageBridgeProtocol.ERROR_BAD_REQUEST,
-            ),
-        )
-    }
-
-    private fun writeFrame(frame: ImageBridgeMuxFrame) {
-        synchronized(writeLock) {
-            ImageBridgeMuxProtocol.writeFrame(client.outputStream, frame)
         }
     }
 

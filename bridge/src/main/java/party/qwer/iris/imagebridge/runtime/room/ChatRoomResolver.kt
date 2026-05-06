@@ -2,9 +2,6 @@ package party.qwer.iris.imagebridge.runtime.room
 
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
-import java.lang.reflect.Constructor
-import java.lang.reflect.Field
-import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.util.concurrent.ConcurrentHashMap
 
@@ -117,28 +114,5 @@ internal class ChatRoomResolver(
                         method.returnType == managerClass
                 }?.apply { isAccessible = true } ?: error("ChatRoomManager singleton accessor not found")
         return { staticAccessor.invoke(null) ?: error("ChatRoomManager static accessor returned null") }
-    }
-
-    private fun Field.readStaticValue(): Any? =
-        runCatching {
-            isAccessible = true
-            get(null)
-        }.getOrNull()
-
-    private fun interface RoomEntityResolver {
-        fun resolve(entity: Any): Any?
-    }
-
-    private class CompanionRoomEntityResolver(
-        private val companion: Any,
-        private val method: Method,
-    ) : RoomEntityResolver {
-        override fun resolve(entity: Any): Any? = method.invoke(companion, entity)
-    }
-
-    private class ConstructorRoomEntityResolver(
-        private val constructor: Constructor<*>,
-    ) : RoomEntityResolver {
-        override fun resolve(entity: Any): Any? = constructor.newInstance(entity)
     }
 }

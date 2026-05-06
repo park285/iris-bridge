@@ -11,6 +11,7 @@ internal class MemberExtractionPlanMapper {
             nicknamePath = plan.nicknamePath,
             rolePath = plan.rolePath,
             profileImagePath = plan.profileImagePath,
+            mentionUserIdPath = plan.mentionUserIdPath,
         )
 
     fun toProtocolPlan(plan: ExtractionPlan): ImageBridgeProtocol.ChatRoomMemberExtractionPlan =
@@ -21,6 +22,7 @@ internal class MemberExtractionPlanMapper {
             nicknamePath = plan.nicknamePath,
             rolePath = plan.rolePath,
             profileImagePath = plan.profileImagePath,
+            mentionUserIdPath = plan.mentionUserIdPath,
             fingerprint = plan.fingerprint(),
         )
 }

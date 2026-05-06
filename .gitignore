@@ -38,6 +38,7 @@ __pycache__/
 !/docs/legacy_kotlin_decommission_closeout.md
 !/docs/legacy_kotlin_coverage_map.md
 !/docs/http2-multiplexing.md
+!/docs/reply-mentions.md
 !/docs/read-model.md
 !/docs/stats.md
 !/docs/testing_surface_policy.md

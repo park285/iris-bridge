@@ -1,0 +1,60 @@
+package party.qwer.iris.imagebridge.runtime.reply
+
+import android.content.Intent
+
+internal object ReplyMentionBridgeExtras {
+    private const val EXTRA_SEND_INTENT = "ConnectManager.ACTION_SEND_INTENT"
+    private const val EXTRA_CHAT_MESSAGE = "EXTRA_CHAT_MESSAGE"
+    private const val EXTRA_CHAT_ATTACHMENT = "EXTRA_CHAT_ATTACHMENT"
+
+    internal data class Snapshot(
+        val sessionId: String? = null,
+        val roomIdRaw: String? = null,
+        val fallbackRoomId: Long? = null,
+        val createdAtEpochMs: Long? = null,
+        val messageText: String? = null,
+        val nestedMessageText: String? = null,
+        val attachmentText: String? = null,
+        val nestedAttachmentText: String? = null,
+    )
+
+    fun extractPendingContext(
+        intent: Intent?,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): ReplyMentionPendingContext? =
+        intent?.let { source ->
+            extractPendingContext(
+                Snapshot(
+                    sessionId = source.stringExtraOrNull(ReplyMarkdownBridgeExtras.SESSION_ID),
+                    roomIdRaw = source.stringExtraOrNull(ReplyMarkdownBridgeExtras.ROOM_ID),
+                    fallbackRoomId = source.longExtraOrNull("key_id"),
+                    createdAtEpochMs = source.longExtraOrNull(ReplyMarkdownBridgeExtras.CREATED_AT),
+                    messageText = source.textExtraOrNull(Intent.EXTRA_TEXT),
+                    nestedMessageText = source.nestedIntentExtraOrNull(EXTRA_SEND_INTENT)?.textExtraOrNull(EXTRA_CHAT_MESSAGE),
+                    attachmentText = source.textExtraOrNull(EXTRA_CHAT_ATTACHMENT),
+                    nestedAttachmentText = source.nestedIntentExtraOrNull(EXTRA_SEND_INTENT)?.textExtraOrNull(EXTRA_CHAT_ATTACHMENT),
+                ),
+                nowEpochMs = nowEpochMs,
+            )
+        }
+
+    fun extractPendingContext(
+        snapshot: Snapshot,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): ReplyMentionPendingContext? {
+        val roomId = snapshot.roomIdRaw?.toLongOrNull() ?: snapshot.fallbackRoomId ?: return null
+        val messageText = snapshot.messageText ?: snapshot.nestedMessageText ?: return null
+        if (messageText.isBlank()) return null
+        val attachmentText =
+            listOfNotNull(snapshot.attachmentText, snapshot.nestedAttachmentText)
+                .firstNotNullOfOrNull(ReplyMentionSendingLogAccess::mentionAttachmentOrNull)
+                ?: return null
+        return ReplyMentionPendingContext(
+            roomId = roomId,
+            messageText = messageText,
+            attachmentText = attachmentText,
+            sessionId = snapshot.sessionId,
+            createdAtEpochMs = snapshot.createdAtEpochMs ?: nowEpochMs,
+        )
+    }
+}

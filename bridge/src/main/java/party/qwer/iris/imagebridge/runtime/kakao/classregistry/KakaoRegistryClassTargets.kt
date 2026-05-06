@@ -1,0 +1,50 @@
+package party.qwer.iris.imagebridge.runtime.kakao.classregistry
+
+import party.qwer.iris.imagebridge.runtime.kakao.DexClassScanner
+
+internal fun discoverMessageType(
+    classLoader: ClassLoader,
+    scanner: DexClassScanner,
+): Class<*> =
+    discoverClass(
+        classLoader,
+        scanner,
+        lastKnownNames = arrayOf("Op.EnumC16810c", "Op.c"),
+        label = "MessageType",
+    ) { clazz ->
+        clazz.isEnum && hasEnumConstants(clazz, "Photo", "MultiPhoto")
+    }
+
+internal fun discoverChatMediaSender(
+    classLoader: ClassLoader,
+    scanner: DexClassScanner,
+    mediaItem: Class<*>,
+    function0: Class<*>,
+    function1: Class<*>,
+): Class<*> =
+    discoverClass(
+        classLoader,
+        scanner,
+        lastKnownNames = arrayOf("bh.c"),
+        label = "ChatMediaSender",
+    ) { clazz ->
+        matchesChatMediaSenderClass(
+            clazz = clazz,
+            mediaItemClass = mediaItem,
+            function0Class = function0,
+            function1Class = function1,
+        )
+    }
+
+internal fun discoverChatRoomManager(
+    classLoader: ClassLoader,
+    scanner: DexClassScanner,
+): Class<*> =
+    discoverClass(
+        classLoader,
+        scanner,
+        lastKnownNames = arrayOf("hp.J0"),
+        label = "ChatRoomManager",
+    ) { clazz ->
+        hasSelfReturningAccessor(clazz) && clazz.declaredMethods.any(::isBroadRoomResolverSignature)
+    }

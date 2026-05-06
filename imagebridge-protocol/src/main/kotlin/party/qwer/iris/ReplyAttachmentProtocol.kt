@@ -8,7 +8,8 @@ object ReplyAttachmentProtocol {
         mentionsJson: String?,
         sessionId: String? = null,
     ): String? {
-        if (!markdown && mentionsJson.isNullOrBlank() && sessionId.isNullOrBlank()) return null
+        val mentions = parseMentions(mentionsJson)
+        if (!markdown && mentions == null) return null
         return JSONObject()
             .apply {
                 put("callingPkg", "com.kakao.talk")
@@ -16,22 +17,17 @@ object ReplyAttachmentProtocol {
                     put("markdown", true)
                     put("f", true)
                 }
-                copyMentionsInto(this, mentionsJson)
-                if (!sessionId.isNullOrBlank()) {
-                    put("irisSessionId", sessionId)
+                if (mentions != null) {
+                    put("mentions", mentions)
                 }
             }.toString()
     }
 
-    private fun copyMentionsInto(
-        target: JSONObject,
+    private fun parseMentions(
         mentionsJson: String?,
-    ) {
-        if (mentionsJson.isNullOrBlank()) return
-        val source = runCatching { JSONObject(mentionsJson) }.getOrNull() ?: return
-        val mentions = source.optJSONArray("mentions") ?: return
-        if (mentions.length() > 0) {
-            target.put("mentions", mentions)
-        }
-    }
+    ) = mentionsJson
+        ?.takeUnless { it.isBlank() }
+        ?.let { raw -> runCatching { JSONObject(raw) }.getOrNull() }
+        ?.optJSONArray("mentions")
+        ?.takeIf { mentions -> mentions.length() > 0 }
 }

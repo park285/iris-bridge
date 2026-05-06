@@ -7,9 +7,13 @@ internal object ReplyMentionSendingLogAccess {
         sendingLog: Any,
         sourceAttachmentText: String? = null,
     ): Boolean {
-        val currentAttachmentText = ReplyMarkdownSendingLogAccess.readAttachmentText(sendingLog) ?: return false
-        val mentionAttachment = mentionAttachmentOrNull(sourceAttachmentText ?: currentAttachmentText) ?: return false
-        val mergedAttachment = mergeMentionAttachment(currentAttachmentText, mentionAttachment) ?: return false
+        val currentAttachmentText = ReplyMarkdownSendingLogAccess.readAttachmentText(sendingLog)
+        val sourceText = sourceAttachmentText ?: currentAttachmentText ?: return false
+        val mentionAttachment = mentionAttachmentOrNull(sourceText) ?: return false
+        val mergedAttachment =
+            currentAttachmentText
+                ?.let { mergeMentionAttachment(it, mentionAttachment) }
+                ?: mentionAttachment
         ReplyMarkdownSendingLogAccess.writeAttachmentText(sendingLog, mergedAttachment)
         return true
     }

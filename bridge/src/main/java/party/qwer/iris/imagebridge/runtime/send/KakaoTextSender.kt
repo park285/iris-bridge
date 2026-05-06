@@ -1,7 +1,9 @@
 package party.qwer.iris.imagebridge.runtime.send
 
+import android.content.Context
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 
 internal class KakaoTextSender(
@@ -9,9 +11,18 @@ internal class KakaoTextSender(
     private val invoker: KakaoTextSendInvoker,
     private val logInfo: (String, String) -> Unit = { tag, message -> Log.i(tag, message) },
 ) {
-    constructor(registry: KakaoClassRegistry) : this(
+    constructor(
+        context: Context,
+        registry: KakaoClassRegistry,
+        mentionPendingContexts: ReplyMentionPendingContextStore? = null,
+    ) : this(
         chatRoomResolver = ChatRoomResolver(registry)::resolve,
-        invoker = KakaoTextSendInvocationFactory(registry),
+        invoker =
+            KakaoTextSendInvocationFactory(
+                registry,
+                context = context,
+                mentionPendingContexts = mentionPendingContexts,
+            ),
     )
 
     fun capability(): KakaoTextSendCapability = invoker.capability()

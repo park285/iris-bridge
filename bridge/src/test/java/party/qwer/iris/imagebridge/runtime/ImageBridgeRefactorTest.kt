@@ -2,6 +2,8 @@
 
 package party.qwer.iris.imagebridge.runtime
 
+import android.app.Application
+import com.kakao.talk.manager.ShareManager
 import org.json.JSONObject
 import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
@@ -15,6 +17,7 @@ import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_ENTRY
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_INJECT
 import party.qwer.iris.imagebridge.runtime.discovery.currentBridgeCapabilities
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntentMetadataResolver
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 import party.qwer.iris.imagebridge.runtime.send.ImageSendRequest
@@ -47,6 +50,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.OutputStream
 import java.nio.file.Files
 import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.CountDownLatch
@@ -864,8 +868,46 @@ class ImageBridgeRequestHandlerTest {
 
 class KakaoTextSendInvocationFactoryTest {
     @Test
+    fun `factory records mention context and resolves ShareManager text path by signature`() {
+        FakeTextRequestRecorder.reset()
+        ShareManager.reset()
+        val registry = buildFakeRegistry()
+        val mentionContexts = ReplyMentionPendingContextStore()
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                context = Application(),
+                mentionPendingContexts = mentionContexts,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+
+        factory.send(
+            roomId = 123L,
+            chatRoom = chatRoom,
+            message = "@alice hello",
+            markdown = false,
+            threadId = null,
+            threadScope = null,
+            mentionsJson = """{"mentions":[{"user_id":"text-alice","at":[1],"len":5}]}""",
+            requestId = "req-mention",
+        )
+
+        assertEquals(chatRoom, ShareManager.chatRoom)
+        assertEquals("@alice hello", ShareManager.message)
+        assertEquals(false, ShareManager.flag)
+        assertEquals(null, FakeTextRequestRecorder.sendingLog)
+        val pending = assertNotNull(mentionContexts.match(123L, "@alice hello"))
+        val mention = JSONObject(pending.attachmentText).getJSONArray("mentions").getJSONObject(0)
+        assertEquals("text-alice", mention.getString("user_id"))
+        assertEquals("req-mention", pending.sessionId)
+    }
+
+    @Test
     fun `factory builds text sending log and invokes request method`() {
         FakeTextRequestRecorder.reset()
+        ShareManager.reset()
         val registry = buildFakeRegistry()
         val factory =
             KakaoTextSendInvocationFactory(
@@ -889,17 +931,19 @@ class KakaoTextSendInvocationFactoryTest {
 
         assertTrue(capability.ready)
         assertEquals(chatRoom, FakeTextRequestRecorder.chatRoom)
-        assertEquals(FakeWriteType.Connect, FakeTextRequestRecorder.writeType)
+        assertEquals(null, FakeTextRequestRecorder.writeType)
         assertFalse(FakeTextRequestRecorder.shouldRetry)
-        assertNotNull(FakeTextRequestRecorder.listener)
+        assertEquals(null, FakeTextRequestRecorder.listener)
         val sendingLog = FakeTextRequestRecorder.sendingLog as FakeTextSendingLog
         assertEquals(123L, sendingLog.getChatRoomId())
         assertEquals("@alice hello", sendingLog.f0())
+        assertEquals("com.kakao.talk.manager.ShareManager", sendingLog.originClass?.name)
+        assertEquals("FM", sendingLog.originTag)
         assertEquals(55L, sendingLog.V0)
         assertEquals(3, sendingLog.Z)
         val attachment = JSONObject(requireNotNull(sendingLog.G))
         assertTrue(attachment.getBoolean("markdown"))
-        assertEquals("req-text", attachment.getString("irisSessionId"))
+        assertFalse(attachment.has("irisSessionId"))
         assertEquals(1, attachment.getJSONArray("mentions").length())
     }
 
@@ -929,7 +973,11 @@ class KakaoTextSendInvocationFactoryTest {
 
         assertTrue(capability.ready)
         assertEquals(chatRoom, FakeTextRequestRecorder.chatRoom)
-        assertEquals("outer singleton", (FakeTextRequestRecorder.sendingLog as FakeTextSendingLog).f0())
+        val sendingLog = FakeTextRequestRecorder.sendingLog as FakeTextSendingLog
+        assertEquals("outer singleton", sendingLog.f0())
+        assertEquals(null, FakeTextRequestRecorder.writeType)
+        assertEquals(null, FakeTextRequestRecorder.listener)
+        assertEquals(null, sendingLog.G)
     }
 
     @Test
@@ -1529,6 +1577,39 @@ class BridgeMuxSessionTest {
     }
 
     @Test
+    fun `mux response write failure closes session without escaping executor`() {
+        var loggedMessage: String? = null
+        val socket =
+            FailingOutputBridgeMuxSocket(
+                muxFrames(
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_REQUEST,
+                        correlationId = "closed-1",
+                        request = healthRequest(),
+                    ),
+                ),
+            )
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        BridgeMuxSession(
+            client = socket,
+            executor = DirectExecutorService(),
+            handler = handler,
+            isRunning = { true },
+            metrics = BridgeMetrics(),
+            logError = { _, message, _ -> loggedMessage = message },
+        ).run()
+
+        assertEquals("bridge mux response write failed", loggedMessage)
+        assertTrue(socket.closed)
+    }
+
+    @Test
     fun `mux idle timeout closes session without error log`() {
         var logged = false
         val socket = TimeoutBridgeMuxSocket()
@@ -2099,6 +2180,25 @@ private class FakeBridgeMuxSocket(
     }
 }
 
+private class FailingOutputBridgeMuxSocket(
+    input: ByteArray,
+) : BridgeMuxSocket {
+    override val inputStream = ByteArrayInputStream(input)
+    override val outputStream =
+        object : OutputStream() {
+            override fun write(byte: Int) = throw IOException("socket not created")
+        }
+    override val peerUid: Int? = 0
+    var closed = false
+        private set
+
+    override fun setReadTimeout(timeoutMs: Int) = Unit
+
+    override fun close() {
+        closed = true
+    }
+}
+
 private class TimeoutBridgeMuxSocket : BridgeMuxSocket {
     override val inputStream: InputStream =
         object : InputStream() {
@@ -2328,7 +2428,7 @@ private class FakeTextRequestCompanion {
     fun u(
         chatRoom: FakeChatRoomModel,
         sendingLog: FakeTextSendingLog,
-        writeType: FakeWriteType,
+        writeType: FakeWriteType?,
         listener: FakeListener?,
         shouldRetry: Boolean,
     ) {
@@ -2357,7 +2457,7 @@ private class FakeOuterTextRequest {
         fun u(
             chatRoom: FakeChatRoomModel,
             sendingLog: FakeTextSendingLog,
-            writeType: FakeWriteType,
+            writeType: FakeWriteType?,
             listener: FakeListener?,
             shouldRetry: Boolean,
         ) {
@@ -2373,6 +2473,8 @@ private class FakeOuterTextRequest {
 private class FakeTextSendingLog private constructor(
     private val roomId: Long,
     private val message: String,
+    val originClass: Class<*>?,
+    val originTag: String?,
 ) {
     var G: String? = null
     var Z: Int = 0
@@ -2397,22 +2499,34 @@ private class FakeTextSendingLog private constructor(
         @Suppress("UNUSED_PARAMETER") messageId: Long?,
         @Suppress("UNUSED_PARAMETER") needsUpload: Boolean,
     ) {
+        constructor(
+            chatRoom: FakeChatRoomModel,
+            messageType: FakeMessageType,
+            reserved: Int,
+            messageId: Long?,
+        ) : this(chatRoom.roomId, messageType, reserved, messageId, false)
+
         private var message: String = ""
+        private var originClass: Class<*>? = null
+        private var originTag: String? = null
 
         fun j(message: String): b {
             this.message = message
             return this
         }
 
-        @Suppress("UNUSED_PARAMETER")
         fun l(
             sourceClass: Class<*>,
             tag: String,
-        ): b = this
+        ): b {
+            originClass = sourceClass
+            originTag = tag
+            return this
+        }
 
         fun b(): FakeTextSendingLog {
             check(messageType == FakeMessageType.Text)
-            return FakeTextSendingLog(roomId, message)
+            return FakeTextSendingLog(roomId, message, originClass, originTag)
         }
     }
 }

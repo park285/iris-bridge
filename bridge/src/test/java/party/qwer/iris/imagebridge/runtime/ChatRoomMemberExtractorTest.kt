@@ -97,6 +97,115 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
+    fun `copies explicit mention user id from matching expected member hint`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Room(
+            val members: List<Member>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                roomId = 77L,
+                room = Room(members = listOf(Member(7L, "Alice"), Member(9L, "Bob"))),
+                expectedMemberHints =
+                    listOf(
+                        ImageBridgeProtocol.ChatRoomMemberHint(
+                            userId = 7L,
+                            nickname = "Alice",
+                            mentionUserId = "text-ping-7",
+                        ),
+                        ImageBridgeProtocol.ChatRoomMemberHint(userId = 9L, nickname = "Bob"),
+                    ),
+            )
+
+        assertEquals("text-ping-7", result.members.first { it.userId == 7L }.mentionUserId)
+        assertNull(result.members.first { it.userId == 9L }.mentionUserId)
+    }
+
+    @Test
+    fun `extracts explicit mention user id field from member object`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+            val mentionUserId: String,
+        )
+
+        data class Room(
+            val members: List<Member>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                roomId = 77L,
+                room = Room(members = listOf(Member(7L, "Alice", "text-ping-7"))),
+                expectedMemberHints = listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "Alice")),
+            )
+
+        assertEquals("text-ping-7", result.members.single().mentionUserId)
+    }
+
+    @Test
+    fun `does not fabricate mention user id from numeric user id or nickname`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Room(
+            val members: List<Member>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                roomId = 77L,
+                room = Room(members = listOf(Member(123456789L, "123456789"))),
+                expectedMemberHints =
+                    listOf(
+                        ImageBridgeProtocol.ChatRoomMemberHint(
+                            userId = 123456789L,
+                            nickname = "123456789",
+                        ),
+                    ),
+            )
+
+        assertNull(result.members.single().mentionUserId)
+    }
+
+    @Test
+    fun `ignores numeric mention user id field`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+            val mentionUserId: String,
+        )
+
+        data class Room(
+            val members: List<Member>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                roomId = 77L,
+                room = Room(members = listOf(Member(123456789L, "Alice", "123456789"))),
+                expectedMemberHints = listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 123456789L, nickname = "Alice")),
+            )
+
+        assertNull(result.members.single().mentionUserId)
+    }
+
+    @Test
     fun `extracts direct user id to nickname maps`() {
         data class Room(
             val a: Map<Long, String>,
@@ -273,6 +382,42 @@ class ChatRoomMemberExtractorTest {
 
         assertEquals("Alice Updated", result.members.single().nickname)
         assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.HIGH, result.confidence)
+        assertEquals(true, result.usedPreferredPlan)
+    }
+
+    @Test
+    fun `preferred plan preserves mention user id path`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+            val mentionUserId: String,
+        )
+
+        data class Room(
+            val q: List<Member>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+        val preferredPlan =
+            ImageBridgeProtocol.ChatRoomMemberExtractionPlan(
+                containerPath = "$.q",
+                sourceClassName = Member::class.java.name,
+                userIdPath = "a",
+                nicknamePath = "b",
+                mentionUserIdPath = "mentionUserId",
+                fingerprint = "$.q|${Member::class.java.name}|a|b|mentionUserId",
+            )
+
+        val result =
+            extractor.snapshot(
+                roomId = 1L,
+                room = Room(q = listOf(Member(7L, "Alice", "text-ping-7"))),
+                expectedMemberHints = listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "Alice")),
+                preferredPlan = preferredPlan,
+            )
+
+        assertEquals("text-ping-7", result.members.single().mentionUserId)
+        assertEquals("mentionUserId", result.selectedPlan?.mentionUserIdPath)
         assertEquals(true, result.usedPreferredPlan)
     }
 
