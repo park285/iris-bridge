@@ -12,8 +12,8 @@ object ReplyAttachmentProtocol {
         if (!markdown && mentions == null) return null
         return JSONObject()
             .apply {
-                put("callingPkg", "com.kakao.talk")
                 if (markdown) {
+                    put("callingPkg", "com.kakao.talk")
                     put("markdown", true)
                     put("f", true)
                 }

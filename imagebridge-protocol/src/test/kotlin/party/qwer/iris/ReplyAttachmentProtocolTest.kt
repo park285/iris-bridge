@@ -27,6 +27,23 @@ class ReplyAttachmentProtocolTest {
     }
 
     @Test
+    fun `builds plain text mention attachment like Kakao native mention metadata`() {
+        val attachment =
+            assertNotNull(
+                ReplyAttachmentProtocol.build(
+                    markdown = false,
+                    mentionsJson = """{"mentions":[{"user_id":123,"at":[1],"len":3}]}""",
+                    sessionId = "req-mention",
+                ),
+            )
+        val json = JSONObject(attachment)
+
+        assertFalse(json.has("callingPkg"))
+        assertEquals(1, json.getJSONArray("mentions").length())
+        assertEquals(123L, json.getJSONArray("mentions").getJSONObject(0).getLong("user_id"))
+    }
+
+    @Test
     fun `returns null when attachment has no metadata`() {
         assertEquals(null, ReplyAttachmentProtocol.build(markdown = false, mentionsJson = null, sessionId = null))
     }
