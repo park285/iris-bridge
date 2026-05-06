@@ -1,9 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.server
 
 import android.content.Context
-import android.net.LocalServerSocket
 import android.util.Log
-import party.qwer.iris.IrisRuntimePathPolicy
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.currentBridgeCapabilities
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
@@ -13,6 +11,11 @@ import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberExtractor
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomOpener
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 import party.qwer.iris.imagebridge.runtime.send.KakaoImageSender
+import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendCapability
+import party.qwer.iris.imagebridge.runtime.send.KakaoTextSender
+import party.qwer.iris.resolveBridgeMuxServerEnabled
+import party.qwer.iris.resolveBridgeTextSendMarkdownEnabled
+import party.qwer.iris.resolveBridgeTextSendTextEnabled
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -36,10 +39,21 @@ internal object ImageBridgeServer {
     private val specStatus = AtomicReference<BridgeSpecStatus?>(null)
     private val registryAvailable = AtomicBoolean(false)
     private val lastRegistryError = AtomicReference<String?>(null)
+    private val textSendCapability = AtomicReference<KakaoTextSendCapability?>(null)
+    private val textBridgeSendTextEnabled = AtomicBoolean(false)
+    private val textBridgeSendMarkdownEnabled = AtomicBoolean(false)
     private val peerIdentityValidator = BridgePeerIdentityValidator()
     private val bridgeMetrics = BridgeMetrics()
     private val clientDispatcher =
         BridgeClientDispatcher(
+            executorProvider = { clientExecutor },
+            handlerProvider = { requestHandler },
+            isRunning = { running.get() },
+            peerIdentityValidator = peerIdentityValidator,
+            metrics = bridgeMetrics,
+        )
+    private val muxClientDispatcher =
+        BridgeMuxClientDispatcher(
             executorProvider = { clientExecutor },
             handlerProvider = { requestHandler },
             isRunning = { running.get() },
@@ -67,6 +81,10 @@ internal object ImageBridgeServer {
         registryAvailable.set(registry != null)
         lastRegistryError.set(registryError)
         val imageSender = registry?.let { KakaoImageSender(it) }
+        val textSender = registry?.let { KakaoTextSender(it) }
+        textSendCapability.set(textSender?.capability())
+        textBridgeSendTextEnabled.set(isTextBridgeSendTextEnabled())
+        textBridgeSendMarkdownEnabled.set(isTextBridgeSendMarkdownEnabled())
         val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
         val chatRoomIntentMetadataResolver =
             ChatRoomIntentMetadataResolver { roomId ->
@@ -96,6 +114,12 @@ internal object ImageBridgeServer {
                             ?: error("KakaoClassRegistry not available: ${registryError ?: "unknown error"}")
                     sender.send(request)
                 },
+                textSender = { request ->
+                    val sender =
+                        textSender
+                            ?: error("Kakao text sender not available: ${registryError ?: "unknown error"}")
+                    sender.send(request)
+                },
                 healthProvider = ::healthSnapshot,
                 chatRoomInspector = { roomId ->
                     val resolver = chatRoomResolver ?: error("chatroom resolver unavailable: ${registryError ?: "unknown error"}")
@@ -111,55 +135,38 @@ internal object ImageBridgeServer {
                 metrics = bridgeMetrics,
             )
         clientExecutor = newClientExecutor()
-        Thread({ runServerLoop() }, "iris-bridge-server").apply {
+        Thread(
+            {
+                BridgeOneShotServerLoop(
+                    dispatcher = clientDispatcher,
+                    isRunning = { running.get() },
+                    restartDelayMs = ::nextBridgeRestartDelayMs,
+                    recordFailure = ::recordServerFailure,
+                    sleepBeforeRestart = ::sleepBeforeRestart,
+                    shutdownExecutor = ::shutdownClientExecutor,
+                ).run()
+            },
+            "iris-bridge-server",
+        ).apply {
             isDaemon = true
             start()
         }
-    }
-
-    private fun runServerLoop() {
-        var consecutiveFailures = 0
-        try {
-            while (running.get()) {
-                try {
-                    serve()
-                    if (running.get()) {
-                        val delayMs = nextBridgeRestartDelayMs(++consecutiveFailures)
-                        restartCount.incrementAndGet()
-                        lastCrashMessage.set("server loop exited unexpectedly")
-                        Log.e(TAG, "bridge server stopped unexpectedly; restarting in ${delayMs}ms")
-                        sleepBeforeRestart(delayMs)
-                    }
-                } catch (e: Exception) {
-                    if (!running.get()) {
-                        break
-                    }
-                    consecutiveFailures += 1
-                    restartCount.incrementAndGet()
-                    lastCrashMessage.set(e.message ?: e.javaClass.name)
-                    val delayMs = nextBridgeRestartDelayMs(consecutiveFailures)
-                    Log.e(TAG, "bridge server crashed; restarting in ${delayMs}ms", e)
-                    sleepBeforeRestart(delayMs)
-                }
+        if (isMuxServerEnabled()) {
+            Thread(
+                {
+                    BridgeMuxServerLoop(
+                        dispatcher = muxClientDispatcher,
+                        isRunning = { running.get() },
+                        restartDelayMs = ::nextBridgeRestartDelayMs,
+                        recordFailure = ::recordServerFailure,
+                        sleepBeforeRestart = ::sleepBeforeRestart,
+                    ).run()
+                },
+                "iris-bridge-mux-server",
+            ).apply {
+                isDaemon = true
+                start()
             }
-        } finally {
-            clientExecutor?.shutdown()
-            clientExecutor = null
-        }
-    }
-
-    private fun serve() {
-        val socketName = IrisRuntimePathPolicy.resolve().imageBridgeSocketName
-        val serverSocket = LocalServerSocket(socketName)
-        try {
-            Log.i(TAG, "bridge server listening on @$socketName")
-            while (running.get()) {
-                val client = serverSocket.accept()
-                clientDispatcher.dispatch(client)
-            }
-        } finally {
-            runCatching { serverSocket.close() }
-            Log.i(TAG, "bridge server socket closed")
         }
     }
 
@@ -168,11 +175,29 @@ internal object ImageBridgeServer {
             running = running.get(),
             specStatus = specStatus.get() ?: BridgeSpecStatus(ready = false, checkedAtEpochMs = 0L, checks = emptyList()),
             discoverySnapshot = BridgeDiscovery.snapshot(),
-            capabilities = currentBridgeCapabilities(registryAvailable.get(), lastRegistryError.get(), specStatus.get()?.ready == true),
+            capabilities =
+                currentBridgeCapabilities(
+                    registryAvailable.get(),
+                    lastRegistryError.get(),
+                    specStatus.get()?.ready == true,
+                    textSendCapability.get(),
+                    textBridgeSendTextEnabled.get(),
+                    textBridgeSendMarkdownEnabled.get(),
+                ),
             metrics = bridgeMetrics.snapshot(),
             restartCount = restartCount.get(),
             lastCrashMessage = lastCrashMessage.get(),
         )
+
+    private fun recordServerFailure(message: String) {
+        restartCount.incrementAndGet()
+        lastCrashMessage.set(message)
+    }
+
+    private fun shutdownClientExecutor() {
+        clientExecutor?.shutdown()
+        clientExecutor = null
+    }
 
     private fun sleepBeforeRestart(delayMs: Long) {
         runCatching {
@@ -188,6 +213,18 @@ internal object ImageBridgeServer {
     internal fun nextBridgeRestartDelayMs(failureCount: Int): Long = (INITIAL_RESTART_DELAY_MS shl (failureCount - 1).coerceAtLeast(0).coerceAtMost(5)).coerceAtMost(MAX_RESTART_DELAY_MS)
 
     internal fun newClientExecutorForTest(): ThreadPoolExecutor = newClientExecutor()
+
+    internal fun isTextBridgeSendTextEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_TEXT_ENABLED")): Boolean = raw?.let(::isTruthy) ?: resolveBridgeTextSendTextEnabled()
+
+    internal fun isTextBridgeSendMarkdownEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_MARKDOWN_ENABLED")): Boolean = raw?.let(::isTruthy) ?: resolveBridgeTextSendMarkdownEnabled()
+
+    internal fun isMuxServerEnabled(raw: String? = System.getenv("IRIS_BRIDGE_MUX_SERVER_ENABLED")): Boolean = raw?.let(::isTruthy) ?: resolveBridgeMuxServerEnabled()
+
+    private fun isTruthy(raw: String): Boolean =
+        when (raw.trim().lowercase()) {
+            "true", "1", "on", "yes" -> true
+            else -> false
+        }
 
     private fun newClientExecutor(): ThreadPoolExecutor =
         ThreadPoolExecutor(

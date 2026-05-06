@@ -79,6 +79,9 @@ class BridgeRuntimeConfigTest {
         assertEquals("", resolution.token)
         assertEquals(BridgeTokenSource.NONE, resolution.source)
         assertEquals("/data/iris/config.json", resolution.configPath)
+        assertEquals(true, resolution.bridgeMuxServerEnabled)
+        assertEquals(true, resolution.textBridgeSendTextEnabled)
+        assertEquals(true, resolution.textBridgeSendMarkdownEnabled)
     }
 
     @Test
@@ -119,5 +122,50 @@ class BridgeRuntimeConfigTest {
             )
 
         assertEquals("/env/iris/reply-images", resolution.replyImageDir)
+    }
+
+    @Test
+    fun `resolves bridge rollout flags from config and lets env override`() {
+        val configResolution =
+            BridgeBootstrapConfigResolver.resolve(
+                env = mapOf("IRIS_CONFIG_PATH" to "/tmp/config.json"),
+                fileReader = {
+                    """
+                    {
+                      "bridgeMuxServerEnabled": true,
+                      "textBridgeSendTextEnabled": true,
+                      "textBridgeSendMarkdownEnabled": false
+                    }
+                    """.trimIndent()
+                },
+            )
+
+        assertEquals(true, configResolution.bridgeMuxServerEnabled)
+        assertEquals(true, configResolution.textBridgeSendTextEnabled)
+        assertEquals(false, configResolution.textBridgeSendMarkdownEnabled)
+
+        val envResolution =
+            BridgeBootstrapConfigResolver.resolve(
+                env =
+                    mapOf(
+                        "IRIS_CONFIG_PATH" to "/tmp/config.json",
+                        "IRIS_BRIDGE_MUX_SERVER_ENABLED" to "false",
+                        "IRIS_TEXT_BRIDGE_SEND_TEXT_ENABLED" to "0",
+                        "IRIS_TEXT_BRIDGE_SEND_MARKDOWN_ENABLED" to "yes",
+                    ),
+                fileReader = {
+                    """
+                    {
+                      "bridgeMuxServerEnabled": true,
+                      "textBridgeSendTextEnabled": true,
+                      "textBridgeSendMarkdownEnabled": false
+                    }
+                    """.trimIndent()
+                },
+            )
+
+        assertEquals(false, envResolution.bridgeMuxServerEnabled)
+        assertEquals(false, envResolution.textBridgeSendTextEnabled)
+        assertEquals(true, envResolution.textBridgeSendMarkdownEnabled)
     }
 }

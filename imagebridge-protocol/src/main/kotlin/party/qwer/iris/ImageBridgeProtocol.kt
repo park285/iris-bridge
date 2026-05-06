@@ -4,8 +4,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.io.DataInputStream
-import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -13,6 +11,8 @@ object ImageBridgeProtocol {
     const val PROTOCOL_VERSION = 1
     const val SOCKET_NAME = IrisRuntimePathPolicy.DEFAULT_IMAGE_BRIDGE_SOCKET_NAME
     const val ACTION_SEND_IMAGE = "send_image"
+    const val ACTION_SEND_TEXT = "send_text"
+    const val ACTION_SEND_MARKDOWN = "send_markdown"
     const val ACTION_HEALTH = "health"
     const val ACTION_INSPECT_CHATROOM = "inspect_chatroom"
     const val ACTION_OPEN_CHATROOM = "open_chatroom"
@@ -20,7 +20,7 @@ object ImageBridgeProtocol {
     const val STATUS_SENT = "sent"
     const val STATUS_FAILED = "failed"
     const val STATUS_OK = "ok"
-    const val MAX_FRAME_SIZE = 1_048_576
+    const val MAX_FRAME_SIZE = LengthPrefixedFrameCodec.MAX_FRAME_SIZE
     const val ERROR_UNSUPPORTED_PROTOCOL = "UNSUPPORTED_PROTOCOL"
     const val ERROR_UNAUTHORIZED = "UNAUTHORIZED"
     const val ERROR_BAD_REQUEST = "BAD_REQUEST"
@@ -44,6 +44,9 @@ object ImageBridgeProtocol {
         val protocolVersion: Int? = null,
         val roomId: Long? = null,
         val imagePaths: List<String> = emptyList(),
+        val message: String? = null,
+        val markdown: Boolean? = null,
+        val mentionsJson: String? = null,
         val threadId: Long? = null,
         val threadScope: Int? = null,
         val requestId: String? = null,
@@ -78,6 +81,8 @@ object ImageBridgeProtocol {
         val inspectChatRoom: ImageBridgeCapability = ImageBridgeCapability(),
         val openChatRoom: ImageBridgeCapability = ImageBridgeCapability(),
         val snapshotChatRoomMembers: ImageBridgeCapability = ImageBridgeCapability(),
+        val sendText: ImageBridgeCapability = ImageBridgeCapability(),
+        val sendMarkdown: ImageBridgeCapability = ImageBridgeCapability(),
     )
 
     @Serializable
@@ -209,6 +214,50 @@ object ImageBridgeProtocol {
             token = token,
         )
 
+    fun buildSendTextRequest(
+        roomId: Long,
+        message: String,
+        threadId: Long?,
+        threadScope: Int?,
+        mentionsJson: String? = null,
+        requestId: String? = null,
+        token: String? = null,
+    ): ImageBridgeRequest =
+        ImageBridgeRequest(
+            action = ACTION_SEND_TEXT,
+            protocolVersion = PROTOCOL_VERSION,
+            roomId = roomId,
+            message = message,
+            markdown = false,
+            mentionsJson = mentionsJson,
+            threadId = threadId,
+            threadScope = threadScope,
+            requestId = requestId,
+            token = token,
+        )
+
+    fun buildSendMarkdownRequest(
+        roomId: Long,
+        message: String,
+        threadId: Long?,
+        threadScope: Int?,
+        mentionsJson: String? = null,
+        requestId: String? = null,
+        token: String? = null,
+    ): ImageBridgeRequest =
+        ImageBridgeRequest(
+            action = ACTION_SEND_MARKDOWN,
+            protocolVersion = PROTOCOL_VERSION,
+            roomId = roomId,
+            message = message,
+            markdown = true,
+            mentionsJson = mentionsJson,
+            threadId = threadId,
+            threadScope = threadScope,
+            requestId = requestId,
+            token = token,
+        )
+
     fun buildHealthRequest(token: String? = null): ImageBridgeRequest =
         ImageBridgeRequest(
             action = ACTION_HEALTH,
@@ -276,21 +325,7 @@ object ImageBridgeProtocol {
     private fun writeFramePayload(
         output: OutputStream,
         payload: String,
-    ) {
-        val bytes = payload.toByteArray(Charsets.UTF_8)
-        require(bytes.size in 1..MAX_FRAME_SIZE) { "invalid frame size: ${bytes.size}" }
-        val dos = DataOutputStream(output)
-        dos.writeInt(bytes.size)
-        dos.write(bytes)
-        dos.flush()
-    }
+    ) = LengthPrefixedFrameCodec.writePayload(output, payload)
 
-    private fun readFramePayload(input: InputStream): String {
-        val dis = DataInputStream(input)
-        val size = dis.readInt()
-        require(size in 1..MAX_FRAME_SIZE) { "invalid frame size: $size" }
-        val bytes = ByteArray(size)
-        dis.readFully(bytes)
-        return String(bytes, Charsets.UTF_8)
-    }
+    private fun readFramePayload(input: InputStream): String = LengthPrefixedFrameCodec.readPayload(input)
 }

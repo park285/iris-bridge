@@ -37,6 +37,8 @@ internal data class ImageBridgeCapabilitiesSnapshot(
     val inspectChatRoom: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
     val openChatRoom: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
     val snapshotChatRoomMembers: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
+    val sendText: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
+    val sendMarkdown: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
 )
 
 internal class BridgeHookSpecVerifier(
@@ -179,6 +181,22 @@ internal fun ImageBridgeHealthSnapshot.toJson(): JSONObject =
                         capabilities.snapshotChatRoomMembers.reason?.let { put("reason", it) }
                     },
                 )
+                put(
+                    "sendText",
+                    JSONObject().apply {
+                        put("supported", capabilities.sendText.supported)
+                        put("ready", capabilities.sendText.ready)
+                        capabilities.sendText.reason?.let { put("reason", it) }
+                    },
+                )
+                put(
+                    "sendMarkdown",
+                    JSONObject().apply {
+                        put("supported", capabilities.sendMarkdown.supported)
+                        put("ready", capabilities.sendMarkdown.ready)
+                        capabilities.sendMarkdown.reason?.let { put("reason", it) }
+                    },
+                )
             },
         )
         metrics?.let { snapshot ->
@@ -256,6 +274,18 @@ internal fun ImageBridgeHealthSnapshot.toProtocolResponse(): party.qwer.iris.Ima
                         supported = capabilities.snapshotChatRoomMembers.supported,
                         ready = capabilities.snapshotChatRoomMembers.ready,
                         reason = capabilities.snapshotChatRoomMembers.reason,
+                    ),
+                sendText =
+                    party.qwer.iris.ImageBridgeProtocol.ImageBridgeCapability(
+                        supported = capabilities.sendText.supported,
+                        ready = capabilities.sendText.ready,
+                        reason = capabilities.sendText.reason,
+                    ),
+                sendMarkdown =
+                    party.qwer.iris.ImageBridgeProtocol.ImageBridgeCapability(
+                        supported = capabilities.sendMarkdown.supported,
+                        ready = capabilities.sendMarkdown.ready,
+                        reason = capabilities.sendMarkdown.reason,
                     ),
             ),
         metrics = metrics,

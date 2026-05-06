@@ -14,6 +14,9 @@ private val bridgeRuntimeConfigJson =
 private data class BridgeRuntimeConfigSnapshot(
     val bridgeToken: String = "",
     val replyImageDir: String = "",
+    val bridgeMuxServerEnabled: Boolean? = null,
+    val textBridgeSendTextEnabled: Boolean? = null,
+    val textBridgeSendMarkdownEnabled: Boolean? = null,
 )
 
 enum class BridgeTokenSource {
@@ -27,6 +30,9 @@ data class BridgeTokenResolution(
     val source: BridgeTokenSource,
     val configPath: String,
     val replyImageDir: String,
+    val bridgeMuxServerEnabled: Boolean,
+    val textBridgeSendTextEnabled: Boolean,
+    val textBridgeSendMarkdownEnabled: Boolean,
 )
 
 object BridgeBootstrapConfigResolver {
@@ -52,6 +58,24 @@ object BridgeBootstrapConfigResolver {
                 ?.trim()
                 .orEmpty()
                 .ifBlank { paths.replyImageDir }
+        val bridgeMuxServerEnabled =
+            resolveBooleanFlag(
+                env = env,
+                envKey = "IRIS_BRIDGE_MUX_SERVER_ENABLED",
+                configValue = configSnapshot?.bridgeMuxServerEnabled,
+            )
+        val textBridgeSendTextEnabled =
+            resolveBooleanFlag(
+                env = env,
+                envKey = "IRIS_TEXT_BRIDGE_SEND_TEXT_ENABLED",
+                configValue = configSnapshot?.textBridgeSendTextEnabled,
+            )
+        val textBridgeSendMarkdownEnabled =
+            resolveBooleanFlag(
+                env = env,
+                envKey = "IRIS_TEXT_BRIDGE_SEND_MARKDOWN_ENABLED",
+                configValue = configSnapshot?.textBridgeSendMarkdownEnabled,
+            )
         return when {
             configToken.isNotBlank() ->
                 BridgeTokenResolution(
@@ -59,6 +83,9 @@ object BridgeBootstrapConfigResolver {
                     source = BridgeTokenSource.CONFIG_FILE,
                     configPath = configPath,
                     replyImageDir = replyImageDir,
+                    bridgeMuxServerEnabled = bridgeMuxServerEnabled,
+                    textBridgeSendTextEnabled = textBridgeSendTextEnabled,
+                    textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled,
                 )
 
             envToken.isNotBlank() ->
@@ -67,6 +94,9 @@ object BridgeBootstrapConfigResolver {
                     source = BridgeTokenSource.ENV_FALLBACK,
                     configPath = configPath,
                     replyImageDir = replyImageDir,
+                    bridgeMuxServerEnabled = bridgeMuxServerEnabled,
+                    textBridgeSendTextEnabled = textBridgeSendTextEnabled,
+                    textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled,
                 )
 
             else ->
@@ -75,6 +105,9 @@ object BridgeBootstrapConfigResolver {
                     source = BridgeTokenSource.NONE,
                     configPath = configPath,
                     replyImageDir = replyImageDir,
+                    bridgeMuxServerEnabled = bridgeMuxServerEnabled,
+                    textBridgeSendTextEnabled = textBridgeSendTextEnabled,
+                    textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled,
                 )
         }
     }
@@ -90,11 +123,41 @@ fun resolveBridgeReplyImageDir(
     fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
 ): String = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).replyImageDir
 
+fun resolveBridgeMuxServerEnabled(
+    env: Map<String, String> = System.getenv(),
+    fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
+): Boolean = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).bridgeMuxServerEnabled
+
+fun resolveBridgeTextSendTextEnabled(
+    env: Map<String, String> = System.getenv(),
+    fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
+): Boolean = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).textBridgeSendTextEnabled
+
+fun resolveBridgeTextSendMarkdownEnabled(
+    env: Map<String, String> = System.getenv(),
+    fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
+): Boolean = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).textBridgeSendMarkdownEnabled
+
 internal fun decodeBridgeToken(rawConfig: String): String =
     decodeBridgeRuntimeConfig(rawConfig)
         ?.bridgeToken
         ?.trim()
         .orEmpty()
+
+private fun resolveBooleanFlag(
+    env: Map<String, String>,
+    envKey: String,
+    configValue: Boolean?,
+): Boolean =
+    env[envKey]
+        ?.let(::isTruthy)
+        ?: (configValue != false)
+
+private fun isTruthy(raw: String): Boolean =
+    when (raw.trim().lowercase()) {
+        "true", "1", "on", "yes" -> true
+        else -> false
+    }
 
 private fun decodeBridgeRuntimeConfig(rawConfig: String): BridgeRuntimeConfigSnapshot? =
     runCatching {

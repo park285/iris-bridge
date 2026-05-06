@@ -1,8 +1,10 @@
-@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+@file:Suppress("ClassName", "FunctionName", "PLATFORM_CLASS_MAPPED_TO_KOTLIN")
 
 package party.qwer.iris.imagebridge.runtime
 
 import org.json.JSONObject
+import party.qwer.iris.ImageBridgeMuxFrame
+import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscoverySnapshot
@@ -11,6 +13,7 @@ import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_MULTIPLE
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_SINGLE
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_ENTRY
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_INJECT
+import party.qwer.iris.imagebridge.runtime.discovery.currentBridgeCapabilities
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntentMetadataResolver
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
@@ -18,13 +21,18 @@ import party.qwer.iris.imagebridge.runtime.send.ImageSendRequest
 import party.qwer.iris.imagebridge.runtime.send.KakaoImageSender
 import party.qwer.iris.imagebridge.runtime.send.KakaoSendInvocationFactory
 import party.qwer.iris.imagebridge.runtime.send.KakaoSendInvoker
+import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendCapability
+import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendInvocationFactory
 import party.qwer.iris.imagebridge.runtime.send.RoomThreadSerialExecutor
+import party.qwer.iris.imagebridge.runtime.send.TextSendRequest
 import party.qwer.iris.imagebridge.runtime.send.ThreadedChatMediaEntryInvoker
 import party.qwer.iris.imagebridge.runtime.send.selectThreadedImageInjectBindingsForTest
 import party.qwer.iris.imagebridge.runtime.send.selectThreadedImageInjectMethodForTest
 import party.qwer.iris.imagebridge.runtime.server.BridgeHandshakeValidator
 import party.qwer.iris.imagebridge.runtime.server.BridgeImagePathValidator
 import party.qwer.iris.imagebridge.runtime.server.BridgeMetrics
+import party.qwer.iris.imagebridge.runtime.server.BridgeMuxSession
+import party.qwer.iris.imagebridge.runtime.server.BridgeMuxSocket
 import party.qwer.iris.imagebridge.runtime.server.BridgePeerIdentityValidator
 import party.qwer.iris.imagebridge.runtime.server.BridgeSecurityMode
 import party.qwer.iris.imagebridge.runtime.server.BridgeSpecCheck
@@ -34,7 +42,13 @@ import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitySnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeHealthSnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
+import party.qwer.iris.imagebridge.runtime.server.toJson
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
+import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -84,6 +98,263 @@ class ImageBridgeRequestHandlerTest {
         assertEquals("req-1", health.metrics?.lastSendRequestId)
         assertNotNull(health.metrics?.lastSendDurationMs)
         file.delete()
+    }
+
+    @Test
+    fun `send text request delegates to text sender and returns sent response`() {
+        var captured: TextSendRequest? = null
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { request -> captured = request },
+                healthProvider = { readyTextHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        val response =
+            handler.handle(
+                sendTextRequest(
+                    roomId = 123L,
+                    message = "hello",
+                    threadId = 55L,
+                    threadScope = 3,
+                    mentionsJson = """{"mentions":[7]}""",
+                    requestId = "text-req-1",
+                ),
+            )
+
+        val textRequest = assertNotNull(captured)
+        assertEquals(123L, textRequest.roomId)
+        assertEquals("hello", textRequest.message)
+        assertFalse(textRequest.markdown)
+        assertEquals(55L, textRequest.threadId)
+        assertEquals(3, textRequest.threadScope)
+        assertEquals("""{"mentions":[7]}""", textRequest.mentionsJson)
+        assertEquals("text-req-1", textRequest.requestId)
+        assertEquals(ImageBridgeProtocol.STATUS_SENT, response.status)
+        assertEquals("text-req-1", response.requestId)
+    }
+
+    @Test
+    fun `send markdown request delegates markdown flag to text sender`() {
+        var captured: TextSendRequest? = null
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { request -> captured = request },
+                healthProvider = { readyTextHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        val response =
+            handler.handle(
+                sendMarkdownRequest(
+                    roomId = 123L,
+                    message = "**hello**",
+                    threadId = 55L,
+                    threadScope = 3,
+                    mentionsJson = """{"mentions":[9]}""",
+                    requestId = "markdown-req-1",
+                ),
+            )
+
+        val markdownRequest = assertNotNull(captured)
+        assertEquals(123L, markdownRequest.roomId)
+        assertEquals("**hello**", markdownRequest.message)
+        assertTrue(markdownRequest.markdown)
+        assertEquals(55L, markdownRequest.threadId)
+        assertEquals(3, markdownRequest.threadScope)
+        assertEquals("""{"mentions":[9]}""", markdownRequest.mentionsJson)
+        assertEquals("markdown-req-1", markdownRequest.requestId)
+        assertEquals(ImageBridgeProtocol.STATUS_SENT, response.status)
+        assertEquals("markdown-req-1", response.requestId)
+    }
+
+    @Test
+    fun `send text requests serialize by room and thread`() {
+        val firstEntered = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val firstCompleted = AtomicBoolean(false)
+        val secondObservedFirstComplete = AtomicBoolean(false)
+        val executor = Executors.newFixedThreadPool(2)
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { request ->
+                    if (request.message == "first") {
+                        firstEntered.countDown()
+                        assertTrue(releaseFirst.await(2, TimeUnit.SECONDS))
+                        firstCompleted.set(true)
+                    } else {
+                        secondObservedFirstComplete.set(firstCompleted.get())
+                    }
+                },
+                healthProvider = { readyTextHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        try {
+            val first =
+                executor.submit<ImageBridgeProtocol.ImageBridgeResponse> {
+                    handler.handle(
+                        sendTextRequest(
+                            roomId = 123L,
+                            message = "first",
+                            threadId = 55L,
+                        ),
+                    )
+                }
+            assertTrue(firstEntered.await(2, TimeUnit.SECONDS))
+            val second =
+                executor.submit<ImageBridgeProtocol.ImageBridgeResponse> {
+                    handler.handle(
+                        sendTextRequest(
+                            roomId = 123L,
+                            message = "second",
+                            threadId = 55L,
+                        ),
+                    )
+                }
+            releaseFirst.countDown()
+
+            assertEquals(ImageBridgeProtocol.STATUS_SENT, first.get(2, TimeUnit.SECONDS).status)
+            assertEquals(ImageBridgeProtocol.STATUS_SENT, second.get(2, TimeUnit.SECONDS).status)
+            assertTrue(secondObservedFirstComplete.get())
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `send text request fails when message is missing`() {
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                logError = { _, _, _ -> },
+            )
+
+        val response =
+            handler.handle(
+                ImageBridgeProtocol.ImageBridgeRequest(
+                    action = ImageBridgeProtocol.ACTION_SEND_TEXT,
+                    protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
+                    roomId = 123L,
+                    requestId = "missing-message-req",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals("message missing", response.error)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, response.errorCode)
+        assertEquals("missing-message-req", response.requestId)
+    }
+
+    @Test
+    fun `send text request fails when message is blank`() {
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                logError = { _, _, _ -> },
+            )
+
+        val response =
+            handler.handle(
+                sendTextRequest(
+                    roomId = 123L,
+                    message = "   ",
+                    requestId = "blank-message-req",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals("message is blank", response.error)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, response.errorCode)
+        assertEquals("blank-message-req", response.requestId)
+    }
+
+    @Test
+    fun `send text request fails when text sender is unavailable`() {
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                logError = { _, _, _ -> },
+            )
+
+        val response =
+            handler.handle(
+                sendTextRequest(
+                    roomId = 123L,
+                    message = "hello",
+                    requestId = "unavailable-text-req",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals("text sender unavailable", response.error)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, response.errorCode)
+        assertEquals("unavailable-text-req", response.requestId)
+    }
+
+    @Test
+    fun `send text request records send metrics`() {
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = {},
+                healthProvider = { readyTextHealthSnapshot().copy(metrics = metrics.snapshot()) },
+                handshakeValidator = developmentHandshakeValidator(),
+                metrics = metrics,
+            )
+
+        val response =
+            handler.handle(
+                sendTextRequest(
+                    roomId = 123L,
+                    message = "hello",
+                    requestId = "text-metrics-req",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_SENT, response.status)
+        val health = handler.handle(healthRequest())
+        assertEquals(1, health.metrics?.sendSuccess)
+        assertEquals("text-metrics-req", health.metrics?.lastSendRequestId)
+        assertNotNull(health.metrics?.lastSendDurationMs)
+    }
+
+    @Test
+    fun `send text request fails when capability is not ready`() {
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                logError = { _, _, _ -> },
+            )
+
+        val response =
+            handler.handle(
+                sendTextRequest(
+                    roomId = 123L,
+                    message = "hello",
+                    requestId = "text-capability-req",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals("text sender unavailable", response.error)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, response.errorCode)
+        assertEquals("text-capability-req", response.requestId)
     }
 
     @Test
@@ -204,42 +475,54 @@ class ImageBridgeRequestHandlerTest {
 
     @Test
     fun `health action returns spec snapshot`() {
+        val healthSnapshot =
+            ImageBridgeHealthSnapshot(
+                running = true,
+                specStatus =
+                    BridgeSpecStatus(
+                        ready = false,
+                        checkedAtEpochMs = 1234L,
+                        checks = listOf(BridgeSpecCheck(name = "class bh.c", ok = false, detail = "missing")),
+                    ),
+                discoverySnapshot =
+                    BridgeDiscoverySnapshot(
+                        installAttempted = true,
+                        hooks =
+                            listOf(
+                                DiscoveryHookStatus(
+                                    name = HOOK_SEND_MULTIPLE,
+                                    installed = true,
+                                    invocationCount = 4,
+                                    lastSeenEpochMs = 99L,
+                                    lastSummary = "uris=2",
+                                ),
+                            ),
+                    ),
+                capabilities =
+                    ImageBridgeCapabilitiesSnapshot(
+                        inspectChatRoom = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
+                        openChatRoom = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
+                        snapshotChatRoomMembers = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
+                        sendText =
+                            ImageBridgeCapabilitySnapshot(
+                                supported = false,
+                                ready = false,
+                                reason = "text sender unavailable",
+                            ),
+                        sendMarkdown =
+                            ImageBridgeCapabilitySnapshot(
+                                supported = false,
+                                ready = false,
+                                reason = "text sender unavailable",
+                            ),
+                    ),
+                restartCount = 3,
+                lastCrashMessage = "bind failed",
+            )
         val handler =
             ImageBridgeRequestHandler(
                 imageSender = { error("should not be called") },
-                healthProvider = {
-                    ImageBridgeHealthSnapshot(
-                        running = true,
-                        specStatus =
-                            BridgeSpecStatus(
-                                ready = false,
-                                checkedAtEpochMs = 1234L,
-                                checks = listOf(BridgeSpecCheck(name = "class bh.c", ok = false, detail = "missing")),
-                            ),
-                        discoverySnapshot =
-                            BridgeDiscoverySnapshot(
-                                installAttempted = true,
-                                hooks =
-                                    listOf(
-                                        DiscoveryHookStatus(
-                                            name = HOOK_SEND_MULTIPLE,
-                                            installed = true,
-                                            invocationCount = 4,
-                                            lastSeenEpochMs = 99L,
-                                            lastSummary = "uris=2",
-                                        ),
-                                    ),
-                            ),
-                        capabilities =
-                            ImageBridgeCapabilitiesSnapshot(
-                                inspectChatRoom = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
-                                openChatRoom = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
-                                snapshotChatRoomMembers = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
-                            ),
-                        restartCount = 3,
-                        lastCrashMessage = "bind failed",
-                    )
-                },
+                healthProvider = { healthSnapshot },
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
@@ -256,6 +539,11 @@ class ImageBridgeRequestHandlerTest {
         assertEquals(1, response.discovery?.hooks?.size)
         assertTrue(response.capabilities?.openChatRoom?.ready == true)
         assertTrue(response.capabilities?.snapshotChatRoomMembers?.ready == true)
+        assertFalse(response.capabilities?.sendText?.supported == true)
+        assertEquals("text sender unavailable", response.capabilities?.sendText?.reason)
+        val jsonCapabilities = healthSnapshot.toJson().getJSONObject("capabilities")
+        assertFalse(jsonCapabilities.getJSONObject("sendText").getBoolean("supported"))
+        assertFalse(jsonCapabilities.getJSONObject("sendMarkdown").getBoolean("ready"))
     }
 
     @Test
@@ -574,6 +862,132 @@ class ImageBridgeRequestHandlerTest {
     }
 }
 
+class KakaoTextSendInvocationFactoryTest {
+    @Test
+    fun `factory builds text sending log and invokes request method`() {
+        FakeTextRequestRecorder.reset()
+        val registry = buildFakeRegistry()
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+
+        val capability = factory.capability()
+        factory.send(
+            roomId = 123L,
+            chatRoom = chatRoom,
+            message = "@alice hello",
+            markdown = true,
+            threadId = 55L,
+            threadScope = 3,
+            mentionsJson = """{"mentions":[{"user_id":7}]}""",
+            requestId = "req-text",
+        )
+
+        assertTrue(capability.ready)
+        assertEquals(chatRoom, FakeTextRequestRecorder.chatRoom)
+        assertEquals(FakeWriteType.Connect, FakeTextRequestRecorder.writeType)
+        assertFalse(FakeTextRequestRecorder.shouldRetry)
+        assertNotNull(FakeTextRequestRecorder.listener)
+        val sendingLog = FakeTextRequestRecorder.sendingLog as FakeTextSendingLog
+        assertEquals(123L, sendingLog.getChatRoomId())
+        assertEquals("@alice hello", sendingLog.f0())
+        assertEquals(55L, sendingLog.V0)
+        assertEquals(3, sendingLog.Z)
+        val attachment = JSONObject(requireNotNull(sendingLog.G))
+        assertTrue(attachment.getBoolean("markdown"))
+        assertEquals("req-text", attachment.getString("irisSessionId"))
+        assertEquals(1, attachment.getJSONArray("mentions").length())
+    }
+
+    @Test
+    fun `factory resolves request singleton from enclosing request class`() {
+        FakeTextRequestRecorder.reset()
+        val registry = buildFakeRegistry()
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeOuterTextRequest.CompanionApi::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(124L))
+
+        val capability = factory.capability()
+        factory.send(
+            roomId = 124L,
+            chatRoom = chatRoom,
+            message = "outer singleton",
+            markdown = false,
+            threadId = null,
+            threadScope = null,
+            mentionsJson = null,
+            requestId = "req-outer-text",
+        )
+
+        assertTrue(capability.ready)
+        assertEquals(chatRoom, FakeTextRequestRecorder.chatRoom)
+        assertEquals("outer singleton", (FakeTextRequestRecorder.sendingLog as FakeTextSendingLog).f0())
+    }
+
+    @Test
+    fun `factory capability fails closed when request method is unavailable`() {
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = buildFakeRegistry(),
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { MissingTextRequestCompanion::class.java },
+            )
+
+        val capability = factory.capability()
+
+        assertFalse(capability.ready)
+        assertTrue(capability.reason?.contains("ChatSendingLogRequest direct text dispatch") == true)
+    }
+
+    @Test
+    fun `current capabilities exposes ready direct text sender`() {
+        val capabilities =
+            currentBridgeCapabilities(
+                registryAvailable = true,
+                registryError = null,
+                specReady = true,
+                textSendCapability = KakaoTextSendCapability(supported = true, ready = true),
+                sendTextEnabled = true,
+                sendMarkdownEnabled = true,
+            )
+
+        assertTrue(capabilities.sendText.ready)
+        assertTrue(capabilities.sendMarkdown.ready)
+    }
+
+    @Test
+    fun `current capabilities exposes direct text ready by default`() {
+        val capabilities =
+            currentBridgeCapabilities(
+                registryAvailable = true,
+                registryError = null,
+                specReady = true,
+                textSendCapability = KakaoTextSendCapability(supported = true, ready = true),
+            )
+
+        assertTrue(capabilities.sendText.ready)
+        assertEquals(null, capabilities.sendText.reason)
+        assertTrue(capabilities.sendMarkdown.ready)
+        assertEquals(null, capabilities.sendMarkdown.reason)
+    }
+
+    @Test
+    fun `text bridge rollout flags parse truthy values`() {
+        assertTrue(ImageBridgeServer.isTextBridgeSendTextEnabled("yes"))
+        assertTrue(ImageBridgeServer.isTextBridgeSendMarkdownEnabled("1"))
+        assertFalse(ImageBridgeServer.isTextBridgeSendTextEnabled("false"))
+        assertTrue(ImageBridgeServer.isTextBridgeSendMarkdownEnabled(null))
+    }
+}
+
 class ChatRoomIntentMetadataResolverTest {
     @Test
     fun `resolves Kakao chatroom type value from room`() {
@@ -638,6 +1052,44 @@ private fun sendImageRequest(
         imagePaths = imagePaths,
         threadId = threadId,
         threadScope = threadScope,
+        requestId = requestId,
+        token = token,
+    )
+
+private fun sendTextRequest(
+    roomId: Long,
+    message: String,
+    threadId: Long? = null,
+    threadScope: Int? = null,
+    mentionsJson: String? = null,
+    requestId: String? = null,
+    token: String? = null,
+): ImageBridgeProtocol.ImageBridgeRequest =
+    ImageBridgeProtocol.buildSendTextRequest(
+        roomId = roomId,
+        message = message,
+        threadId = threadId,
+        threadScope = threadScope,
+        mentionsJson = mentionsJson,
+        requestId = requestId,
+        token = token,
+    )
+
+private fun sendMarkdownRequest(
+    roomId: Long,
+    message: String,
+    threadId: Long? = null,
+    threadScope: Int? = null,
+    mentionsJson: String? = null,
+    requestId: String? = null,
+    token: String? = null,
+): ImageBridgeProtocol.ImageBridgeRequest =
+    ImageBridgeProtocol.buildSendMarkdownRequest(
+        roomId = roomId,
+        message = message,
+        threadId = threadId,
+        threadScope = threadScope,
+        mentionsJson = mentionsJson,
         requestId = requestId,
         token = token,
     )
@@ -960,6 +1412,192 @@ class ImageBridgeServerRestartPolicyTest {
         } finally {
             executor.shutdownNow()
         }
+    }
+
+    @Test
+    fun `mux server flag parses truthy values`() {
+        assertTrue(ImageBridgeServer.isMuxServerEnabled("true"))
+        assertTrue(ImageBridgeServer.isMuxServerEnabled("yes"))
+        assertTrue(ImageBridgeServer.isMuxServerEnabled("1"))
+        assertFalse(ImageBridgeServer.isMuxServerEnabled("false"))
+        assertTrue(ImageBridgeServer.isMuxServerEnabled(null))
+    }
+}
+
+class BridgeMuxSessionTest {
+    @Test
+    fun `mux request response preserves correlation id`() {
+        val socket =
+            FakeBridgeMuxSocket(
+                muxFrames(
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_REQUEST,
+                        correlationId = "corr-1",
+                        request = healthRequest(),
+                    ),
+                ),
+            )
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        BridgeMuxSession(
+            client = socket,
+            executor = DirectExecutorService(),
+            handler = handler,
+            isRunning = { true },
+            metrics = BridgeMetrics(),
+            logError = { _, _, _ -> },
+        ).run()
+
+        val response = ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(socket.outputStream.toByteArray()))
+        assertEquals(ImageBridgeMuxProtocol.TYPE_RESPONSE, response.type)
+        assertEquals("corr-1", response.correlationId)
+        assertEquals(ImageBridgeProtocol.STATUS_OK, response.response?.status)
+    }
+
+    @Test
+    fun `mux ping returns pong`() {
+        val socket =
+            FakeBridgeMuxSocket(
+                muxFrames(
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_PING,
+                        correlationId = "ping-1",
+                    ),
+                ),
+            )
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        BridgeMuxSession(
+            client = socket,
+            executor = DirectExecutorService(),
+            handler = handler,
+            isRunning = { true },
+            metrics = BridgeMetrics(),
+            logError = { _, _, _ -> },
+        ).run()
+
+        val response = ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(socket.outputStream.toByteArray()))
+        assertEquals(ImageBridgeMuxProtocol.TYPE_PONG, response.type)
+        assertEquals("ping-1", response.correlationId)
+    }
+
+    @Test
+    fun `mux request over in flight limit returns bridge busy`() {
+        val socket =
+            FakeBridgeMuxSocket(
+                muxFrames(
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_REQUEST,
+                        correlationId = "busy-1",
+                        request = healthRequest(),
+                    ),
+                ),
+            )
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot().copy(metrics = metrics.snapshot()) },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        BridgeMuxSession(
+            client = socket,
+            executor = DirectExecutorService(),
+            handler = handler,
+            isRunning = { true },
+            metrics = metrics,
+            maxInFlight = 0,
+            logError = { _, _, _ -> },
+        ).run()
+
+        val response = ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(socket.outputStream.toByteArray()))
+        assertEquals(ImageBridgeMuxProtocol.TYPE_RESPONSE, response.type)
+        assertEquals("busy-1", response.correlationId)
+        assertEquals(ImageBridgeProtocol.ERROR_BRIDGE_BUSY, response.response?.errorCode)
+        assertEquals(1, metrics.snapshot().bridgeBusy)
+    }
+
+    @Test
+    fun `mux idle timeout closes session without error log`() {
+        var logged = false
+        val socket = TimeoutBridgeMuxSocket()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        BridgeMuxSession(
+            client = socket,
+            executor = DirectExecutorService(),
+            handler = handler,
+            isRunning = { true },
+            metrics = BridgeMetrics(),
+            logError = { _, _, _ -> logged = true },
+        ).run()
+
+        assertFalse(logged)
+        assertTrue(socket.closed)
+    }
+
+    @Test
+    fun `mux partial frame timeout is logged as protocol failure`() {
+        var logged = false
+        val socket = PartialPayloadTimeoutBridgeMuxSocket()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        BridgeMuxSession(
+            client = socket,
+            executor = DirectExecutorService(),
+            handler = handler,
+            isRunning = { true },
+            metrics = BridgeMetrics(),
+            logError = { _, _, _ -> logged = true },
+        ).run()
+
+        assertTrue(logged)
+        assertTrue(socket.closed)
+    }
+
+    @Test
+    fun `mux partial length timeout is logged as protocol failure`() {
+        var logged = false
+        val socket = PartialLengthTimeoutBridgeMuxSocket()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        BridgeMuxSession(
+            client = socket,
+            executor = DirectExecutorService(),
+            handler = handler,
+            isRunning = { true },
+            metrics = BridgeMetrics(),
+            logError = { _, _, _ -> logged = true },
+        ).run()
+
+        assertTrue(logged)
+        assertTrue(socket.closed)
     }
 }
 
@@ -1434,6 +2072,129 @@ private class RecordingKakaoSendInvoker : KakaoSendInvoker {
     }
 }
 
+private fun muxFrames(vararg frames: ImageBridgeMuxFrame): ByteArray =
+    ByteArrayOutputStream()
+        .also { output ->
+            frames.forEach { frame -> ImageBridgeMuxProtocol.writeFrame(output, frame) }
+        }.toByteArray()
+
+private class FakeBridgeMuxSocket(
+    input: ByteArray,
+    override val peerUid: Int? = 0,
+) : BridgeMuxSocket {
+    override val inputStream = ByteArrayInputStream(input)
+    override val outputStream = ByteArrayOutputStream()
+
+    var readTimeoutMs: Int = 0
+        private set
+    var closed = false
+        private set
+
+    override fun setReadTimeout(timeoutMs: Int) {
+        readTimeoutMs = timeoutMs
+    }
+
+    override fun close() {
+        closed = true
+    }
+}
+
+private class TimeoutBridgeMuxSocket : BridgeMuxSocket {
+    override val inputStream: InputStream =
+        object : InputStream() {
+            override fun read(): Int = throw IOException("Try again")
+        }
+    override val outputStream = ByteArrayOutputStream()
+    override val peerUid: Int? = 0
+    var closed = false
+        private set
+
+    override fun setReadTimeout(timeoutMs: Int) = Unit
+
+    override fun close() {
+        closed = true
+    }
+}
+
+private class PartialPayloadTimeoutBridgeMuxSocket : BridgeMuxSocket {
+    override val inputStream: InputStream =
+        object : InputStream() {
+            private val header = byteArrayOf(0, 0, 0, 16)
+            private var index = 0
+
+            override fun read(): Int {
+                if (index < header.size) {
+                    return header[index++].toInt() and 0xff
+                }
+                throw IOException("Try again")
+            }
+        }
+    override val outputStream = ByteArrayOutputStream()
+    override val peerUid: Int? = 0
+    var closed = false
+        private set
+
+    override fun setReadTimeout(timeoutMs: Int) = Unit
+
+    override fun close() {
+        closed = true
+    }
+}
+
+private class PartialLengthTimeoutBridgeMuxSocket : BridgeMuxSocket {
+    override val inputStream: InputStream =
+        object : InputStream() {
+            private var firstRead = true
+
+            override fun read(): Int {
+                if (firstRead) {
+                    firstRead = false
+                    return 0
+                }
+                throw IOException("Try again")
+            }
+        }
+    override val outputStream = ByteArrayOutputStream()
+    override val peerUid: Int? = 0
+    var closed = false
+        private set
+
+    override fun setReadTimeout(timeoutMs: Int) = Unit
+
+    override fun close() {
+        closed = true
+    }
+}
+
+private class DirectExecutorService : AbstractExecutorService() {
+    private val shutdown = AtomicBoolean(false)
+
+    override fun shutdown() {
+        shutdown.set(true)
+    }
+
+    override fun shutdownNow(): List<Runnable> {
+        shutdown.set(true)
+        return emptyList()
+    }
+
+    override fun isShutdown(): Boolean = shutdown.get()
+
+    override fun isTerminated(): Boolean = shutdown.get()
+
+    override fun awaitTermination(
+        timeout: Long,
+        unit: TimeUnit,
+    ): Boolean = true
+
+    override fun execute(command: Runnable) {
+        if (shutdown.get()) {
+            error("executor shut down")
+        }
+        command.run()
+    }
+}
+
 private fun readyHealthSnapshot(): ImageBridgeHealthSnapshot =
     ImageBridgeHealthSnapshot(
         running = true,
@@ -1451,6 +2212,15 @@ private fun readyHealthSnapshot(): ImageBridgeHealthSnapshot =
             ),
         restartCount = 0,
         lastCrashMessage = null,
+    )
+
+private fun readyTextHealthSnapshot(): ImageBridgeHealthSnapshot =
+    readyHealthSnapshot().copy(
+        capabilities =
+            ImageBridgeCapabilitiesSnapshot(
+                sendText = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
+                sendMarkdown = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
+            ),
     )
 
 private class FakeMediaItem(
@@ -1521,6 +2291,7 @@ private class FakeMediaSender(
 }
 
 private enum class FakeMessageType {
+    Text,
     Photo,
     MultiPhoto,
 }
@@ -1531,6 +2302,120 @@ private enum class FakeWriteType {
 }
 
 private interface FakeListener
+
+private object FakeTextRequestRecorder {
+    var chatRoom: Any? = null
+    var sendingLog: Any? = null
+    var writeType: FakeWriteType? = null
+    var listener: Any? = null
+    var shouldRetry: Boolean = true
+
+    fun reset() {
+        chatRoom = null
+        sendingLog = null
+        writeType = null
+        listener = null
+        shouldRetry = true
+    }
+}
+
+private class FakeTextRequestCompanion {
+    companion object {
+        @JvmField
+        val f = FakeTextRequestCompanion()
+    }
+
+    fun u(
+        chatRoom: FakeChatRoomModel,
+        sendingLog: FakeTextSendingLog,
+        writeType: FakeWriteType,
+        listener: FakeListener?,
+        shouldRetry: Boolean,
+    ) {
+        FakeTextRequestRecorder.chatRoom = chatRoom
+        FakeTextRequestRecorder.sendingLog = sendingLog
+        FakeTextRequestRecorder.writeType = writeType
+        FakeTextRequestRecorder.listener = listener
+        FakeTextRequestRecorder.shouldRetry = shouldRetry
+    }
+}
+
+private class MissingTextRequestCompanion {
+    companion object {
+        @JvmField
+        val f = MissingTextRequestCompanion()
+    }
+}
+
+private class FakeOuterTextRequest {
+    companion object {
+        @JvmField
+        val f = CompanionApi()
+    }
+
+    class CompanionApi {
+        fun u(
+            chatRoom: FakeChatRoomModel,
+            sendingLog: FakeTextSendingLog,
+            writeType: FakeWriteType,
+            listener: FakeListener?,
+            shouldRetry: Boolean,
+        ) {
+            FakeTextRequestRecorder.chatRoom = chatRoom
+            FakeTextRequestRecorder.sendingLog = sendingLog
+            FakeTextRequestRecorder.writeType = writeType
+            FakeTextRequestRecorder.listener = listener
+            FakeTextRequestRecorder.shouldRetry = shouldRetry
+        }
+    }
+}
+
+private class FakeTextSendingLog private constructor(
+    private val roomId: Long,
+    private val message: String,
+) {
+    var G: String? = null
+    var Z: Int = 0
+    var V0: Long? = null
+
+    fun getChatRoomId(): Long = roomId
+
+    fun f0(): String = message
+
+    fun H1(threadScope: Int) {
+        Z = threadScope
+    }
+
+    fun J1(threadId: Long?) {
+        V0 = threadId
+    }
+
+    class b(
+        private val roomId: Long,
+        private val messageType: FakeMessageType,
+        @Suppress("UNUSED_PARAMETER") reserved: Int,
+        @Suppress("UNUSED_PARAMETER") messageId: Long?,
+        @Suppress("UNUSED_PARAMETER") needsUpload: Boolean,
+    ) {
+        private var message: String = ""
+
+        fun j(message: String): b {
+            this.message = message
+            return this
+        }
+
+        @Suppress("UNUSED_PARAMETER")
+        fun l(
+            sourceClass: Class<*>,
+            tag: String,
+        ): b = this
+
+        fun b(): FakeTextSendingLog {
+            check(messageType == FakeMessageType.Text)
+            return FakeTextSendingLog(roomId, message)
+        }
+    }
+}
 
 private class RenamedThreadedEntryMediaSender(
     chatRoom: FakeChatRoom,
