@@ -1541,6 +1541,18 @@ class ChatRoomResolverTest {
 
         assertEquals(listOf("c"), LegacyNameSensitiveRecorder.calls)
     }
+
+    @Test
+    fun `resolveFresh prefers manager path over database path`() {
+        FakeChatRuntime.reset()
+        val resolver = ChatRoomResolver(registry = buildFakeRegistry())
+
+        val room = resolver.resolveFresh(202L)
+
+        assertNotNull(room)
+        assertEquals(listOf(202L), FakeChatRuntime.managerRoomIds)
+        assertEquals(emptyList(), FakeChatRuntime.databaseRoomIds)
+    }
 }
 
 class KakaoImageSenderTest {
@@ -2957,9 +2969,13 @@ private class FakeThreadedRequestCompanion {
 
 private object FakeChatRuntime {
     val resolvedRoomIds = mutableListOf<Long>()
+    val databaseRoomIds = mutableListOf<Long>()
+    val managerRoomIds = mutableListOf<Long>()
 
     fun reset() {
         resolvedRoomIds.clear()
+        databaseRoomIds.clear()
+        managerRoomIds.clear()
         FakeMasterDatabase.INSTANCE = FakeMasterDatabase()
     }
 }
@@ -2975,7 +2991,10 @@ private class FakeMasterDatabase {
 }
 
 private class FakeRoomDao {
-    fun h(roomId: Long): FakeRoomEntity = FakeRoomEntity(roomId)
+    fun h(roomId: Long): FakeRoomEntity {
+        FakeChatRuntime.databaseRoomIds += roomId
+        return FakeRoomEntity(roomId)
+    }
 }
 
 private data class FakeRoomEntity(
@@ -3036,7 +3055,10 @@ private class FakeChatRoomManager {
         includeOpenLink: Boolean,
     ): FakeChatRoomModel? = null
 
-    fun d0(roomId: Long): FakeChatRoomModel = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(roomId))
+    fun d0(roomId: Long): FakeChatRoomModel {
+        FakeChatRuntime.managerRoomIds += roomId
+        return FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(roomId))
+    }
 }
 
 class KakaoClassRegistryTest {

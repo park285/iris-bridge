@@ -17,6 +17,7 @@ internal class ChatRoomMemberSnapshotBuilder(
         roomId: Long,
         containers: List<ContainerCandidate>,
         expected: ExpectedMemberHints,
+        fallbackSnapshot: ImageBridgeProtocol.ChatRoomMembersSnapshot? = null,
     ): ImageBridgeProtocol.ChatRoomMembersSnapshot {
         val ranked =
             containers
@@ -24,6 +25,8 @@ internal class ChatRoomMemberSnapshotBuilder(
                 .sortedByDescending { it.score }
         val best =
             ranked.firstOrNull()
+                ?: fallbackSnapshot
+                    ?.let { return it }
                 ?: run {
                     diagnostics.logMissingCandidateDiagnostics(roomId, containers, expected.ids, expected.nicknames)
                     error("chatroom member candidates not found")

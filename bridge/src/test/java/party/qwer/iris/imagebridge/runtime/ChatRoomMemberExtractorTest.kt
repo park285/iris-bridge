@@ -514,6 +514,44 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
+    fun `falls back to open direct backup id and welcome nickname`() {
+        data class Notice(
+            val c: String,
+        )
+
+        data class MetaBox(
+            val nameValuePairs: Map<String, Any>,
+        )
+
+        data class Room(
+            val u: Map<String, Notice>,
+            val v0: MetaBox,
+        )
+
+        val extractor = ChatRoomMemberExtractor(clock = { 1234L })
+
+        val result =
+            extractor.snapshot(
+                roomId = 1L,
+                room =
+                    Room(
+                        u = linkedMapOf("Notice" to Notice("Welcome to '카푸치노'.")),
+                        v0 =
+                            MetaBox(
+                                linkedMapOf(
+                                    "openLinkChatMemberIdBackup" to 8691114094424718810L,
+                                    "display_user_ids" to "8691114094424718810",
+                                ),
+                            ),
+                    ),
+            )
+
+        assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM, result.confidence)
+        assertEquals(8691114094424718810L, result.members.single().userId)
+        assertEquals("카푸치노", result.members.single().nickname)
+    }
+
+    @Test
     fun `falls back to discovery when preferred plan no longer validates`() {
         data class Member(
             val a: Long,

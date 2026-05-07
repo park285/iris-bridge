@@ -29,6 +29,14 @@ internal class ChatRoomResolver(
         return null
     }
 
+    fun resolveFresh(roomId: Long): Any? =
+        runCatching { resolveFromManager(roomId) }
+            .onFailure { Log.e(TAG, "fresh manager resolver failed: ${it.message}", it) }
+            .getOrNull()
+            ?: runCatching { resolveFromDatabase(roomId) }
+                .onFailure { Log.e(TAG, "fresh database resolver failed: ${it.message}", it) }
+                .getOrNull()
+
     private fun resolveFromDatabase(roomId: Long): Any? {
         val database =
             registry.masterDbSingletonField.apply { isAccessible = true }.get(null)
