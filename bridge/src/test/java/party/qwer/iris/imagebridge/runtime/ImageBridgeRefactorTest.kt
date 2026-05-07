@@ -208,6 +208,7 @@ class ImageBridgeRequestHandlerTest {
                             roomId = 123L,
                             message = "first",
                             threadId = 55L,
+                            requestId = "serialize-first",
                         ),
                     )
                 }
@@ -219,6 +220,7 @@ class ImageBridgeRequestHandlerTest {
                             roomId = 123L,
                             message = "second",
                             threadId = 55L,
+                            requestId = "serialize-second",
                         ),
                     )
                 }
@@ -230,6 +232,152 @@ class ImageBridgeRequestHandlerTest {
         } finally {
             executor.shutdownNow()
         }
+    }
+
+    @Test
+    fun `side effect request without requestId fails`() {
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyTextHealthSnapshot().copy(metrics = metrics.snapshot()) },
+                handshakeValidator = developmentHandshakeValidator(),
+                metrics = metrics,
+                logError = { _, _, _ -> },
+            )
+
+        val response = handler.handle(sendTextRequest(roomId = 123L, message = "hello", requestId = null))
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals(ImageBridgeProtocol.ERROR_MISSING_REQUEST_ID, response.errorCode)
+        assertEquals("requestId missing", response.error)
+        val health = handler.handle(healthRequest())
+        assertEquals(1, health.metrics?.missingRequestId)
+    }
+
+    @Test
+    fun `open chatroom request without requestId fails before opener`() {
+        var openCount = 0
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyTextHealthSnapshot().copy(metrics = metrics.snapshot()) },
+                chatRoomOpener = { openCount += 1 },
+                handshakeValidator = developmentHandshakeValidator(),
+                metrics = metrics,
+                logError = { _, _, _ -> },
+            )
+
+        val response = handler.handle(openChatRoomRequest(roomId = 77L, requestId = null))
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals(ImageBridgeProtocol.ERROR_MISSING_REQUEST_ID, response.errorCode)
+        assertEquals(0, openCount)
+        val health = handler.handle(healthRequest())
+        assertEquals(1, health.metrics?.missingRequestId)
+    }
+
+    @Test
+    fun `duplicate send text request returns cached response and invokes sender once`() {
+        var sendCount = 0
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { sendCount += 1 },
+                healthProvider = { readyTextHealthSnapshot().copy(metrics = metrics.snapshot()) },
+                handshakeValidator = developmentHandshakeValidator(),
+                metrics = metrics,
+            )
+        val request = sendTextRequest(roomId = 123L, message = "hello", requestId = "dedupe-text-1")
+
+        val first = handler.handle(request)
+        val second = handler.handle(request)
+
+        assertEquals(ImageBridgeProtocol.STATUS_SENT, first.status)
+        assertEquals(first, second)
+        assertEquals(1, sendCount)
+        val health = handler.handle(healthRequest())
+        assertEquals(1, health.metrics?.muxRequestDeduplicated)
+    }
+
+    @Test
+    fun `duplicate send image request returns cached response and invokes sender once`() {
+        var sendCount = 0
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { sendCount += 1 },
+                healthProvider = { readyHealthSnapshot().copy(metrics = metrics.snapshot()) },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                metrics = metrics,
+            )
+        val request = sendImageRequest(roomId = 123L, imagePaths = listOf(file.absolutePath), requestId = "dedupe-image-1")
+
+        val first = handler.handle(request)
+        val second = handler.handle(request)
+
+        assertEquals(ImageBridgeProtocol.STATUS_SENT, first.status)
+        assertEquals(first, second)
+        assertEquals(1, sendCount)
+        val health = handler.handle(healthRequest())
+        assertEquals(1, health.metrics?.muxRequestDeduplicated)
+        file.delete()
+    }
+
+    @Test
+    fun `duplicate open chatroom request returns cached response and invokes opener once`() {
+        var openCount = 0
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot().copy(metrics = metrics.snapshot()) },
+                chatRoomOpener = { openCount += 1 },
+                handshakeValidator = developmentHandshakeValidator(),
+                metrics = metrics,
+            )
+        val request = openChatRoomRequest(roomId = 77L, requestId = "dedupe-open-1")
+
+        val first = handler.handle(request)
+        val second = handler.handle(request)
+
+        assertEquals(ImageBridgeProtocol.STATUS_OK, first.status)
+        assertEquals(first, second)
+        assertEquals("dedupe-open-1", first.requestId)
+        assertEquals(1, openCount)
+        val health = handler.handle(healthRequest())
+        assertEquals(1, health.metrics?.muxRequestDeduplicated)
+    }
+
+    @Test
+    fun `duplicate failing send text request returns same cached failure response`() {
+        var sendCount = 0
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = {
+                    sendCount += 1
+                    error("text send failed")
+                },
+                healthProvider = { readyTextHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                logError = { _, _, _ -> },
+            )
+        val request = sendTextRequest(roomId = 123L, message = "hello", requestId = "dedupe-text-fail")
+
+        val first = handler.handle(request)
+        val second = handler.handle(request)
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, first.status)
+        assertEquals(ImageBridgeProtocol.ERROR_SEND_FAILED, first.errorCode)
+        assertEquals("dedupe-text-fail", first.requestId)
+        assertEquals(first, second)
+        assertEquals(1, sendCount)
     }
 
     @Test
@@ -410,7 +558,7 @@ class ImageBridgeRequestHandlerTest {
         assertEquals(ImageBridgeProtocol.ERROR_SEND_FAILED, response.errorCode)
         val health = handler.handle(healthRequest())
         assertEquals(1, health.metrics?.sendFailure)
-        assertEquals(1, health.metrics?.missingRequestId)
+        assertEquals(0, health.metrics?.missingRequestId)
         assertEquals(ImageBridgeProtocol.ERROR_SEND_FAILED, health.metrics?.lastSendErrorCode)
         file.delete()
     }
@@ -613,6 +761,7 @@ class ImageBridgeRequestHandlerTest {
 
         assertEquals(ImageBridgeProtocol.STATUS_OK, response.status)
         assertEquals(77L, openedRoomId)
+        assertEquals("open-request", response.requestId)
     }
 
     @Test
@@ -650,6 +799,7 @@ class ImageBridgeRequestHandlerTest {
                 ImageBridgeProtocol.ImageBridgeRequest(
                     action = ImageBridgeProtocol.ACTION_OPEN_CHATROOM,
                     protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
+                    requestId = "missing-room-open",
                 ),
             )
 
@@ -1095,7 +1245,7 @@ private fun sendImageRequest(
     imagePaths: List<String>,
     threadId: Long? = null,
     threadScope: Int? = null,
-    requestId: String? = null,
+    requestId: String? = "image-request",
     token: String? = null,
 ): ImageBridgeProtocol.ImageBridgeRequest =
     ImageBridgeProtocol.buildSendImageRequest(
@@ -1113,7 +1263,7 @@ private fun sendTextRequest(
     threadId: Long? = null,
     threadScope: Int? = null,
     mentionsJson: String? = null,
-    requestId: String? = null,
+    requestId: String? = "text-request",
     token: String? = null,
 ): ImageBridgeProtocol.ImageBridgeRequest =
     ImageBridgeProtocol.buildSendTextRequest(
@@ -1132,7 +1282,7 @@ private fun sendMarkdownRequest(
     threadId: Long? = null,
     threadScope: Int? = null,
     mentionsJson: String? = null,
-    requestId: String? = null,
+    requestId: String? = "markdown-request",
     token: String? = null,
 ): ImageBridgeProtocol.ImageBridgeRequest =
     ImageBridgeProtocol.buildSendMarkdownRequest(
@@ -1158,10 +1308,12 @@ private fun inspectChatRoomRequest(
 
 private fun openChatRoomRequest(
     roomId: Long,
+    requestId: String? = "open-request",
     token: String? = null,
 ): ImageBridgeProtocol.ImageBridgeRequest =
     ImageBridgeProtocol.buildOpenChatRoomRequest(
         roomId = roomId,
+        requestId = requestId,
         token = token,
     )
 
@@ -1464,15 +1616,6 @@ class ImageBridgeServerRestartPolicyTest {
             executor.shutdownNow()
         }
     }
-
-    @Test
-    fun `mux server flag parses truthy values`() {
-        assertTrue(ImageBridgeServer.isMuxServerEnabled("true"))
-        assertTrue(ImageBridgeServer.isMuxServerEnabled("yes"))
-        assertTrue(ImageBridgeServer.isMuxServerEnabled("1"))
-        assertFalse(ImageBridgeServer.isMuxServerEnabled("false"))
-        assertTrue(ImageBridgeServer.isMuxServerEnabled(null))
-    }
 }
 
 class BridgeMuxSessionTest {
@@ -1577,6 +1720,48 @@ class BridgeMuxSessionTest {
         assertEquals("busy-1", response.correlationId)
         assertEquals(ImageBridgeProtocol.ERROR_BRIDGE_BUSY, response.response?.errorCode)
         assertEquals(1, metrics.snapshot().bridgeBusy)
+    }
+
+    @Test
+    fun `mux cancel before queued request runs suppresses side effect and response`() {
+        var sendCount = 0
+        val executor = QueuedExecutorService()
+        val socket =
+            FakeBridgeMuxSocket(
+                muxFrames(
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_REQUEST,
+                        correlationId = "cancel-1",
+                        request = sendTextRequest(roomId = 123L, message = "hello", requestId = "cancel-req-1"),
+                    ),
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_CANCEL,
+                        correlationId = "cancel-1",
+                    ),
+                ),
+            )
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { sendCount += 1 },
+                healthProvider = { readyTextHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        BridgeMuxSession(
+            client = socket,
+            executor = executor,
+            handler = handler,
+            isRunning = { socket.inputStream.available() > 0 },
+            metrics = metrics,
+            logError = { _, _, _ -> },
+        ).run()
+        executor.runNext()
+
+        assertEquals(0, sendCount)
+        assertEquals(1, metrics.snapshot().muxRequestCancelled)
+        assertEquals(0, socket.outputStream.size())
     }
 
     @Test
@@ -1881,7 +2066,7 @@ class BridgeSecurityTest {
             input,
             ImageBridgeHandshakeProtocol.buildHello(
                 clientNonce = "client-nonce",
-                socketName = "iris-image-bridge",
+                socketName = "iris-image-bridge-mux",
                 timestampMs = 1234L,
             ),
         )
@@ -1901,7 +2086,7 @@ class BridgeSecurityTest {
                 nonceFactory = { "server-nonce" },
             )
 
-        authenticator.authenticate(ByteArrayInputStream(input.toByteArray()), output, "iris-image-bridge")
+        authenticator.authenticate(ByteArrayInputStream(input.toByteArray()), output, "iris-image-bridge-mux")
 
         val serverProof = ImageBridgeHandshakeProtocol.readFrame(ByteArrayInputStream(output.toByteArray()))
         assertEquals(ImageBridgeHandshakeProtocol.TYPE_SERVER_PROOF, serverProof.type)
@@ -1912,7 +2097,7 @@ class BridgeSecurityTest {
                     bridgeToken = "bridge-token",
                     clientNonce = "client-nonce",
                     serverNonce = "server-nonce",
-                    socketName = "iris-image-bridge",
+                    socketName = "iris-image-bridge-mux",
                 ),
             ),
         )
@@ -1925,7 +2110,7 @@ class BridgeSecurityTest {
             input,
             ImageBridgeHandshakeProtocol.buildHello(
                 clientNonce = "client-nonce",
-                socketName = "iris-image-bridge",
+                socketName = "iris-image-bridge-mux",
                 timestampMs = 1234L,
             ),
         )
@@ -1946,7 +2131,7 @@ class BridgeSecurityTest {
 
         val error =
             assertFailsWith<IllegalArgumentException> {
-                authenticator.authenticate(ByteArrayInputStream(input.toByteArray()), ByteArrayOutputStream(), "iris-image-bridge")
+                authenticator.authenticate(ByteArrayInputStream(input.toByteArray()), ByteArrayOutputStream(), "iris-image-bridge-mux")
             }
 
         assertEquals(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED, error.message)
@@ -2373,6 +2558,40 @@ private class DirectExecutorService : AbstractExecutorService() {
             error("executor shut down")
         }
         command.run()
+    }
+}
+
+private class QueuedExecutorService : AbstractExecutorService() {
+    private val shutdown = AtomicBoolean(false)
+    private val tasks = ArrayDeque<Runnable>()
+
+    override fun shutdown() {
+        shutdown.set(true)
+    }
+
+    override fun shutdownNow(): List<Runnable> {
+        shutdown.set(true)
+        return tasks.toList().also { tasks.clear() }
+    }
+
+    override fun isShutdown(): Boolean = shutdown.get()
+
+    override fun isTerminated(): Boolean = shutdown.get() && tasks.isEmpty()
+
+    override fun awaitTermination(
+        timeout: Long,
+        unit: TimeUnit,
+    ): Boolean = isTerminated
+
+    override fun execute(command: Runnable) {
+        if (shutdown.get()) {
+            error("executor shut down")
+        }
+        tasks += command
+    }
+
+    fun runNext() {
+        tasks.removeFirst().run()
     }
 }
 

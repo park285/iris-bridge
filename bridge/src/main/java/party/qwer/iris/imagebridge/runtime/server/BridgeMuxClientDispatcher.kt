@@ -81,6 +81,7 @@ internal class BridgeMuxClientDispatcher(
         error: String,
         errorCode: String,
     ) {
+        metrics.recordMuxGoawaySent()
         runCatching {
             ImageBridgeMuxProtocol.writeFrame(
                 client.outputStream,
@@ -96,6 +97,6 @@ internal class BridgeMuxClientDispatcher(
 
     private companion object {
         private const val TAG = "IrisBridge"
-        private const val CLIENT_READ_TIMEOUT_MS = 5_000
+        private const val CLIENT_READ_TIMEOUT_MS = 30_000
     }
 }

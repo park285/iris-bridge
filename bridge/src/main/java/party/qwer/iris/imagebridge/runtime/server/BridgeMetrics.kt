@@ -16,6 +16,9 @@ internal class BridgeMetrics {
     private val rejectedClient = AtomicLong()
     private val activeClient = AtomicLong()
     private val queuedClient = AtomicLong()
+    private val muxRequestCancelled = AtomicLong()
+    private val muxRequestDeduplicated = AtomicLong()
+    private val muxGoawaySent = AtomicLong()
     private val lastSendRequestId = AtomicReference<String?>()
     private val lastSendStartedAtEpochMs = AtomicReference<Long?>()
     private val lastSendCompletedAtEpochMs = AtomicReference<Long?>()
@@ -36,6 +39,8 @@ internal class BridgeMetrics {
         lastSendErrorCode.set(null)
     }
 
+    fun recordMissingRequestId() = missingRequestId.incrementAndGet()
+
     fun recordSendSuccess(
         completedAtEpochMs: Long,
         durationMs: Long,
@@ -51,13 +56,9 @@ internal class BridgeMetrics {
         lastSendErrorCode.set(errorCode)
     }
 
-    fun recordPathValidationFailure() {
-        pathValidationFailure.incrementAndGet()
-    }
+    fun recordPathValidationFailure() = pathValidationFailure.incrementAndGet()
 
-    fun recordUnauthorizedClient() {
-        unauthorizedClient.incrementAndGet()
-    }
+    fun recordUnauthorizedClient() = unauthorizedClient.incrementAndGet()
 
     fun recordBridgeBusy() {
         bridgeBusy.incrementAndGet()
@@ -69,21 +70,21 @@ internal class BridgeMetrics {
         rejectedClient.incrementAndGet()
     }
 
-    fun recordTimeout() {
-        timeout.incrementAndGet()
-    }
+    fun recordTimeout() = timeout.incrementAndGet()
 
-    fun recordClientStart() {
-        activeClient.incrementAndGet()
-    }
+    fun recordClientStart() = activeClient.incrementAndGet()
 
-    fun recordClientEnd() {
-        activeClient.decrementAndGet()
-    }
+    fun recordClientEnd() = activeClient.decrementAndGet()
 
     fun recordQueuedClientCount(count: Long) {
         queuedClient.set(count.coerceAtLeast(0))
     }
+
+    fun recordMuxRequestCancelled() = muxRequestCancelled.incrementAndGet()
+
+    fun recordMuxRequestDeduplicated() = muxRequestDeduplicated.incrementAndGet()
+
+    fun recordMuxGoawaySent() = muxGoawaySent.incrementAndGet()
 
     fun snapshot(): ImageBridgeProtocol.ImageBridgeMetrics =
         ImageBridgeProtocol.ImageBridgeMetrics(
@@ -98,6 +99,9 @@ internal class BridgeMetrics {
             rejectedClient = rejectedClient.get(),
             activeClient = activeClient.get(),
             queuedClient = queuedClient.get(),
+            muxRequestCancelled = muxRequestCancelled.get(),
+            muxRequestDeduplicated = muxRequestDeduplicated.get(),
+            muxGoawaySent = muxGoawaySent.get(),
             lastSendRequestId = lastSendRequestId.get(),
             lastSendStartedAtEpochMs = lastSendStartedAtEpochMs.get(),
             lastSendCompletedAtEpochMs = lastSendCompletedAtEpochMs.get(),

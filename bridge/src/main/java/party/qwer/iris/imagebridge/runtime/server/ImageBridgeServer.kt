@@ -26,7 +26,6 @@ internal object ImageBridgeServer {
     private val textBridgeSendMarkdownEnabled = AtomicBoolean(false)
     private val peerIdentityValidator = BridgePeerIdentityValidator()
     private val bridgeMetrics = BridgeMetrics()
-    private val clientDispatcher = newBridgeClientDispatcher({ clientExecutor }, { requestHandler }, { running.get() }, peerIdentityValidator, bridgeMetrics)
     private val muxClientDispatcher = newBridgeMuxClientDispatcher({ clientExecutor }, { requestHandler }, { running.get() }, peerIdentityValidator, bridgeMetrics)
 
     @Volatile
@@ -65,21 +64,7 @@ internal object ImageBridgeServer {
         logBridgeSpecFailure(TAG, components.initialSpecStatus)
         requestHandler = components.requestHandler
         clientExecutor = newClientExecutor()
-        startOneShotServerThread()
-        if (isMuxServerEnabled()) {
-            startMuxServerThread()
-        }
-    }
-
-    private fun startOneShotServerThread() {
-        startOneShotBridgeServerThread(
-            dispatcher = clientDispatcher,
-            isRunning = { running.get() },
-            restartDelayMs = ::nextBridgeRestartDelayMs,
-            recordFailure = ::recordServerFailure,
-            sleepBeforeRestart = ::sleepBeforeRestart,
-            shutdownExecutor = ::shutdownClientExecutor,
-        )
+        startMuxServerThread()
     }
 
     private fun startMuxServerThread() {
@@ -126,8 +111,6 @@ internal object ImageBridgeServer {
     internal fun isTextBridgeSendTextEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_TEXT_ENABLED")): Boolean = textBridgeSendTextEnabled(raw)
 
     internal fun isTextBridgeSendMarkdownEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_MARKDOWN_ENABLED")): Boolean = textBridgeSendMarkdownEnabled(raw)
-
-    internal fun isMuxServerEnabled(raw: String? = System.getenv("IRIS_BRIDGE_MUX_SERVER_ENABLED")): Boolean = muxBridgeServerEnabled(raw)
 
     private fun newClientExecutor(): ThreadPoolExecutor = newBridgeClientExecutor()
 }

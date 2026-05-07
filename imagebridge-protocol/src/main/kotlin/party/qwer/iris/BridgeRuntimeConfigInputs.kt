@@ -5,7 +5,6 @@ internal data class BridgeRuntimeConfigInputs(
     val configToken: String,
     val configPath: String,
     val replyImageDir: String,
-    val bridgeMuxServerEnabled: Boolean,
     val textBridgeSendTextEnabled: Boolean,
     val textBridgeSendMarkdownEnabled: Boolean,
 )
@@ -26,12 +25,6 @@ internal fun resolveBridgeRuntimeConfigInputs(
         configToken = configSnapshot?.bridgeToken?.trim().orEmpty(),
         configPath = paths.configPath,
         replyImageDir = configSnapshot.replyImageDirOrDefault(paths.replyImageDir),
-        bridgeMuxServerEnabled =
-            resolveBridgeBooleanFlag(
-                env = env,
-                envKey = "IRIS_BRIDGE_MUX_SERVER_ENABLED",
-                configValue = configSnapshot?.bridgeMuxServerEnabled,
-            ),
         textBridgeSendTextEnabled =
             resolveBridgeBooleanFlag(
                 env = env,
@@ -54,7 +47,6 @@ internal fun BridgeRuntimeConfigInputs.toBridgeTokenResolution(): BridgeTokenRes
         source = tokenSource(token),
         configPath = configPath,
         replyImageDir = replyImageDir,
-        bridgeMuxServerEnabled = bridgeMuxServerEnabled,
         textBridgeSendTextEnabled = textBridgeSendTextEnabled,
         textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled,
     )

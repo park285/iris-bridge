@@ -29,8 +29,9 @@ internal fun evaluateMemberContainer(
             mentionUserIdPath = paths.mentionUserIdPath?.path,
             mentionUserIds = expectedMentionUserIds,
             fieldSelector = fieldSelector,
-        ).filter { member -> member.userId in expectedMemberIds }
+        ).filter { member -> expectedMemberIds.isEmpty() || member.userId in expectedMemberIds }
     if (members.isEmpty()) return null
+    if (expectedMemberIds.isEmpty() && !isSafeUnanchoredMemberContainer(container, members, paths, candidateCollector)) return null
     return rankMemberContainer(container, views, members, paths, expectedMemberIds, expectedNicknames, candidateCollector, fieldSelector)
 }
 
@@ -49,6 +50,20 @@ private fun selectMemberPaths(
         profilePath = fieldSelector.selectProfileImagePath(views),
         mentionUserIdPath = fieldSelector.selectMentionUserIdPath(views, userPath.path, nicknamePath.path),
     )
+}
+
+private fun isSafeUnanchoredMemberContainer(
+    container: ContainerCandidate,
+    members: List<party.qwer.iris.ImageBridgeProtocol.ChatRoomMemberSnapshot>,
+    paths: SelectedMemberPaths,
+    candidateCollector: MemberCandidateCollector,
+): Boolean {
+    if (members.size < 2) return false
+    if (candidateCollector.typeLabel(container) != CONTAINER_TYPE_COLLECTION) return false
+    if (paths.nicknamePath.genericPenalty >= 100) return false
+    val normalizedPath = container.path.lowercase()
+    if (UNANCHORED_DISCOURAGED_CONTAINER_TOKENS.any { token -> normalizedPath.contains(token) }) return false
+    return UNANCHORED_MEMBER_CONTAINER_TOKENS.any { token -> normalizedPath.contains(token) }
 }
 
 private fun rankMemberContainer(
@@ -82,7 +97,17 @@ private fun rankMemberContainer(
     return RankedContainerCandidate(
         plan = plan,
         members = members,
-        score = memberContainerScore(container, members, paths, matchedExpected, classBonus, candidateCollector, fieldSelector),
+        score =
+            memberContainerScore(
+                container = container,
+                members = members,
+                paths = paths,
+                matchedExpected = matchedExpected,
+                classBonus = classBonus,
+                unanchored = expectedMemberIds.isEmpty(),
+                candidateCollector = candidateCollector,
+                fieldSelector = fieldSelector,
+            ),
         expectedNicknameMatches = expectedNicknameMatches,
         matchedExpectedCount = matchedExpected,
         hasRolePath = paths.rolePath != null,
@@ -99,10 +124,11 @@ private fun memberContainerScore(
     paths: SelectedMemberPaths,
     matchedExpected: Int,
     classBonus: Int,
+    unanchored: Boolean,
     candidateCollector: MemberCandidateCollector,
     fieldSelector: MemberFieldSelector,
 ): Int =
-    members.size * 1_000 +
+    memberCountScore(members.size, unanchored) +
         matchedExpected * 400 +
         paths.userPath.score +
         paths.nicknamePath.score +
@@ -115,4 +141,27 @@ private fun memberContainerScore(
             discouragedTokens = setOf("notice", "message", "thread", "backup"),
         ) +
         candidateCollector.typeScore(container) +
+        classBonusScore(classBonus, unanchored)
+
+private fun memberCountScore(
+    memberCount: Int,
+    unanchored: Boolean,
+): Int =
+    if (unanchored) {
+        memberCount.coerceAtMost(8) * 40
+    } else {
+        memberCount * 1_000
+    }
+
+private fun classBonusScore(
+    classBonus: Int,
+    unanchored: Boolean,
+): Int =
+    if (unanchored) {
+        classBonus.coerceAtMost(3) * 20
+    } else {
         classBonus * 20
+    }
+
+internal val UNANCHORED_MEMBER_CONTAINER_TOKENS = setOf("member", "members", "user", "users", "participant", "participants")
+internal val UNANCHORED_DISCOURAGED_CONTAINER_TOKENS = setOf("notice", "message", "messages", "thread", "threads", "backup")

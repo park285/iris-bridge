@@ -14,7 +14,6 @@ private val bridgeRuntimeConfigJson =
 internal data class BridgeRuntimeConfigSnapshot(
     val bridgeToken: String = "",
     val replyImageDir: String = "",
-    val bridgeMuxServerEnabled: Boolean? = null,
     val textBridgeSendTextEnabled: Boolean? = null,
     val textBridgeSendMarkdownEnabled: Boolean? = null,
 )

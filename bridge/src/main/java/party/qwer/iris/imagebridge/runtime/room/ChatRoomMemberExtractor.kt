@@ -35,7 +35,6 @@ internal class ChatRoomMemberExtractor(
         preferredPlan: ImageBridgeProtocol.ChatRoomMemberExtractionPlan? = null,
     ): ImageBridgeProtocol.ChatRoomMembersSnapshot {
         val expected = expectedMemberHintsFrom(expectedMemberHints)
-        check(expected.ids.isNotEmpty()) { "expected member ids required" }
         val containers = candidateCollector.collectContainers(room)
 
         preferredPlan

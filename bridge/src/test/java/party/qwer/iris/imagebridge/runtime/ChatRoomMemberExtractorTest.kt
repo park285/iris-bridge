@@ -482,6 +482,38 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
+    fun `prefers member objects over display user id map artifacts`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Room(
+            val q: List<Member>,
+            val displayUserIds: Map<Long, String>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                roomId = 1L,
+                room =
+                    Room(
+                        q = listOf(Member(7L, "박준우")),
+                        displayUserIds = linkedMapOf(7L to "display_user_ids"),
+                    ),
+                expectedMemberHints =
+                    listOf(
+                        ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "박준우"),
+                    ),
+            )
+
+        assertEquals("박준우", result.members.single().nickname)
+        assertEquals("$.q", result.sourcePath)
+    }
+
+    @Test
     fun `falls back to discovery when preferred plan no longer validates`() {
         data class Member(
             val a: Long,
@@ -534,7 +566,7 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
-    fun `requires expected member ids for anchored extraction`() {
+    fun `snapshots members without expected hints for refresh flows`() {
         data class Member(
             val a: Long,
             val b: String,
@@ -546,8 +578,60 @@ class ChatRoomMemberExtractorTest {
 
         val extractor = ChatRoomMemberExtractor()
 
-        assertFailsWith<IllegalStateException> {
-            extractor.snapshot(1L, Room(members = listOf(Member(7L, "Alice"))))
+        val result = extractor.snapshot(1L, Room(members = listOf(Member(7L, "Alice"), Member(9L, "Bob"))))
+
+        assertEquals(listOf(7L, 9L), result.members.map { it.userId })
+        assertEquals(listOf("Alice", "Bob"), result.members.map { it.nickname })
+        assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM, result.confidence)
+    }
+
+    @Test
+    fun `unanchored snapshot ignores larger non-member containers`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Message(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Room(
+            val messages: List<Message>,
+            val members: List<Member>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                1L,
+                Room(
+                    messages = (1L..20L).map { id -> Message(id, "message-$id") },
+                    members = listOf(Member(7L, "Alice"), Member(9L, "Bob")),
+                ),
+            )
+
+        assertEquals("$.members", result.sourcePath)
+        assertEquals(listOf(7L, 9L), result.members.map { it.userId })
+    }
+
+    @Test
+    fun `unanchored snapshot rejects containers without member path evidence`() {
+        data class Candidate(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Room(
+            val q: List<Candidate>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        assertFailsWith<RuntimeException> {
+            extractor.snapshot(1L, Room(q = listOf(Candidate(7L, "Alice"), Candidate(9L, "Bob"))))
         }
     }
 }

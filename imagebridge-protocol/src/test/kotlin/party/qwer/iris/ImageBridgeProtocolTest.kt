@@ -16,7 +16,7 @@ class ImageBridgeProtocolTest {
         val hello =
             ImageBridgeHandshakeProtocol.buildHello(
                 clientNonce = "client-nonce",
-                socketName = "iris-image-bridge",
+                socketName = "iris-image-bridge-mux",
                 timestampMs = 1234L,
             )
 
@@ -36,7 +36,7 @@ class ImageBridgeProtocolTest {
                 bridgeToken = "bridge-token",
                 clientNonce = "client-nonce",
                 serverNonce = "server-nonce",
-                socketName = "iris-image-bridge",
+                socketName = "iris-image-bridge-mux",
             )
         val clientProof =
             ImageBridgeHandshakeProtocol.clientProof(

@@ -17,6 +17,7 @@ internal class ImageBridgeRequestHandler(
     private val serialExecutor: RoomThreadSerialExecutor = RoomThreadSerialExecutor(),
     private val pathValidator: BridgeImagePathValidator = BridgeImagePathValidator(),
     private val metrics: BridgeMetrics = BridgeMetrics(),
+    private val deduper: BridgeRequestDeduper = BridgeRequestDeduper(onDedupeHit = { metrics.recordMuxRequestDeduplicated() }),
     private val logError: (String, String, Throwable) -> Unit = { tag, message, error -> Log.e(tag, message, error) },
 ) {
     private val imageActionHandler =
@@ -36,29 +37,33 @@ internal class ImageBridgeRequestHandler(
     fun handle(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =
         try {
             handshakeValidator.validate(request)
-            when (val action = request.action) {
-                ImageBridgeProtocol.ACTION_SEND_IMAGE -> handleSendImage(request)
-                ImageBridgeProtocol.ACTION_SEND_TEXT -> handleSendText(request, markdown = false)
-                ImageBridgeProtocol.ACTION_SEND_MARKDOWN -> handleSendText(request, markdown = true)
-                ImageBridgeProtocol.ACTION_HEALTH -> healthProvider().toProtocolResponse()
-                ImageBridgeProtocol.ACTION_INSPECT_CHATROOM -> handleInspectChatRoom(request)
-                ImageBridgeProtocol.ACTION_OPEN_CHATROOM -> handleOpenChatRoom(request)
-                ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS -> handleSnapshotChatRoomMembers(request)
-                else ->
-                    bridgeFailureResponse(
-                        error = "unknown action: $action",
-                        errorCode = ImageBridgeProtocol.ERROR_BAD_REQUEST,
-                        requestId = request.requestId,
-                    )
-            }
+            executeWithBridgeAdmission(request, metrics, deduper) { handleValidatedSafely(request) }
         } catch (e: Exception) {
-            metrics.recordFailure(bridgeErrorCodeFor(e))
-            logFailure(request, e)
-            bridgeFailureResponse(
-                error = e.message ?: "internal error",
-                errorCode = bridgeErrorCodeFor(e),
-                requestId = request.requestId,
-            )
+            bridgeRequestFailureResponse(request, e, metrics, logError)
+        }
+
+    private fun handleValidatedSafely(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =
+        try {
+            handleValidated(request)
+        } catch (e: Exception) {
+            bridgeRequestFailureResponse(request, e, metrics, logError)
+        }
+
+    private fun handleValidated(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =
+        when (val action = request.action) {
+            ImageBridgeProtocol.ACTION_SEND_IMAGE -> handleSendImage(request)
+            ImageBridgeProtocol.ACTION_SEND_TEXT -> handleSendText(request, markdown = false)
+            ImageBridgeProtocol.ACTION_SEND_MARKDOWN -> handleSendText(request, markdown = true)
+            ImageBridgeProtocol.ACTION_HEALTH -> healthProvider().toProtocolResponse()
+            ImageBridgeProtocol.ACTION_INSPECT_CHATROOM -> handleInspectChatRoom(request)
+            ImageBridgeProtocol.ACTION_OPEN_CHATROOM -> handleOpenChatRoom(request)
+            ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS -> handleSnapshotChatRoomMembers(request)
+            else ->
+                bridgeFailureResponse(
+                    error = "unknown action: $action",
+                    errorCode = ImageBridgeProtocol.ERROR_BAD_REQUEST,
+                    requestId = request.requestId,
+                )
         }
 
     private fun handleSendImage(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse = imageActionHandler.handle(request, healthProvider())
@@ -78,7 +83,7 @@ internal class ImageBridgeRequestHandler(
         val roomId = checkNotNull(request.roomId) { "roomId missing" }
         val opener = checkNotNull(chatRoomOpener) { "chatroom opener unavailable" }
         opener(roomId)
-        return ImageBridgeProtocol.ImageBridgeResponse(status = ImageBridgeProtocol.STATUS_OK)
+        return ImageBridgeProtocol.ImageBridgeResponse(status = ImageBridgeProtocol.STATUS_OK, requestId = request.requestId)
     }
 
     private fun handleSnapshotChatRoomMembers(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse {
@@ -98,17 +103,5 @@ internal class ImageBridgeRequestHandler(
                     request.preferredMemberPlan,
                 ),
         )
-    }
-
-    private fun logFailure(
-        request: ImageBridgeProtocol.ImageBridgeRequest,
-        error: Exception,
-    ) {
-        val action = request.action.ifBlank { "<missing>" }
-        val roomId = request.roomId?.toString() ?: "<missing>"
-        val requestId = request.requestId ?: "<missing>"
-        runCatching {
-            logError(BRIDGE_LOG_TAG, "request handling failed action=$action roomId=$roomId requestId=$requestId", error)
-        }
     }
 }

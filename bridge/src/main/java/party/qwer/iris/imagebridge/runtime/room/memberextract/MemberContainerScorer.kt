@@ -61,6 +61,17 @@ internal class MemberContainerScorer(
             candidate.matchedExpectedCount >= 2 &&
                 candidate.containerType == CONTAINER_TYPE_MAP &&
                 (candidate.expectedNicknameMatches >= 2 || candidate.members.size >= 2) -> ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM
+            candidate.matchedExpectedCount == 0 &&
+                candidate.containerType == CONTAINER_TYPE_COLLECTION &&
+                candidate.members.size >= 2 &&
+                candidate.genericLabelPenalty < 100 &&
+                safeUnanchoredMemberContainerPath(candidate.plan.containerPath) -> ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM
             else -> ImageBridgeProtocol.ChatRoomSnapshotConfidence.LOW
         }
+}
+
+private fun safeUnanchoredMemberContainerPath(path: String): Boolean {
+    val normalized = path.lowercase()
+    if (UNANCHORED_DISCOURAGED_CONTAINER_TOKENS.any { token -> normalized.contains(token) }) return false
+    return UNANCHORED_MEMBER_CONTAINER_TOKENS.any { token -> normalized.contains(token) }
 }
