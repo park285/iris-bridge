@@ -28,7 +28,7 @@ internal fun sendWithShareManagerTextPath(
     if (shareManagerTextInvoker == null) return false
     val mentionAttachment = replyAttachment?.let(ReplyMentionSendingLogAccess::mentionAttachmentOrNull)
     return when {
-        mentionAttachment != null && mentionPendingContexts != null -> {
+        mentionAttachment != null && mentionPendingContexts != null && !requestId.isNullOrBlank() -> {
             mentionPendingContexts.remember(
                 ReplyMentionPendingContext(
                     roomId = roomId,

@@ -24,6 +24,7 @@ internal class ReplyMentionPendingContextStore(
 
     @Synchronized
     fun remember(context: ReplyMentionPendingContext) {
+        if (context.sessionId.isNullOrBlank()) return
         pruneExpiredLocked()
         while (entries.size >= maxEntries) {
             entries.removeFirst()
@@ -38,11 +39,8 @@ internal class ReplyMentionPendingContextStore(
         sessionId: String? = null,
     ): ReplyMentionPendingContext? {
         pruneExpiredLocked()
-        if (sessionId != null) {
-            findAndRemoveBySessionIdLocked(roomId, sessionId)?.let { return it }
-            return findAndRemoveLatestByMessageLocked(roomId, messageText, sessionlessOnly = true)
-        }
-        return findAndRemoveLatestByMessageLocked(roomId, messageText, sessionlessOnly = false)
+        val session = sessionId?.takeIf { it.isNotBlank() } ?: return null
+        return findAndRemoveBySessionIdLocked(roomId, session)
     }
 
     @Synchronized
@@ -64,27 +62,6 @@ internal class ReplyMentionPendingContextStore(
             }
         }
         return null
-    }
-
-    private fun findAndRemoveLatestByMessageLocked(
-        roomId: Long,
-        messageText: String,
-        sessionlessOnly: Boolean,
-    ): ReplyMentionPendingContext? {
-        val iterator = entries.iterator()
-        var latest: ReplyMentionPendingContext? = null
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (entry.context.roomId != roomId || entry.context.messageText != messageText) {
-                continue
-            }
-            if (sessionlessOnly && entry.context.sessionId != null) {
-                continue
-            }
-            latest = entry.context
-            iterator.remove()
-        }
-        return latest
     }
 
     private fun pruneExpiredLocked() {

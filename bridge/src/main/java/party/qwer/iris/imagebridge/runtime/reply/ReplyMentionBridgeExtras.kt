@@ -48,6 +48,7 @@ internal object ReplyMentionBridgeExtras {
         bridgeToken: String = resolveBridgeToken(),
     ): ReplyMentionPendingContext? {
         val roomId = snapshot.roomIdRaw?.toLongOrNull() ?: snapshot.fallbackRoomId ?: return null
+        val sessionId = snapshot.sessionId?.takeIf { it.isNotBlank() } ?: return null
         val messageText = snapshot.messageText ?: snapshot.nestedMessageText ?: return null
         if (messageText.isBlank()) return null
         val attachmentText =
@@ -60,7 +61,7 @@ internal object ReplyMentionBridgeExtras {
                 bridgeToken = bridgeToken,
                 roomId = roomId,
                 messageText = messageText,
-                sessionId = snapshot.sessionId,
+                sessionId = sessionId,
                 createdAtEpochMs = snapshot.createdAtEpochMs,
                 mentionsHash = mentionsHash,
                 signature = snapshot.signature,
@@ -73,7 +74,7 @@ internal object ReplyMentionBridgeExtras {
             roomId = roomId,
             messageText = messageText,
             attachmentText = attachmentText,
-            sessionId = snapshot.sessionId,
+            sessionId = sessionId,
             createdAtEpochMs = snapshot.createdAtEpochMs ?: nowEpochMs,
         )
     }

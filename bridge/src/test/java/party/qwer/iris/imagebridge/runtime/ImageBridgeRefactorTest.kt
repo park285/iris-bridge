@@ -1051,7 +1051,7 @@ class KakaoTextSendInvocationFactoryTest {
         assertEquals("@alice hello", ShareManager.message)
         assertEquals(false, ShareManager.flag)
         assertEquals(null, FakeTextRequestRecorder.sendingLog)
-        val pending = assertNotNull(mentionContexts.match(123L, "@alice hello"))
+        val pending = assertNotNull(mentionContexts.match(123L, "@alice hello", "req-mention"))
         val mention = JSONObject(pending.attachmentText).getJSONArray("mentions").getJSONObject(0)
         assertEquals("text-alice", mention.getString("user_id"))
         assertEquals("req-mention", pending.sessionId)
