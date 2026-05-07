@@ -482,6 +482,38 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
+    fun `prefers member objects over display user id map artifacts`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Room(
+            val q: List<Member>,
+            val displayUserIds: Map<Long, String>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                roomId = 1L,
+                room =
+                    Room(
+                        q = listOf(Member(7L, "박준우")),
+                        displayUserIds = linkedMapOf(7L to "display_user_ids"),
+                    ),
+                expectedMemberHints =
+                    listOf(
+                        ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "박준우"),
+                    ),
+            )
+
+        assertEquals("박준우", result.members.single().nickname)
+        assertEquals("$.q", result.sourcePath)
+    }
+
+    @Test
     fun `falls back to discovery when preferred plan no longer validates`() {
         data class Member(
             val a: Long,

@@ -99,8 +99,10 @@ internal val INTERNAL_ARTIFACT_TOKENS =
         "backup",
         "openlink",
         "chatmember",
+        "display",
         "memberid",
         "userid",
+        "user_ids",
         "nickname",
         "profile",
     )
