@@ -12,7 +12,6 @@ class IrisRuntimePathPolicyTest {
         assertEquals("/data/iris/config.json", paths.configPath)
         assertEquals("/data/iris/logs", paths.logDir)
         assertEquals("/data/iris/reply-images", paths.replyImageDir)
-        assertEquals("iris-image-bridge", paths.imageBridgeSocketName)
         assertEquals("iris-image-bridge-mux", paths.imageBridgeMuxSocketName)
     }
 
@@ -35,7 +34,6 @@ class IrisRuntimePathPolicyTest {
                     "IRIS_CONFIG_PATH" to "/opt/iris/config.json",
                     "IRIS_LOG_DIR" to "/var/log/iris",
                     "IRIS_REPLY_IMAGE_DIR" to "/var/lib/iris/images",
-                    "IRIS_IMAGE_BRIDGE_SOCKET_NAME" to "iris-image-bridge-dev",
                     "IRIS_IMAGE_BRIDGE_MUX_SOCKET_NAME" to "iris-image-bridge-mux-dev",
                 ),
             )
@@ -44,7 +42,6 @@ class IrisRuntimePathPolicyTest {
         assertEquals("/opt/iris/config.json", paths.configPath)
         assertEquals("/var/log/iris", paths.logDir)
         assertEquals("/var/lib/iris/images", paths.replyImageDir)
-        assertEquals("iris-image-bridge-dev", paths.imageBridgeSocketName)
         assertEquals("iris-image-bridge-mux-dev", paths.imageBridgeMuxSocketName)
     }
 }

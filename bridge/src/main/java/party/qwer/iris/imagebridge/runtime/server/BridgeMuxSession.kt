@@ -6,6 +6,7 @@ import party.qwer.iris.FrameReadTimeoutException
 import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -22,6 +23,7 @@ internal class BridgeMuxSession(
 ) {
     private val closed = AtomicBoolean(false)
     private val inFlight = AtomicInteger(0)
+    private val activeRequests = ConcurrentHashMap<String, ActiveMuxRequest>()
     private val writeLock = Any()
     private val writer = BridgeMuxSessionWriter(client, writeLock, ::close)
 
@@ -39,7 +41,7 @@ internal class BridgeMuxSession(
                                 correlationId = frame.correlationId,
                             ),
                         )
-                    ImageBridgeMuxProtocol.TYPE_CANCEL -> Unit
+                    ImageBridgeMuxProtocol.TYPE_CANCEL -> handleCancel(frame.correlationId)
                     else -> writer.writeProtocolFailure(frame.correlationId, "unsupported mux frame type: ${frame.type}")
                 }
             }
@@ -73,12 +75,15 @@ internal class BridgeMuxSession(
             )
             return
         }
+        val active = ActiveMuxRequest(correlationId, request)
+        activeRequests[correlationId] = active
         try {
             executor.execute {
-                handleAcceptedRequest(correlationId, request)
+                handleAcceptedRequest(active)
             }
         } catch (error: RejectedExecutionException) {
             inFlight.decrementAndGet()
+            activeRequests.remove(correlationId)
             metrics.recordBridgeBusy()
             writer.writeResponse(
                 correlationId,
@@ -91,15 +96,22 @@ internal class BridgeMuxSession(
         }
     }
 
-    private fun handleAcceptedRequest(
-        correlationId: String,
-        request: ImageBridgeProtocol.ImageBridgeRequest,
-    ) {
+    private fun handleAcceptedRequest(active: ActiveMuxRequest) {
         try {
-            writeResponseOrClose(correlationId, handleRequestSafely(request))
+            if (!active.cancelled.get()) {
+                writeResponseOrClose(active, handleRequestSafely(active.request))
+            }
         } finally {
+            activeRequests.remove(active.correlationId)
             inFlight.decrementAndGet()
         }
+    }
+
+    private fun handleCancel(correlationId: String?) {
+        if (correlationId.isNullOrBlank()) return
+        val active = activeRequests[correlationId] ?: return
+        active.cancelled.set(true)
+        metrics.recordMuxRequestCancelled()
     }
 
     private fun handleRequestSafely(
@@ -116,11 +128,12 @@ internal class BridgeMuxSession(
         }
 
     private fun writeResponseOrClose(
-        correlationId: String,
+        active: ActiveMuxRequest,
         response: ImageBridgeProtocol.ImageBridgeResponse,
     ) {
+        if (closed.get() || active.cancelled.get()) return
         try {
-            writer.writeResponse(correlationId, response)
+            writer.writeResponse(active.correlationId, response)
         } catch (error: Exception) {
             if (!closed.get() && isRunning()) {
                 logError(TAG, "bridge mux response write failed", error)
@@ -141,3 +154,9 @@ internal class BridgeMuxSession(
         private const val DEFAULT_MAX_IN_FLIGHT = 4
     }
 }
+
+private data class ActiveMuxRequest(
+    val correlationId: String,
+    val request: ImageBridgeProtocol.ImageBridgeRequest,
+    val cancelled: AtomicBoolean = AtomicBoolean(false),
+)

@@ -76,8 +76,9 @@ interface ImageBridgeRequestFactory {
 
     fun buildOpenChatRoomRequest(
         roomId: Long,
+        requestId: String? = null,
         token: String? = null,
-    ): ImageBridgeRequest = roomRequest(ImageBridgeProtocol.ACTION_OPEN_CHATROOM, roomId, token)
+    ): ImageBridgeRequest = roomRequest(ImageBridgeProtocol.ACTION_OPEN_CHATROOM, roomId, token, requestId)
 
     fun buildSnapshotChatRoomMembersRequest(
         roomId: Long,
@@ -125,10 +126,12 @@ private fun roomRequest(
     action: String,
     roomId: Long,
     token: String?,
+    requestId: String? = null,
 ): ImageBridgeRequest =
     ImageBridgeRequest(
         action = action,
         protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
         roomId = roomId,
         token = token,
+        requestId = requestId,
     )

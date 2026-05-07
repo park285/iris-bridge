@@ -5,7 +5,6 @@ object ImageBridgeProtocol :
     ImageBridgeRequestFactory,
     ImageBridgeResponseFactory {
     const val PROTOCOL_VERSION = 1
-    const val SOCKET_NAME = IrisRuntimePathPolicy.DEFAULT_IMAGE_BRIDGE_SOCKET_NAME
     const val ACTION_SEND_IMAGE = "send_image"
     const val ACTION_SEND_TEXT = "send_text"
     const val ACTION_SEND_MARKDOWN = "send_markdown"
@@ -29,6 +28,9 @@ object ImageBridgeProtocol :
     const val ERROR_SEND_FAILED = "SEND_FAILED"
     const val ERROR_TIMEOUT = "TIMEOUT"
     const val ERROR_INTERNAL = "INTERNAL_ERROR"
+    const val ERROR_MISSING_REQUEST_ID = "MISSING_REQUEST_ID"
+    const val ERROR_DUPLICATE_REQUEST = "DUPLICATE_REQUEST"
+    const val ERROR_CANCELLED = "CANCELLED"
 
     typealias ImageBridgeRequest = party.qwer.iris.ImageBridgeRequest
     typealias ChatRoomMemberHint = party.qwer.iris.ChatRoomMemberHint
