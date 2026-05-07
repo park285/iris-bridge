@@ -55,6 +55,10 @@ __pycache__/
 *.zip
 image.png
 
+# Local secrets
+/configs/iris/iris.env
+*.local.env
+
 # Build artifacts
 **/target/
 
