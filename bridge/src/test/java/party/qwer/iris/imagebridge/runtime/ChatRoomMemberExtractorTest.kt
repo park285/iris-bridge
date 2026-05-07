@@ -552,7 +552,7 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
-    fun `does not use welcome fallback as renamed nickname when stale hint exists`() {
+    fun `uses open direct welcome fallback when only expected member hint matches backup id`() {
         data class Notice(
             val c: String,
         )
@@ -568,7 +568,7 @@ class ChatRoomMemberExtractorTest {
 
         val extractor = ChatRoomMemberExtractor(clock = { 1234L })
 
-        assertFailsWith<RuntimeException> {
+        val result =
             extractor.snapshot(
                 roomId = 1L,
                 room =
@@ -590,7 +590,10 @@ class ChatRoomMemberExtractorTest {
                         ),
                     ),
             )
-        }
+
+        assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM, result.confidence)
+        assertEquals(8691114094424718810L, result.members.single().userId)
+        assertEquals("카푸치노", result.members.single().nickname)
     }
 
     @Test

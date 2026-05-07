@@ -16,7 +16,6 @@ internal class OpenDirectMemberSnapshotFallback(
         containers: List<ContainerCandidate>,
         expected: ExpectedMemberHints,
     ): ImageBridgeProtocol.ChatRoomMembersSnapshot? {
-        if (expected.ids.isNotEmpty()) return null
         val userId = openLinkBackupUserId(containers, expected.ids) ?: return null
         val nickname = welcomeNickname(containers) ?: return null
         return ImageBridgeProtocol.ChatRoomMembersSnapshot(
