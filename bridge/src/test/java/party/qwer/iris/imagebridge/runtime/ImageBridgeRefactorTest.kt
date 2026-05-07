@@ -5,6 +5,8 @@ package party.qwer.iris.imagebridge.runtime
 import android.app.Application
 import com.kakao.talk.manager.ShareManager
 import org.json.JSONObject
+import party.qwer.iris.ImageBridgeHandshakeFrame
+import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
@@ -38,6 +40,7 @@ import party.qwer.iris.imagebridge.runtime.server.BridgeMuxSession
 import party.qwer.iris.imagebridge.runtime.server.BridgeMuxSocket
 import party.qwer.iris.imagebridge.runtime.server.BridgePeerIdentityValidator
 import party.qwer.iris.imagebridge.runtime.server.BridgeSecurityMode
+import party.qwer.iris.imagebridge.runtime.server.BridgeSocketHandshakeAuthenticator
 import party.qwer.iris.imagebridge.runtime.server.BridgeSpecCheck
 import party.qwer.iris.imagebridge.runtime.server.BridgeSpecStatus
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitiesSnapshot
@@ -1869,6 +1872,84 @@ class BridgeSecurityTest {
             }
 
         assertEquals("unauthorized bridge token", error.message)
+    }
+
+    @Test
+    fun `socket authenticator accepts matching client proof before request handling`() {
+        val input = ByteArrayOutputStream()
+        ImageBridgeHandshakeProtocol.writeFrame(
+            input,
+            ImageBridgeHandshakeProtocol.buildHello(
+                clientNonce = "client-nonce",
+                socketName = "iris-image-bridge",
+                timestampMs = 1234L,
+            ),
+        )
+        ImageBridgeHandshakeProtocol.writeFrame(
+            input,
+            ImageBridgeHandshakeProtocol.buildClientProof(
+                bridgeToken = "bridge-token",
+                clientNonce = "client-nonce",
+                serverNonce = "server-nonce",
+            ),
+        )
+        val output = ByteArrayOutputStream()
+        val authenticator =
+            BridgeSocketHandshakeAuthenticator(
+                expectedToken = "bridge-token",
+                securityMode = BridgeSecurityMode.PRODUCTION,
+                nonceFactory = { "server-nonce" },
+            )
+
+        authenticator.authenticate(ByteArrayInputStream(input.toByteArray()), output, "iris-image-bridge")
+
+        val serverProof = ImageBridgeHandshakeProtocol.readFrame(ByteArrayInputStream(output.toByteArray()))
+        assertEquals(ImageBridgeHandshakeProtocol.TYPE_SERVER_PROOF, serverProof.type)
+        assertTrue(
+            ImageBridgeHandshakeProtocol.proofMatches(
+                serverProof.proof,
+                ImageBridgeHandshakeProtocol.serverProof(
+                    bridgeToken = "bridge-token",
+                    clientNonce = "client-nonce",
+                    serverNonce = "server-nonce",
+                    socketName = "iris-image-bridge",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `socket authenticator rejects bad client proof with sanitized error`() {
+        val input = ByteArrayOutputStream()
+        ImageBridgeHandshakeProtocol.writeFrame(
+            input,
+            ImageBridgeHandshakeProtocol.buildHello(
+                clientNonce = "client-nonce",
+                socketName = "iris-image-bridge",
+                timestampMs = 1234L,
+            ),
+        )
+        ImageBridgeHandshakeProtocol.writeFrame(
+            input,
+            ImageBridgeHandshakeFrame(
+                type = ImageBridgeHandshakeProtocol.TYPE_CLIENT_PROOF,
+                protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
+                proof = "bad-proof",
+            ),
+        )
+        val authenticator =
+            BridgeSocketHandshakeAuthenticator(
+                expectedToken = "bridge-token",
+                securityMode = BridgeSecurityMode.PRODUCTION,
+                nonceFactory = { "server-nonce" },
+            )
+
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                authenticator.authenticate(ByteArrayInputStream(input.toByteArray()), ByteArrayOutputStream(), "iris-image-bridge")
+            }
+
+        assertEquals(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED, error.message)
     }
 
     @Test

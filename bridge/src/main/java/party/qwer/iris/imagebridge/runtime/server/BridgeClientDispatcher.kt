@@ -2,7 +2,9 @@ package party.qwer.iris.imagebridge.runtime.server
 
 import android.net.LocalSocket
 import android.util.Log
+import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.IrisRuntimePathPolicy
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
@@ -13,6 +15,8 @@ internal class BridgeClientDispatcher(
     private val isRunning: () -> Boolean,
     private val peerIdentityValidator: BridgePeerIdentityValidator,
     private val metrics: BridgeMetrics,
+    private val handshakeAuthenticator: BridgeSocketHandshakeAuthenticator = BridgeSocketHandshakeAuthenticator(),
+    private val socketNameProvider: () -> String = { IrisRuntimePathPolicy.resolve().imageBridgeSocketName },
 ) {
     fun dispatch(client: LocalSocket) {
         val executor = executorProvider()
@@ -62,6 +66,7 @@ internal class BridgeClientDispatcher(
     ) {
         metrics.recordClientStart()
         try {
+            handshakeAuthenticator.authenticate(client.inputStream, client.outputStream, socketNameProvider())
             val request = ImageBridgeProtocol.readRequestFrame(client.inputStream)
             val response = handler.handle(request)
             ImageBridgeProtocol.writeFrame(client.outputStream, response)
@@ -70,13 +75,24 @@ internal class BridgeClientDispatcher(
             if (isTimeout) {
                 metrics.recordTimeout()
             }
-            Log.e(TAG, "client handler error", error)
+            if (error.isBridgeAuthenticationFailure()) {
+                Log.e(TAG, ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED)
+            } else {
+                Log.e(TAG, "client handler error", error)
+            }
             runCatching {
                 ImageBridgeProtocol.writeFrame(
                     client.outputStream,
                     bridgeFailureResponse(
-                        error = error.message ?: "internal error",
-                        errorCode = if (isTimeout) ImageBridgeProtocol.ERROR_TIMEOUT else ImageBridgeProtocol.ERROR_INTERNAL,
+                        error = error.sanitizedClientError(),
+                        errorCode =
+                            if (error.isBridgeAuthenticationFailure()) {
+                                ImageBridgeProtocol.ERROR_UNAUTHORIZED
+                            } else if (isTimeout) {
+                                ImageBridgeProtocol.ERROR_TIMEOUT
+                            } else {
+                                ImageBridgeProtocol.ERROR_INTERNAL
+                            },
                     ),
                 )
             }
@@ -109,6 +125,17 @@ internal class BridgeClientDispatcher(
             Log.w(TAG, "failed to set bridge client read timeout: ${error.message}")
         }
     }
+
+    private fun Exception.isBridgeAuthenticationFailure(): Boolean =
+        message == ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED ||
+            cause?.message == ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED
+
+    private fun Exception.sanitizedClientError(): String =
+        if (isBridgeAuthenticationFailure()) {
+            ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED
+        } else {
+            message ?: "internal error"
+        }
 
     private companion object {
         private const val TAG = "IrisBridge"

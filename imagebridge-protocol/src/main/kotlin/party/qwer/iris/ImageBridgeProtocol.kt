@@ -13,6 +13,9 @@ object ImageBridgeProtocol :
     const val ACTION_INSPECT_CHATROOM = "inspect_chatroom"
     const val ACTION_OPEN_CHATROOM = "open_chatroom"
     const val ACTION_SNAPSHOT_CHATROOM_MEMBERS = "snapshot_chatroom_members"
+    const val HANDSHAKE_HELLO = ImageBridgeHandshakeProtocol.TYPE_HELLO
+    const val HANDSHAKE_SERVER_PROOF = ImageBridgeHandshakeProtocol.TYPE_SERVER_PROOF
+    const val HANDSHAKE_CLIENT_PROOF = ImageBridgeHandshakeProtocol.TYPE_CLIENT_PROOF
     const val STATUS_SENT = "sent"
     const val STATUS_FAILED = "failed"
     const val STATUS_OK = "ok"

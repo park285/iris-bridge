@@ -2,9 +2,11 @@ package party.qwer.iris.imagebridge.runtime.server
 
 import android.net.LocalSocket
 import android.util.Log
+import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.IrisRuntimePathPolicy
 import java.util.concurrent.ExecutorService
 
 internal class BridgeMuxClientDispatcher(
@@ -14,6 +16,8 @@ internal class BridgeMuxClientDispatcher(
     private val peerIdentityValidator: BridgePeerIdentityValidator,
     private val metrics: BridgeMetrics,
     private val socketWrapper: (LocalSocket) -> BridgeMuxSocket = ::LocalBridgeMuxSocket,
+    private val handshakeAuthenticator: BridgeSocketHandshakeAuthenticator = BridgeSocketHandshakeAuthenticator(),
+    private val socketNameProvider: () -> String = { IrisRuntimePathPolicy.resolve().imageBridgeMuxSocketName },
 ) {
     fun dispatch(client: LocalSocket) {
         dispatch(socketWrapper(client))
@@ -42,13 +46,28 @@ internal class BridgeMuxClientDispatcher(
         client.setReadTimeout(CLIENT_READ_TIMEOUT_MS)
         Thread(
             {
-                BridgeMuxSession(
-                    client = client,
-                    executor = executor,
-                    handler = handler,
-                    isRunning = isRunning,
-                    metrics = metrics,
-                ).run()
+                val authenticated =
+                    try {
+                        handshakeAuthenticator.authenticate(client.inputStream, client.outputStream, socketNameProvider())
+                        true
+                    } catch (_: Exception) {
+                        Log.e(TAG, ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED)
+                        writeGoaway(
+                            client,
+                            ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED,
+                            ImageBridgeProtocol.ERROR_UNAUTHORIZED,
+                        )
+                        false
+                    }
+                if (authenticated) {
+                    BridgeMuxSession(
+                        client = client,
+                        executor = executor,
+                        handler = handler,
+                        isRunning = isRunning,
+                        metrics = metrics,
+                    ).run()
+                }
             },
             "iris-bridge-mux-client",
         ).apply {

@@ -5,10 +5,51 @@ import java.io.ByteArrayOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ImageBridgeProtocolTest {
+    @Test
+    fun `handshake hello omits bridge token and payload fields`() {
+        val buffer = ByteArrayOutputStream()
+        val hello =
+            ImageBridgeHandshakeProtocol.buildHello(
+                clientNonce = "client-nonce",
+                socketName = "iris-image-bridge",
+                timestampMs = 1234L,
+            )
+
+        ImageBridgeHandshakeProtocol.writeFrame(buffer, hello)
+
+        val payload = LengthPrefixedFrameCodec.readPayload(ByteArrayInputStream(buffer.toByteArray()))
+        assertTrue(payload.contains(""""type":"hello""""))
+        assertTrue(payload.contains(""""clientNonce":"client-nonce""""))
+        assertFalse(payload.contains("token"))
+        assertFalse(payload.contains("message"))
+    }
+
+    @Test
+    fun `handshake proof uses separate server and client domains`() {
+        val serverProof =
+            ImageBridgeHandshakeProtocol.serverProof(
+                bridgeToken = "bridge-token",
+                clientNonce = "client-nonce",
+                serverNonce = "server-nonce",
+                socketName = "iris-image-bridge",
+            )
+        val clientProof =
+            ImageBridgeHandshakeProtocol.clientProof(
+                bridgeToken = "bridge-token",
+                clientNonce = "client-nonce",
+                serverNonce = "server-nonce",
+            )
+
+        assertNotEquals(serverProof, clientProof)
+        assertTrue(ImageBridgeHandshakeProtocol.proofMatches(serverProof, serverProof))
+        assertFalse(ImageBridgeHandshakeProtocol.proofMatches(clientProof, serverProof))
+    }
+
     @Test
     fun `member snapshot reads legacy payload without mention user id`() {
         val buffer = ByteArrayOutputStream()
