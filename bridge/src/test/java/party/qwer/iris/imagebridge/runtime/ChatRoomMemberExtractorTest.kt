@@ -552,6 +552,73 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
+    fun `does not use welcome fallback as renamed nickname when stale hint exists`() {
+        data class Notice(
+            val c: String,
+        )
+
+        data class MetaBox(
+            val nameValuePairs: Map<String, Any>,
+        )
+
+        data class Room(
+            val u: Map<String, Notice>,
+            val v0: MetaBox,
+        )
+
+        val extractor = ChatRoomMemberExtractor(clock = { 1234L })
+
+        assertFailsWith<RuntimeException> {
+            extractor.snapshot(
+                roomId = 1L,
+                room =
+                    Room(
+                        u = linkedMapOf("Notice" to Notice("Welcome to '카푸치노'.")),
+                        v0 =
+                            MetaBox(
+                                linkedMapOf(
+                                    "openLinkChatMemberIdBackup" to 8691114094424718810L,
+                                    "display_user_ids" to "8691114094424718810",
+                                ),
+                            ),
+                    ),
+                expectedMemberHints =
+                    listOf(
+                        ImageBridgeProtocol.ChatRoomMemberHint(
+                            userId = 8691114094424718810L,
+                            nickname = "카푸",
+                        ),
+                    ),
+            )
+        }
+    }
+
+    @Test
+    fun `ignores welcome notice and detects renamed member nickname`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+            val c: String,
+        )
+
+        data class Room(
+            val q: List<Member>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                roomId = 1L,
+                room = Room(q = listOf(Member(7L, "Welcome to '카푸치노'.", "카푸"))),
+                expectedMemberHints = listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "카푸치노")),
+            )
+
+        assertEquals("카푸", result.members.single().nickname)
+        assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.LOW, result.confidence)
+    }
+
+    @Test
     fun `falls back to discovery when preferred plan no longer validates`() {
         data class Member(
             val a: Long,

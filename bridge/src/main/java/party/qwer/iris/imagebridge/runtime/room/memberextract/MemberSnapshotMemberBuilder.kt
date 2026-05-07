@@ -9,6 +9,7 @@ internal fun buildChatRoomMembers(
     rolePath: String?,
     profilePath: String?,
     mentionUserIdPath: String?,
+    expectedNicknames: Map<Long, String>,
     mentionUserIds: Map<Long, String>,
     fieldSelector: MemberFieldSelector,
 ): List<ImageBridgeProtocol.ChatRoomMemberSnapshot> {
@@ -21,6 +22,7 @@ internal fun buildChatRoomMembers(
                 ?.trim()
                 ?.takeIf(fieldSelector::looksLikeNickname)
                 ?: return@forEach
+        if (nickname == userId.toString() && expectedNicknames[userId] != nickname) return@forEach
         val candidate =
             ImageBridgeProtocol.ChatRoomMemberSnapshot(
                 userId = userId,

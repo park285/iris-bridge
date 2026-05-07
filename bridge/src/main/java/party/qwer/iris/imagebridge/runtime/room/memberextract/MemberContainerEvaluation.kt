@@ -27,6 +27,7 @@ internal fun evaluateMemberContainer(
             rolePath = paths.rolePath?.path,
             profilePath = paths.profilePath?.path,
             mentionUserIdPath = paths.mentionUserIdPath?.path,
+            expectedNicknames = expectedNicknames,
             mentionUserIds = expectedMentionUserIds,
             fieldSelector = fieldSelector,
         ).filter { member -> expectedMemberIds.isEmpty() || member.userId in expectedMemberIds }

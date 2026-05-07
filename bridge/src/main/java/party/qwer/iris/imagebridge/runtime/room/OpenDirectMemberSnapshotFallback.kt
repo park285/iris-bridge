@@ -16,6 +16,7 @@ internal class OpenDirectMemberSnapshotFallback(
         containers: List<ContainerCandidate>,
         expected: ExpectedMemberHints,
     ): ImageBridgeProtocol.ChatRoomMembersSnapshot? {
+        if (expected.ids.isNotEmpty()) return null
         val userId = openLinkBackupUserId(containers, expected.ids) ?: return null
         val nickname = welcomeNickname(containers) ?: return null
         return ImageBridgeProtocol.ChatRoomMembersSnapshot(
@@ -49,18 +50,32 @@ internal class OpenDirectMemberSnapshotFallback(
     private fun welcomeNickname(containers: List<ContainerCandidate>): FallbackValue<String>? {
         val candidates =
             containers
-                .flatMap { container ->
-                    candidateCollector.views(container).flatMap { view ->
-                        view.values.mapNotNull { (path, value) ->
-                            val text = (value as? PrimitiveValue.StringValue)?.value?.trim() ?: return@mapNotNull null
-                            val nickname = WELCOME_TO_PATTERN.matchEntire(text)?.groupValues?.getOrNull(1)?.trim() ?: return@mapNotNull null
-                            nickname
-                                .takeIf(::looksLikeNickname)
-                                ?.let { FallbackValue(it, "${container.path}.$path") }
-                        }
-                    }
-                }.distinctBy { it.value }
+                .flatMap(::welcomeNicknameCandidates)
+                .distinctBy { it.value }
         return candidates.singleOrNull()
+    }
+
+    private fun welcomeNicknameCandidates(container: ContainerCandidate): List<FallbackValue<String>> =
+        candidateCollector.views(container).flatMap { view ->
+            view.values.mapNotNull { (path, value) -> welcomeNicknameValue(container.path, path, value) }
+        }
+
+    private fun welcomeNicknameValue(
+        containerPath: String,
+        path: String,
+        value: PrimitiveValue,
+    ): FallbackValue<String>? {
+        val text = (value as? PrimitiveValue.StringValue)?.value?.trim() ?: return null
+        val nickname =
+            WELCOME_TO_PATTERN
+                .matchEntire(text)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.trim()
+                ?: return null
+        return nickname
+            .takeIf(::looksLikeNickname)
+            ?.let { FallbackValue(it, "$containerPath.$path") }
     }
 
     private data class FallbackValue<T>(
