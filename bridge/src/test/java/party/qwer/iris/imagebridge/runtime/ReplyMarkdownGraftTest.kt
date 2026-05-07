@@ -1,6 +1,7 @@
 package party.qwer.iris.imagebridge.runtime
 
 import org.json.JSONObject
+import party.qwer.iris.ReplyHookSignatureProtocol
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownBridgeExtras
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContext
@@ -12,9 +13,12 @@ import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionSendingLogAccess
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+
+private const val BRIDGE_TOKEN = "bridge-token"
 
 class ReplyMarkdownPendingContextStoreTest {
     @Test
@@ -182,11 +186,16 @@ class ReplyMarkdownPendingContextStoreTest {
         val extracted =
             ReplyMarkdownBridgeExtras.extractPendingContext(
                 ReplyMarkdownBridgeExtras.Snapshot(
+                    sessionId = "session-capture",
                     roomIdRaw = "18478615493603057",
                     threadIdRaw = "3805486995143352321",
                     threadScope = 2,
+                    createdAtEpochMs = 1_000L,
+                    signature = markdownSignature(18478615493603057L, "thread text", "session-capture", 1_000L),
                     messageText = "thread text",
                 ),
+                nowEpochMs = 1_001L,
+                bridgeToken = BRIDGE_TOKEN,
             )
         assertNotNull(extracted)
         store.remember(extracted)
@@ -205,9 +214,11 @@ class ReplyMarkdownBridgeExtrasTest {
                     threadIdRaw = "3805486995143352321",
                     threadScope = 3,
                     createdAtEpochMs = 99L,
+                    signature = markdownSignature(18478615493603057L, "markdown text", "session-1", 99L),
                     nestedMessageText = "markdown text",
                 ),
-                nowEpochMs = 5L,
+                nowEpochMs = 100L,
+                bridgeToken = BRIDGE_TOKEN,
             )
 
         assertNotNull(context)
@@ -224,11 +235,15 @@ class ReplyMarkdownBridgeExtrasTest {
         val context =
             ReplyMarkdownBridgeExtras.extractPendingContext(
                 ReplyMarkdownBridgeExtras.Snapshot(
+                    sessionId = "session-2",
                     roomIdRaw = "1",
                     threadIdRaw = "2",
+                    createdAtEpochMs = 7L,
+                    signature = markdownSignature(1L, "hi", "session-2", 7L),
                     messageText = "hi",
                 ),
-                nowEpochMs = 7L,
+                nowEpochMs = 8L,
+                bridgeToken = BRIDGE_TOKEN,
             )
 
         assertNotNull(context)
@@ -241,13 +256,16 @@ class ReplyMarkdownBridgeExtrasTest {
         val context =
             ReplyMarkdownBridgeExtras.extractPendingContext(
                 ReplyMarkdownBridgeExtras.Snapshot(
+                    sessionId = "session-3",
                     roomIdRaw = 18478615493603057L.toString(),
                     threadIdRaw = 3805486995143352321L.toString(),
                     threadScope = 2,
                     createdAtEpochMs = 99L,
+                    signature = markdownSignature(18478615493603057L, "numeric extras", "session-3", 99L),
                     messageText = "numeric extras",
                 ),
-                nowEpochMs = 5L,
+                nowEpochMs = 100L,
+                bridgeToken = BRIDGE_TOKEN,
             )
 
         assertNotNull(context)
@@ -265,6 +283,41 @@ class ReplyMarkdownBridgeExtrasTest {
                     roomIdRaw = "1",
                     messageText = "hi",
                 ),
+            ),
+        )
+    }
+
+    @Test
+    fun `extract pending context skips missing signature`() {
+        assertNull(
+            ReplyMarkdownBridgeExtras.extractPendingContext(
+                ReplyMarkdownBridgeExtras.Snapshot(
+                    sessionId = "session-4",
+                    roomIdRaw = "1",
+                    threadIdRaw = "2",
+                    createdAtEpochMs = 1_000L,
+                    messageText = "hi",
+                ),
+                nowEpochMs = 1_001L,
+                bridgeToken = BRIDGE_TOKEN,
+            ),
+        )
+    }
+
+    @Test
+    fun `extract pending context skips expired signature`() {
+        assertNull(
+            ReplyMarkdownBridgeExtras.extractPendingContext(
+                ReplyMarkdownBridgeExtras.Snapshot(
+                    sessionId = "session-5",
+                    roomIdRaw = "1",
+                    threadIdRaw = "2",
+                    createdAtEpochMs = 1_000L,
+                    signature = markdownSignature(1L, "hi", "session-5", 1_000L),
+                    messageText = "hi",
+                ),
+                nowEpochMs = 1_000L + ReplyHookSignatureProtocol.TTL_MS + 1,
+                bridgeToken = BRIDGE_TOKEN,
             ),
         )
     }
@@ -316,10 +369,19 @@ class ReplyMentionBridgeExtrasTest {
                     sessionId = "session-1",
                     fallbackRoomId = 18478615493603057L,
                     createdAtEpochMs = 99L,
+                    signature =
+                        mentionSignature(
+                            roomId = 18478615493603057L,
+                            messageText = "@홍길동 테스트",
+                            sessionId = "session-1",
+                            createdAtEpochMs = 99L,
+                            mentionsJson = """{"mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
+                        ),
                     nestedMessageText = "@홍길동 테스트",
                     nestedAttachmentText = """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
                 ),
-                nowEpochMs = 5L,
+                nowEpochMs = 100L,
+                bridgeToken = BRIDGE_TOKEN,
             )
 
         assertNotNull(context)
@@ -340,6 +402,31 @@ class ReplyMentionBridgeExtrasTest {
                     messageText = "hello",
                     attachmentText = """{"callingPkg":"com.kakao.talk","markdown":true}""",
                 ),
+            ),
+        )
+    }
+
+    @Test
+    fun `extract pending mention context skips wrong mentions hash`() {
+        assertNull(
+            ReplyMentionBridgeExtras.extractPendingContext(
+                ReplyMentionBridgeExtras.Snapshot(
+                    sessionId = "session-2",
+                    fallbackRoomId = 1L,
+                    createdAtEpochMs = 100L,
+                    signature =
+                        mentionSignature(
+                            roomId = 1L,
+                            messageText = "@홍길동 테스트",
+                            sessionId = "session-2",
+                            createdAtEpochMs = 100L,
+                            mentionsJson = """{"mentions":[{"user_id":999,"at":[1],"len":3}]}""",
+                        ),
+                    messageText = "@홍길동 테스트",
+                    attachmentText = """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
+                ),
+                nowEpochMs = 101L,
+                bridgeToken = BRIDGE_TOKEN,
             ),
         )
     }
@@ -419,18 +506,13 @@ class ReplyMarkdownSendingLogAccessTest {
     }
 
     @Test
-    fun `injects mention attachment without pending thread context`() {
+    fun `does not inject mention attachment without pending context`() {
         val log =
             FakeSendingLogWithAttachmentField(
                 """{"callingPkg":"com.kakao.talk","mentions":[{"user_id":123456789,"at":[1],"len":3}]}""",
             )
 
-        assertTrue(ReplyMentionSendingLogAccess.injectMentionAttachment(log))
-
-        val mention = JSONObject(log.G).getJSONArray("mentions").getJSONObject(0)
-        assertEquals(123456789L, mention.getLong("user_id"))
-        assertEquals(1, mention.getJSONArray("at").getInt(0))
-        assertEquals(3, mention.getInt("len"))
+        assertFalse(ReplyMentionSendingLogAccess.injectMentionAttachment(log))
     }
 
     @Test
@@ -572,6 +654,41 @@ private class FakeMarkdownOtherChatRoom
 private class FakeMarkdownWriteType
 
 private interface FakeMarkdownListener
+
+private fun markdownSignature(
+    roomId: Long,
+    messageText: String,
+    sessionId: String,
+    createdAtEpochMs: Long,
+): String =
+    requireNotNull(
+        ReplyHookSignatureProtocol.signPreparedOrNull(
+            bridgeToken = BRIDGE_TOKEN,
+            roomId = roomId,
+            messageText = messageText,
+            sessionId = sessionId,
+            createdAtEpochMs = createdAtEpochMs,
+            mentionsHash = null,
+        ),
+    )
+
+private fun mentionSignature(
+    roomId: Long,
+    messageText: String,
+    sessionId: String,
+    createdAtEpochMs: Long,
+    mentionsJson: String,
+): String =
+    requireNotNull(
+        ReplyHookSignatureProtocol.signOrNull(
+            bridgeToken = BRIDGE_TOKEN,
+            roomId = roomId,
+            messageText = messageText,
+            sessionId = sessionId,
+            createdAtEpochMs = createdAtEpochMs,
+            mentionsJson = mentionsJson,
+        ),
+    )
 
 @Suppress("UNUSED_PARAMETER")
 private class FakeRequestCompanion {
