@@ -29,7 +29,7 @@ internal fun evaluateMemberContainer(
             mentionUserIdPath = paths.mentionUserIdPath?.path,
             mentionUserIds = expectedMentionUserIds,
             fieldSelector = fieldSelector,
-        ).filter { member -> member.userId in expectedMemberIds }
+        ).filter { member -> expectedMemberIds.isEmpty() || member.userId in expectedMemberIds }
     if (members.isEmpty()) return null
     return rankMemberContainer(container, views, members, paths, expectedMemberIds, expectedNicknames, candidateCollector, fieldSelector)
 }

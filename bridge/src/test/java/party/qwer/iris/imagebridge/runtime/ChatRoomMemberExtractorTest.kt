@@ -4,7 +4,6 @@ import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberExtractor
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class ChatRoomMemberExtractorTest {
@@ -534,7 +533,7 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
-    fun `requires expected member ids for anchored extraction`() {
+    fun `snapshots members without expected hints for refresh flows`() {
         data class Member(
             val a: Long,
             val b: String,
@@ -546,8 +545,9 @@ class ChatRoomMemberExtractorTest {
 
         val extractor = ChatRoomMemberExtractor()
 
-        assertFailsWith<IllegalStateException> {
-            extractor.snapshot(1L, Room(members = listOf(Member(7L, "Alice"))))
-        }
+        val result = extractor.snapshot(1L, Room(members = listOf(Member(7L, "Alice"), Member(9L, "Bob"))))
+
+        assertEquals(listOf(7L, 9L), result.members.map { it.userId })
+        assertEquals(listOf("Alice", "Bob"), result.members.map { it.nickname })
     }
 }
