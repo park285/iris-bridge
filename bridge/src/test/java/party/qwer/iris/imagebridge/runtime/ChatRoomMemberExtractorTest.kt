@@ -4,6 +4,7 @@ import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberExtractor
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class ChatRoomMemberExtractorTest {
@@ -549,5 +550,56 @@ class ChatRoomMemberExtractorTest {
 
         assertEquals(listOf(7L, 9L), result.members.map { it.userId })
         assertEquals(listOf("Alice", "Bob"), result.members.map { it.nickname })
+        assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM, result.confidence)
+    }
+
+    @Test
+    fun `unanchored snapshot ignores larger non-member containers`() {
+        data class Member(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Message(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Room(
+            val messages: List<Message>,
+            val members: List<Member>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        val result =
+            extractor.snapshot(
+                1L,
+                Room(
+                    messages = (1L..20L).map { id -> Message(id, "message-$id") },
+                    members = listOf(Member(7L, "Alice"), Member(9L, "Bob")),
+                ),
+            )
+
+        assertEquals("$.members", result.sourcePath)
+        assertEquals(listOf(7L, 9L), result.members.map { it.userId })
+    }
+
+    @Test
+    fun `unanchored snapshot rejects containers without member path evidence`() {
+        data class Candidate(
+            val a: Long,
+            val b: String,
+        )
+
+        data class Room(
+            val q: List<Candidate>,
+        )
+
+        val extractor = ChatRoomMemberExtractor()
+
+        assertFailsWith<RuntimeException> {
+            extractor.snapshot(1L, Room(q = listOf(Candidate(7L, "Alice"), Candidate(9L, "Bob"))))
+        }
     }
 }
