@@ -347,7 +347,7 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
-    fun `uses preferred plan when previous nickname hint is stale after rename`() {
+    fun `uses preferred plan when expected nickname hint differs from current member label`() {
         data class NickBox(
             val a: String,
         )
@@ -375,12 +375,12 @@ class ChatRoomMemberExtractorTest {
         val result =
             extractor.snapshot(
                 roomId = 1L,
-                room = Room(q = listOf(Member(7L, NickBox("Alice Updated"), "Notice"))),
+                room = Room(q = listOf(Member(7L, NickBox("Alice Current"), "Notice"))),
                 expectedMemberHints = listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "Alice")),
                 preferredPlan = preferredPlan,
             )
 
-        assertEquals("Alice Updated", result.members.single().nickname)
+        assertEquals("Alice Current", result.members.single().nickname)
         assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.HIGH, result.confidence)
         assertEquals(true, result.usedPreferredPlan)
     }
@@ -442,7 +442,7 @@ class ChatRoomMemberExtractorTest {
         val result =
             extractor.snapshot(
                 roomId = 1L,
-                room = Room(q = listOf(Member(7L, NickBox("Alice Updated"), "Notice"))),
+                room = Room(q = listOf(Member(7L, NickBox("Alice Current"), "Notice"))),
                 expectedMemberHints = listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "Alice")),
             )
 
@@ -514,90 +514,7 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
-    fun `falls back to open direct backup id and welcome nickname`() {
-        data class Notice(
-            val c: String,
-        )
-
-        data class MetaBox(
-            val nameValuePairs: Map<String, Any>,
-        )
-
-        data class Room(
-            val u: Map<String, Notice>,
-            val v0: MetaBox,
-        )
-
-        val extractor = ChatRoomMemberExtractor(clock = { 1234L })
-
-        val result =
-            extractor.snapshot(
-                roomId = 1L,
-                room =
-                    Room(
-                        u = linkedMapOf("Notice" to Notice("Welcome to '카푸치노'.")),
-                        v0 =
-                            MetaBox(
-                                linkedMapOf(
-                                    "openLinkChatMemberIdBackup" to 8691114094424718810L,
-                                    "display_user_ids" to "8691114094424718810",
-                                ),
-                            ),
-                    ),
-            )
-
-        assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM, result.confidence)
-        assertEquals(8691114094424718810L, result.members.single().userId)
-        assertEquals("카푸치노", result.members.single().nickname)
-    }
-
-    @Test
-    fun `uses open direct welcome fallback when only expected member hint matches backup id`() {
-        data class Notice(
-            val c: String,
-        )
-
-        data class MetaBox(
-            val nameValuePairs: Map<String, Any>,
-        )
-
-        data class Room(
-            val u: Map<String, Notice>,
-            val v0: MetaBox,
-        )
-
-        val extractor = ChatRoomMemberExtractor(clock = { 1234L })
-
-        val result =
-            extractor.snapshot(
-                roomId = 1L,
-                room =
-                    Room(
-                        u = linkedMapOf("Notice" to Notice("Welcome to '카푸치노'.")),
-                        v0 =
-                            MetaBox(
-                                linkedMapOf(
-                                    "openLinkChatMemberIdBackup" to 8691114094424718810L,
-                                    "display_user_ids" to "8691114094424718810",
-                                ),
-                            ),
-                    ),
-                expectedMemberHints =
-                    listOf(
-                        ImageBridgeProtocol.ChatRoomMemberHint(
-                            userId = 8691114094424718810L,
-                            nickname = "카푸",
-                        ),
-                    ),
-            )
-
-        assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM, result.confidence)
-        assertEquals(8691114094424718810L, result.members.single().userId)
-        assertEquals("카푸치노", result.members.single().nickname)
-    }
-
-    @Test
-    fun `ignores welcome notice and detects renamed member nickname`() {
+    fun `ignores welcome notice when selecting member nickname`() {
         data class Member(
             val a: Long,
             val b: String,
@@ -645,12 +562,12 @@ class ChatRoomMemberExtractorTest {
         val result =
             extractor.snapshot(
                 roomId = 1L,
-                room = Room(q = listOf(Member(7L, "Alice Updated"))),
+                room = Room(q = listOf(Member(7L, "Alice Current"))),
                 expectedMemberHints = listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "Alice")),
                 preferredPlan = preferredPlan,
             )
 
-        assertEquals("Alice Updated", result.members.single().nickname)
+        assertEquals("Alice Current", result.members.single().nickname)
         assertEquals(false, result.usedPreferredPlan)
         assertEquals("$.q", result.sourcePath)
     }
@@ -674,7 +591,7 @@ class ChatRoomMemberExtractorTest {
     }
 
     @Test
-    fun `snapshots members without expected hints for refresh flows`() {
+    fun `snapshots members without expected hints for mention warmup`() {
         data class Member(
             val a: Long,
             val b: String,

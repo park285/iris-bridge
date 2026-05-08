@@ -27,7 +27,6 @@ internal class ChatRoomMemberExtractor(
     private val diagnostics = MemberExtractionDiagnostics(candidateCollector)
     private val snapshotBuilder = ChatRoomMemberSnapshotBuilder(clock, scorer, planMapper, diagnostics)
     private val preferredPlanApplier = PreferredMemberPlanApplier(candidateCollector, scorer, snapshotBuilder)
-    private val openDirectFallback = OpenDirectMemberSnapshotFallback(clock, candidateCollector)
 
     fun snapshot(
         roomId: Long,
@@ -53,7 +52,6 @@ internal class ChatRoomMemberExtractor(
             roomId = roomId,
             containers = containers,
             expected = expected,
-            fallbackSnapshot = openDirectFallback.snapshot(roomId, containers, expected),
         )
     }
 
