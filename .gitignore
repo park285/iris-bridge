@@ -41,6 +41,7 @@ __pycache__/
 !/docs/reply-mentions.md
 !/docs/read-model.md
 !/docs/stats.md
+!/docs/nickname-events.md
 !/docs/testing_surface_policy.md
 !/docs/testing/
 !/docs/testing/*.md
