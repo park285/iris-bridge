@@ -1051,7 +1051,7 @@ class KakaoTextSendInvocationFactoryTest {
         assertEquals("@alice hello", ShareManager.message)
         assertEquals(false, ShareManager.flag)
         assertEquals(null, FakeTextRequestRecorder.sendingLog)
-        val pending = assertNotNull(mentionContexts.match(123L, "@alice hello"))
+        val pending = assertNotNull(mentionContexts.match(123L, "@alice hello", "req-mention"))
         val mention = JSONObject(pending.attachmentText).getJSONArray("mentions").getJSONObject(0)
         assertEquals("text-alice", mention.getString("user_id"))
         assertEquals("req-mention", pending.sessionId)
@@ -1540,6 +1540,18 @@ class ChatRoomResolverTest {
         resolver.resolve(777L)
 
         assertEquals(listOf("c"), LegacyNameSensitiveRecorder.calls)
+    }
+
+    @Test
+    fun `resolveFresh prefers manager path over database path`() {
+        FakeChatRuntime.reset()
+        val resolver = ChatRoomResolver(registry = buildFakeRegistry())
+
+        val room = resolver.resolveFresh(202L)
+
+        assertNotNull(room)
+        assertEquals(listOf(202L), FakeChatRuntime.managerRoomIds)
+        assertEquals(emptyList(), FakeChatRuntime.databaseRoomIds)
     }
 }
 
@@ -2957,9 +2969,13 @@ private class FakeThreadedRequestCompanion {
 
 private object FakeChatRuntime {
     val resolvedRoomIds = mutableListOf<Long>()
+    val databaseRoomIds = mutableListOf<Long>()
+    val managerRoomIds = mutableListOf<Long>()
 
     fun reset() {
         resolvedRoomIds.clear()
+        databaseRoomIds.clear()
+        managerRoomIds.clear()
         FakeMasterDatabase.INSTANCE = FakeMasterDatabase()
     }
 }
@@ -2975,7 +2991,10 @@ private class FakeMasterDatabase {
 }
 
 private class FakeRoomDao {
-    fun h(roomId: Long): FakeRoomEntity = FakeRoomEntity(roomId)
+    fun h(roomId: Long): FakeRoomEntity {
+        FakeChatRuntime.databaseRoomIds += roomId
+        return FakeRoomEntity(roomId)
+    }
 }
 
 private data class FakeRoomEntity(
@@ -3036,7 +3055,10 @@ private class FakeChatRoomManager {
         includeOpenLink: Boolean,
     ): FakeChatRoomModel? = null
 
-    fun d0(roomId: Long): FakeChatRoomModel = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(roomId))
+    fun d0(roomId: Long): FakeChatRoomModel {
+        FakeChatRuntime.managerRoomIds += roomId
+        return FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(roomId))
+    }
 }
 
 class KakaoClassRegistryTest {

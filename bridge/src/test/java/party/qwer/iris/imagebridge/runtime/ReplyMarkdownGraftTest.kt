@@ -325,7 +325,7 @@ class ReplyMarkdownBridgeExtrasTest {
 
 class ReplyMentionPendingContextStoreTest {
     @Test
-    fun `match removes first exact room and message mention context`() {
+    fun `sessionless mention context is ignored`() {
         var now = 1_000L
         val store = ReplyMentionPendingContextStore(clock = { now })
         val context =
@@ -338,7 +338,7 @@ class ReplyMentionPendingContextStoreTest {
 
         store.remember(context)
 
-        assertEquals(context, store.match(roomId = 7L, messageText = "@홍길동 테스트"))
+        assertNull(store.match(roomId = 7L, messageText = "@홍길동 테스트"))
         assertNull(store.match(roomId = 7L, messageText = "@홍길동 테스트"))
     }
 
@@ -356,6 +356,7 @@ class ReplyMentionPendingContextStoreTest {
 
         store.remember(context)
 
+        assertNull(store.match(roomId = 9L, messageText = "@홍길동 테스트"))
         assertEquals(context, store.match(roomId = 9L, messageText = "@홍길동 테스트", sessionId = "session-1"))
     }
 }

@@ -37,6 +37,7 @@ internal class MemberContainerScorer(
             rolePath = rolePath,
             profilePath = profilePath,
             mentionUserIdPath = mentionUserIdPath,
+            expectedNicknames = emptyMap(),
             mentionUserIds = mentionUserIds,
             fieldSelector = fieldSelector,
         )

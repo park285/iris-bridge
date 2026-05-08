@@ -18,6 +18,7 @@ internal fun looksLikeNickname(value: String): Boolean {
     if (value.isBlank() || value.length > MAX_NICKNAME_LENGTH) return false
     if (looksLikeProfileUrl(value)) return false
     if (looksLikeInternalArtifactValue(value)) return false
+    if (looksLikeSystemNotice(value)) return false
     return true
 }
 
@@ -80,9 +81,20 @@ internal fun genericLabelPenalty(value: String): Int {
 
 private fun looksLikeInternalArtifactValue(value: String): Boolean {
     val normalized = value.trim()
-    if (normalized.length < 16) return false
     val lowercase = normalized.lowercase()
+    if (lowercase in INTERNAL_ARTIFACT_TOKENS) return true
+    if (normalized.length < 16) return false
     val hasArtifactToken = INTERNAL_ARTIFACT_TOKENS.any { token -> lowercase.contains(token) }
     val asciiIdentifierLike = normalized.all { it.isLetterOrDigit() || it == '_' || it == '-' }
     return asciiIdentifierLike && hasArtifactToken
 }
+
+private fun looksLikeSystemNotice(value: String): Boolean {
+    val normalized = value.trim()
+    return SYSTEM_NOTICE_PATTERNS.any { pattern -> pattern.matches(normalized) }
+}
+
+private val SYSTEM_NOTICE_PATTERNS =
+    listOf(
+        Regex("""Welcome to ['‘’"].+?['‘’"]\.?""", RegexOption.IGNORE_CASE),
+    )

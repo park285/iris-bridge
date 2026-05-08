@@ -41,7 +41,7 @@ internal fun buildBridgeRequestHandlerComponents(
                 chatRoomInspector = { roomId -> inspectChatRoom(chatRoomResolver, registryError, roomId) },
                 chatRoomOpener = chatRoomOpener::open,
                 chatRoomMemberSnapshotProvider = { roomId, expectedMemberHints, preferredPlan ->
-                    val room = resolveChatRoom(chatRoomResolver, registryError, roomId)
+                    val room = resolveFreshChatRoom(chatRoomResolver, registryError, roomId)
                     memberExtractor.snapshot(roomId, room, expectedMemberHints, preferredPlan)
                 },
                 metrics = bridgeMetrics,
@@ -78,4 +78,13 @@ private fun resolveChatRoom(
 ): Any {
     val resolver = chatRoomResolver ?: error("chatroom resolver unavailable: ${registryError ?: "unknown error"}")
     return resolver.resolve(roomId) ?: error("chatroom not found: $roomId")
+}
+
+private fun resolveFreshChatRoom(
+    chatRoomResolver: ChatRoomResolver?,
+    registryError: String?,
+    roomId: Long,
+): Any {
+    val resolver = chatRoomResolver ?: error("chatroom resolver unavailable: ${registryError ?: "unknown error"}")
+    return resolver.resolveFresh(roomId) ?: error("chatroom not found: $roomId")
 }
