@@ -7,7 +7,7 @@ import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 internal class KakaoImageSender(
     private val chatRoomResolver: (Long) -> Any?,
     private val sendInvocationFactory: KakaoSendInvoker,
-    private val logInfo: (String, String) -> Unit = { tag, message -> Log.i(tag, message) },
+    private val logInfo: (String, String) -> Unit = { tag, message -> Log.d(tag, message) },
 ) {
     companion object {
         private const val TAG = "IrisBridge"
