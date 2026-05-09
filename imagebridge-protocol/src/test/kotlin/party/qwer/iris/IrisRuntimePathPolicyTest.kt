@@ -11,7 +11,7 @@ class IrisRuntimePathPolicyTest {
         assertEquals("/data/iris", paths.dataDir)
         assertEquals("/data/iris/config.json", paths.configPath)
         assertEquals("/data/iris/logs", paths.logDir)
-        assertEquals("/data/iris/reply-images", paths.replyImageDir)
+        assertEquals("/data/iris-tmp/reply-images", paths.replyImageDir)
         assertEquals("iris-image-bridge-mux", paths.imageBridgeMuxSocketName)
     }
 
@@ -22,7 +22,7 @@ class IrisRuntimePathPolicyTest {
         assertEquals("/custom/iris", paths.dataDir)
         assertEquals("/custom/iris/config.json", paths.configPath)
         assertEquals("/custom/iris/logs", paths.logDir)
-        assertEquals("/custom/iris/reply-images", paths.replyImageDir)
+        assertEquals("/data/iris-tmp/reply-images", paths.replyImageDir)
     }
 
     @Test

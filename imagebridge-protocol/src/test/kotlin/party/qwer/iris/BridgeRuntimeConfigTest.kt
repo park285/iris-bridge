@@ -19,7 +19,7 @@ class BridgeRuntimeConfigTest {
         assertEquals("bridge-secret", resolution.token)
         assertEquals(BridgeTokenSource.ENV_FALLBACK, resolution.source)
         assertEquals("/tmp/missing.json", resolution.configPath)
-        assertEquals("/data/iris/reply-images", resolution.replyImageDir)
+        assertEquals("/data/iris-tmp/reply-images", resolution.replyImageDir)
     }
 
     @Test
@@ -120,7 +120,7 @@ class BridgeRuntimeConfigTest {
                 fileReader = { """{"replyImageDir":"   "}""" },
             )
 
-        assertEquals("/env/iris/reply-images", resolution.replyImageDir)
+        assertEquals("/data/iris-tmp/reply-images", resolution.replyImageDir)
     }
 
     @Test

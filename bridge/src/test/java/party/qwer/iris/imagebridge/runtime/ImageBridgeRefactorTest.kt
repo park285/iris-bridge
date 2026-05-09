@@ -2238,14 +2238,14 @@ class BridgeSecurityTest {
 
     @Test
     fun `default path validator allows native runtime reply image root`() {
-        assertTrue(BridgeImagePathValidator.DEFAULT_ALLOWED_IMAGE_ROOTS.contains("/data/iris/reply-images"))
+        assertTrue(BridgeImagePathValidator.DEFAULT_ALLOWED_IMAGE_ROOTS.contains("/data/iris-tmp/reply-images"))
         assertFalse(BridgeImagePathValidator.DEFAULT_ALLOWED_IMAGE_ROOTS.contains(BridgeImagePathValidator.LEGACY_OUTBOX_IMAGE_ROOT))
     }
 
     @Test
     fun `default path roots honor runtime data dir policy`() {
         assertEquals(
-            listOf("/custom/iris/reply-images"),
+            listOf("/data/iris-tmp/reply-images"),
             BridgeImagePathValidator.defaultAllowedImageRoots(mapOf("IRIS_DATA_DIR" to "/custom/iris")),
         )
     }
@@ -2286,7 +2286,7 @@ class BridgeSecurityTest {
 
         val error =
             assertFailsWith<IllegalArgumentException> {
-                validator.validate(listOf("/data/iris/reply-images/" + "a".repeat(BridgeImagePathValidator.MAX_IMAGE_PATH_LENGTH)))
+                validator.validate(listOf("/data/iris-tmp/reply-images/" + "a".repeat(BridgeImagePathValidator.MAX_IMAGE_PATH_LENGTH)))
             }
 
         assertTrue(error.message?.contains("too long") == true)
