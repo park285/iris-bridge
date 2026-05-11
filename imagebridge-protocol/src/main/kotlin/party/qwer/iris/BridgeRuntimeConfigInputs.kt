@@ -14,16 +14,21 @@ internal fun resolveBridgeRuntimeConfigInputs(
     fileReader: (String) -> String?,
 ): BridgeRuntimeConfigInputs {
     val paths = IrisRuntimePathPolicy.resolve(env)
-    val configSnapshot =
-        runCatching {
-            fileReader(paths.configPath)
-        }.getOrNull()
-            ?.let(::decodeBridgeRuntimeConfig)
+    val explicitConfigPath = env["IRIS_CONFIG_PATH"]?.trim()?.isNotEmpty() == true
+    val resolvedConfig =
+        readConfigSnapshot(paths.configPath, fileReader)
+            ?: if (!explicitConfigPath && paths.configPath != PUBLIC_TMP_CONFIG_PATH) {
+                readConfigSnapshot(PUBLIC_TMP_CONFIG_PATH, fileReader)
+            } else {
+                null
+            }
+    val configPath = resolvedConfig?.first ?: paths.configPath
+    val configSnapshot = resolvedConfig?.second
 
     return BridgeRuntimeConfigInputs(
         envToken = env["IRIS_BRIDGE_TOKEN"]?.trim().orEmpty(),
         configToken = configSnapshot?.bridgeToken?.trim().orEmpty(),
-        configPath = paths.configPath,
+        configPath = configPath,
         replyImageDir = configSnapshot.replyImageDirOrDefault(paths.replyImageDir),
         textBridgeSendTextEnabled =
             resolveBridgeBooleanFlag(
@@ -39,6 +44,18 @@ internal fun resolveBridgeRuntimeConfigInputs(
             ),
     )
 }
+
+private const val PUBLIC_TMP_CONFIG_PATH = "/data/local/tmp/config.json"
+
+private fun readConfigSnapshot(
+    configPath: String,
+    fileReader: (String) -> String?,
+): Pair<String, BridgeRuntimeConfigSnapshot>? =
+    runCatching {
+        fileReader(configPath)
+    }.getOrNull()
+        ?.let(::decodeBridgeRuntimeConfig)
+        ?.let { configPath to it }
 
 internal fun BridgeRuntimeConfigInputs.toBridgeTokenResolution(): BridgeTokenResolution {
     val token = configToken.takeIf { it.isNotBlank() } ?: envToken

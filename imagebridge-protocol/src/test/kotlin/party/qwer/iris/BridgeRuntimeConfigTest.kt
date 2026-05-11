@@ -92,6 +92,33 @@ class BridgeRuntimeConfigTest {
     }
 
     @Test
+    fun `falls back to public tmp config when default data dir config is unreadable`() {
+        val readPaths = mutableListOf<String>()
+        val resolution =
+            BridgeBootstrapConfigResolver.resolve(
+                env = emptyMap(),
+                fileReader = { path ->
+                    readPaths += path
+                    when (path) {
+                        "/data/iris/config.json" -> null
+                        "/data/local/tmp/config.json" ->
+                            """
+                            {
+                              "bridgeToken": "public-config-token"
+                            }
+                            """.trimIndent()
+                        else -> null
+                    }
+                },
+            )
+
+        assertEquals(listOf("/data/iris/config.json", "/data/local/tmp/config.json"), readPaths)
+        assertEquals("public-config-token", resolution.token)
+        assertEquals(BridgeTokenSource.CONFIG_FILE, resolution.source)
+        assertEquals("/data/local/tmp/config.json", resolution.configPath)
+    }
+
+    @Test
     fun `prefers config reply image directory over env path policy`() {
         val resolution =
             BridgeBootstrapConfigResolver.resolve(
