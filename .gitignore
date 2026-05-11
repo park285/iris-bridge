@@ -43,6 +43,8 @@ __pycache__/
 !/docs/stats.md
 !/docs/nickname-events.md
 !/docs/testing_surface_policy.md
+!/docs/native/
+!/docs/native/*.md
 !/docs/testing/
 !/docs/testing/*.md
 
