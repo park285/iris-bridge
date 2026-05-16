@@ -6,6 +6,7 @@ import org.gradle.testing.jacoco.tasks.JacocoReport
 
 plugins {
     alias(libs.plugins.android.application)
+    id("party.qwer.iris.android-release-signing")
     alias(libs.plugins.ktlint)
     jacoco
 }
@@ -90,7 +91,7 @@ ktlint {
 
 dependencies {
     implementation(project(":imagebridge-protocol"))
-    compileOnly(libs.xposed.api)
+    compileOnly(libs.libxposed.api)
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.org.json)

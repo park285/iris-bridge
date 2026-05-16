@@ -1,4 +1,6 @@
 pluginManagement {
+    includeBuild("build-logic")
+
     repositories {
         google {
             content {
@@ -16,14 +18,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        exclusiveContent {
-            forRepository {
-                maven { url = uri("https://api.xposed.info/") }
-            }
-            filter {
-                includeGroup("de.robv.android.xposed")
-            }
-        }
     }
 }
 

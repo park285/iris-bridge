@@ -30,6 +30,7 @@ __pycache__/
 .serena/
 
 # Nested module build outputs
+**/.gradle/
 **/build/
 /imagebridge-protocol/bin/
 
@@ -64,6 +65,8 @@ image.png
 
 # Build artifacts
 **/target/
+*.profraw
+*.profdata
 
 # Closeout artifacts
 docs/closeout-*/
