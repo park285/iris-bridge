@@ -68,6 +68,9 @@ image.png
 *.profraw
 *.profdata
 
+# Local patch snapshots
+/scripts_gate_*.patch
+
 # Closeout artifacts
 docs/closeout-*/
 docs/closeout-*.tar.gz
