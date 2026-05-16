@@ -55,6 +55,9 @@ private fun sendWithKakaoLinkSpecPath(
     leverageAttachmentPatcher: KakaoLeverageAttachmentPatcher?,
     logInfo: (String, String) -> Unit,
 ): Boolean {
+    if (threadId != null || threadScope != null) {
+        return false
+    }
     val sender = kakaoLinkSpecSender ?: binding.kakaoLinkSpecSender ?: return false
     val serverGeneratedTemplate = hasExplicitKakaoLinkTemplateArgs(rawAttachment)
     if (!serverGeneratedTemplate) {

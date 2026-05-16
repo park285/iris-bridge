@@ -75,9 +75,9 @@ plugins.withId("com.android.application") {
     def signingPartial = signingValues.any { it != null } && !signingComplete
     def keystoreFile = keystoreFilePath == null ? null : resolveSigningFile(keystoreFilePath)
 
-    if (signingComplete && gradle.startParameter.configurationCacheRequested) {
+    if (signingValues.any { it != null } && gradle.startParameter.configurationCacheRequested) {
         throw new GradleException(
-            "Android release signing secrets must not be captured in Gradle configuration cache; " +
+            "Android release signing inputs must not be captured in Gradle configuration cache; " +
                 "rerun signed release builds with --no-configuration-cache."
         )
     }

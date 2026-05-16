@@ -128,9 +128,9 @@ class KakaoTextSendInvocationFactoryTest {
             chatRoom = chatRoom,
             message = "@alice hello",
             markdown = false,
-            threadId = 55L,
-            threadScope = 3,
-            mentionsJson = """{"mentions":[{"user_id":7}]}""",
+            threadId = null,
+            threadScope = null,
+            mentionsJson = null,
             requestId = "req-text",
             attachmentJson = """{"P":{"TP":"List"},"K":{"ti":"121065"}}""",
         )
@@ -149,11 +149,55 @@ class KakaoTextSendInvocationFactoryTest {
         assertEquals(null, FakeTextRequestRecorder.sendingLog)
         assertEquals(null, leverageContexts.match(123L, "@alice hello", "req-text"))
         val pending = assertNotNull(leverageCommitContexts.match(123L, "@alice hello", "req-text"))
-        assertEquals(55L, pending.threadId)
-        assertEquals(3, pending.threadScope)
+        assertEquals(null, pending.threadId)
+        assertEquals(null, pending.threadScope)
         val rawAttachment = JSONObject(pending.attachmentText)
         assertEquals("List", rawAttachment.getJSONObject("P").getString("TP"))
         assertEquals("121065", rawAttachment.getJSONObject("K").getString("ti"))
+    }
+
+    @Test
+    fun `factory skips KakaoLinkSpec path for threaded raw attachment reply`() {
+        FakeTextRequestRecorder.reset()
+        ShareManager.reset()
+        val registry = buildFakeRegistry()
+        val leverageContexts = ReplyLeveragePendingContextStore()
+        val leverageCommitContexts = ReplyLeveragePendingContextStore()
+        val linkSender = RecordingKakaoLinkSpecSender(result = true)
+        val patcher = RecordingKakaoLeverageAttachmentPatcher()
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                context = Application(),
+                leveragePendingContexts = leverageContexts,
+                leverageCommitPendingContexts = leverageCommitContexts,
+                kakaoLinkSpecSender = linkSender,
+                leverageAttachmentPatcher = patcher,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+
+        factory.send(
+            roomId = 123L,
+            chatRoom = chatRoom,
+            message = "thread card",
+            markdown = false,
+            threadId = 55L,
+            threadScope = 3,
+            mentionsJson = null,
+            requestId = "req-thread-card",
+            attachmentJson = """{"P":{"TP":"List"},"K":{"ti":"121065"}}""",
+        )
+
+        assertEquals(null, linkSender.roomId)
+        assertEquals(null, patcher.roomId)
+        assertEquals(chatRoom, ShareManager.chatRoom)
+        assertEquals("thread card", ShareManager.message)
+        assertEquals(null, leverageCommitContexts.match(123L, "thread card", "req-thread-card"))
+        val pending = assertNotNull(leverageContexts.match(123L, "thread card", "req-thread-card"))
+        assertEquals(55L, pending.threadId)
+        assertEquals(3, pending.threadScope)
     }
 
     @Test
@@ -196,8 +240,8 @@ class KakaoTextSendInvocationFactoryTest {
             chatRoom = chatRoom,
             message = "5분 전 알림",
             markdown = false,
-            threadId = 55L,
-            threadScope = 3,
+            threadId = null,
+            threadScope = null,
             mentionsJson = null,
             requestId = "req-template",
             attachmentJson = attachment,

@@ -139,9 +139,15 @@ private fun rememberReplyMarkdownIntent(
     markdownPendingContexts: ReplyMarkdownPendingContextStore,
 ) {
     ReplyMentionIngressCapture.capture(intent, mentionPendingContexts) { context ->
-        BridgeDiscovery.recordHook(hookName, "room=${context.roomId} mention=true text=${context.messageText.take(32)}")
+        BridgeDiscovery.recordHook(
+            hookName,
+            "room=${context.roomId} mention=true textLength=${context.messageText.length}",
+        )
     }
     ReplyMarkdownIngressCapture.capture(intent, markdownPendingContexts) { context ->
-        BridgeDiscovery.recordHook(hookName, "room=${context.roomId} scope=${context.threadScope} text=${context.messageText.take(32)}")
+        BridgeDiscovery.recordHook(
+            hookName,
+            "room=${context.roomId} scope=${context.threadScope} textLength=${context.messageText.length}",
+        )
     }
 }
