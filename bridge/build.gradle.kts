@@ -6,10 +6,11 @@ import org.gradle.testing.jacoco.tasks.JacocoReport
 
 plugins {
     alias(libs.plugins.android.application)
-    id("party.qwer.iris.android-release-signing")
     alias(libs.plugins.ktlint)
     jacoco
 }
+
+apply(from = rootProject.file("gradle/android-release-signing.gradle"))
 
 android {
     namespace = "party.qwer.iris.bridge"

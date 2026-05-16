@@ -1,0 +1,132 @@
+import java.io.FileInputStream
+import java.io.IOException
+import java.util.Locale
+import java.util.Properties
+import org.gradle.api.GradleException
+
+def defaultSigningPropertiesFile = "/run/iris/android-signing.properties"
+
+def nonBlank = { value ->
+    if (value == null) {
+        return null
+    }
+    def trimmed = value.toString().trim()
+    return trimmed.isEmpty() ? null : trimmed
+}
+
+def firstNonBlank = { first, second ->
+    return first != null ? first : nonBlank(second)
+}
+
+def env = { name ->
+    return nonBlank(providers.environmentVariable(name).orNull)
+}
+
+def resolveSigningFile = { path ->
+    return rootProject.file(path)
+}
+
+def loadSigningProperties = { path ->
+    def properties = new Properties()
+    def propertiesFile = resolveSigningFile(path)
+    if (!propertiesFile.isFile()) {
+        return properties
+    }
+    try {
+        new FileInputStream(propertiesFile).withCloseable { input ->
+            properties.load(input)
+        }
+    } catch (IOException error) {
+        throw new GradleException("Failed to load Android release signing properties: ${path}", error)
+    }
+    return properties
+}
+
+def isTruthy = { value ->
+    switch (value?.toString()?.trim()?.toLowerCase(Locale.ROOT)) {
+        case "1":
+        case "true":
+        case "yes":
+        case "on":
+            return true
+        default:
+            return false
+    }
+}
+
+plugins.withId("com.android.application") {
+    def signingPropertiesFile = firstNonBlank(
+        env("IRIS_ANDROID_SIGNING_PROPERTIES_FILE"),
+        defaultSigningPropertiesFile
+    ) ?: defaultSigningPropertiesFile
+    def signingProperties = loadSigningProperties(signingPropertiesFile)
+    def signingValue = { name ->
+        return firstNonBlank(env(name), signingProperties.getProperty(name))
+    }
+
+    def keystoreFilePath = signingValue("IRIS_ANDROID_KEYSTORE_FILE")
+    def keystorePassword = signingValue("IRIS_ANDROID_KEYSTORE_PASSWORD")
+    def keyAlias = signingValue("IRIS_ANDROID_KEY_ALIAS")
+    def keyPassword = signingValue("IRIS_ANDROID_KEY_PASSWORD")
+    def allowUnsignedRelease = isTruthy(env("IRIS_ALLOW_UNSIGNED_RELEASE"))
+
+    def signingValues = [keystoreFilePath, keystorePassword, keyAlias, keyPassword]
+    def signingComplete = signingValues.every { it != null }
+    def signingPartial = signingValues.any { it != null } && !signingComplete
+    def keystoreFile = keystoreFilePath == null ? null : resolveSigningFile(keystoreFilePath)
+
+    if (signingComplete && gradle.startParameter.configurationCacheRequested) {
+        throw new GradleException(
+            "Android release signing secrets must not be captured in Gradle configuration cache; " +
+                "rerun signed release builds with --no-configuration-cache."
+        )
+    }
+
+    if (signingComplete) {
+        def android = extensions.getByName("android")
+        def releaseSigningConfig = android.signingConfigs.maybeCreate("irisRelease")
+        releaseSigningConfig.storeFile = keystoreFile
+        releaseSigningConfig.storePassword = keystorePassword
+        releaseSigningConfig.keyAlias = keyAlias
+        releaseSigningConfig.keyPassword = keyPassword
+
+        android.buildTypes.named("release").configure { buildType ->
+            buildType.signingConfig = releaseSigningConfig
+        }
+    }
+
+    def requireReleaseSigningInput = tasks.register("requireReleaseSigningInput") { task ->
+        task.group = "verification"
+        task.description = "Validates Iris Android release signing input."
+        inputs.property("signingComplete", signingComplete)
+        inputs.property("signingPartial", signingPartial)
+        inputs.property("allowUnsignedRelease", allowUnsignedRelease)
+        inputs.property("signingPropertiesFile", signingPropertiesFile)
+        if (keystoreFile != null) {
+            inputs.file(keystoreFile).withPropertyName("keystoreFile").optional()
+        }
+
+        doLast {
+            if (signingPartial) {
+                throw new GradleException(
+                    "Incomplete Android release signing input. Set IRIS_ANDROID_KEYSTORE_FILE, " +
+                        "IRIS_ANDROID_KEYSTORE_PASSWORD, IRIS_ANDROID_KEY_ALIAS, and IRIS_ANDROID_KEY_PASSWORD " +
+                        "through environment variables or ${signingPropertiesFile}."
+                )
+            }
+            if (!signingComplete && !allowUnsignedRelease) {
+                throw new GradleException(
+                    "Android release signing input is required. Render ${signingPropertiesFile} " +
+                        "or set IRIS_ALLOW_UNSIGNED_RELEASE=1 for local unsigned verification only."
+                )
+            }
+            if (signingComplete && keystoreFile?.isFile() != true) {
+                throw new GradleException("Android release keystore is missing: ${keystoreFilePath}")
+            }
+        }
+    }
+
+    tasks.matching { task -> task.name == "preReleaseBuild" }.configureEach { task ->
+        task.dependsOn(requireReleaseSigningInput)
+    }
+}
