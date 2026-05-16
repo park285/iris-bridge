@@ -3,6 +3,7 @@ package party.qwer.iris.imagebridge.runtime.send
 import android.content.Context
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 
@@ -10,6 +11,10 @@ internal class KakaoTextSendInvocationFactory(
     private val registry: KakaoClassRegistry,
     private val context: Context? = null,
     private val mentionPendingContexts: ReplyMentionPendingContextStore? = null,
+    private val leveragePendingContexts: ReplyLeveragePendingContextStore? = null,
+    private val leverageCommitPendingContexts: ReplyLeveragePendingContextStore? = null,
+    private val kakaoLinkSpecSender: KakaoLinkSpecSender? = null,
+    private val leverageAttachmentPatcher: KakaoLeverageAttachmentPatcher? = null,
     private val logInfo: (String, String) -> Unit = { tag, message -> Log.i(tag, message) },
     private val requestCompanionClassProvider: () -> Class<*> = {
         Class.forName(
@@ -19,7 +24,16 @@ internal class KakaoTextSendInvocationFactory(
         )
     },
 ) : KakaoTextSendInvoker {
-    private val bindingResult: Result<KakaoTextSendBinding> by lazy { runCatching { discoverTextSendBinding() } }
+    private val bindingResult: Result<KakaoTextSendBinding> by lazy {
+        runCatching {
+            discoverKakaoTextSendBinding(
+                registry = registry,
+                context = context,
+                logInfo = logInfo,
+                requestCompanionClassProvider = requestCompanionClassProvider,
+            )
+        }
+    }
 
     override fun capability(): KakaoTextSendCapability =
         bindingResult.fold(
@@ -41,16 +55,39 @@ internal class KakaoTextSendInvocationFactory(
         threadId: Long?,
         threadScope: Int?,
         mentionsJson: String?,
+        attachmentJson: String?,
         requestId: String?,
     ) {
         val binding = bindingResult.getOrThrow()
         logInfo(
             KAKAO_TEXT_SEND_TAG,
             "text send invoking requestId=$requestId room=$roomId markdown=$markdown " +
-                "threadId=$threadId messageLength=${message.length} mentions=${!mentionsJson.isNullOrBlank()}",
+                "threadId=$threadId messageLength=${message.length} mentions=${!mentionsJson.isNullOrBlank()} " +
+                "attachment=${!attachmentJson.isNullOrBlank()}",
         )
-        val replyAttachment = buildReplyAttachment(markdown, mentionsJson, requestId)
-        if (canUseShareManagerTextPath(markdown, threadId, threadScope, binding.shareManagerTextInvoker)) {
+        val rawAttachment = attachmentJson?.trim()?.takeIf { it.isNotEmpty() }
+        val replyAttachment = rawAttachment ?: buildReplyAttachment(markdown, mentionsJson, requestId)
+        if (
+            rawAttachment != null &&
+            trySendWithLeveragePaths(
+                binding = binding,
+                chatRoom = chatRoom,
+                roomId = roomId,
+                message = message,
+                threadId = threadId,
+                threadScope = threadScope,
+                rawAttachment = rawAttachment,
+                requestId = requestId,
+                leveragePendingContexts = leveragePendingContexts,
+                leverageCommitPendingContexts = leverageCommitPendingContexts,
+                kakaoLinkSpecSender = kakaoLinkSpecSender,
+                leverageAttachmentPatcher = leverageAttachmentPatcher,
+                logInfo = logInfo,
+            )
+        ) {
+            return
+        }
+        if (rawAttachment == null && canUseShareManagerTextPath(markdown, threadId, threadScope, binding.shareManagerTextInvoker)) {
             if (
                 sendWithShareManagerTextPath(
                     chatRoom = chatRoom,
@@ -66,8 +103,9 @@ internal class KakaoTextSendInvocationFactory(
                 return
             }
         }
+        val sendingLogFactory = if (rawAttachment != null) binding.leverageSendingLogFactory else binding.sendingLogFactory
         val sendingLog =
-            binding.sendingLogFactory.newSendingLog(
+            sendingLogFactory.newSendingLog(
                 roomId = roomId,
                 chatRoom = chatRoom,
                 message = message,
@@ -84,46 +122,6 @@ internal class KakaoTextSendInvocationFactory(
             )
         }
         binding.invoke(chatRoom, sendingLog)
-    }
-
-    private fun discoverTextSendBinding(): KakaoTextSendBinding {
-        val companionClass = requestCompanionClassProvider()
-        val requestMethod = selectTextRequestMethod(companionClass, registry)
-        val requestTarget = resolveRequestTarget(companionClass, requestMethod)
-        val sendingLogClass = requestMethod.parameterTypes[1]
-        val sendingLogFactory =
-            discoverSendingLogFactory(
-                sendingLogClass = sendingLogClass,
-                messageType = selectTextMessageType(registry),
-                logInfo = logInfo,
-                chatRoomClass = registry.chatRoomClass,
-                origin = resolveTextSendingLogOrigin(registry.chatRoomClass.classLoader),
-            )
-        logInfo(
-            KAKAO_TEXT_SEND_TAG,
-            "text send discovery companion=${companionClass.name} requestMethod=${requestMethod.toGenericString()} " +
-                "sendingLogClass=${sendingLogClass.name}",
-        )
-        return KakaoTextSendBinding(
-            requestMethod = requestMethod,
-            requestTarget = requestTarget,
-            sendingLogFactory = sendingLogFactory,
-            shareManagerTextInvoker =
-                discoverShareManagerTextInvoker(
-                    context = context,
-                    chatRoomClass = registry.chatRoomClass,
-                    listenerClass = registry.listenerClass,
-                    logInfo = logInfo,
-                ),
-            writeType = selectTextWriteType(),
-            listener =
-                createShareManagerSendListener(
-                    context = context,
-                    loader = registry.chatRoomClass.classLoader,
-                    listenerClass = registry.listenerClass,
-                    logInfo = logInfo,
-                ),
-        )
     }
 
     private companion object {

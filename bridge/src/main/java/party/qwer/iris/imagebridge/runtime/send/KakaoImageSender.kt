@@ -1,6 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.send
 
 import android.util.Log
+import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 
@@ -13,9 +14,12 @@ internal class KakaoImageSender(
         private const val TAG = "IrisBridge"
     }
 
-    constructor(registry: KakaoClassRegistry) : this(
+    constructor(
+        registry: KakaoClassRegistry,
+        hookInstaller: BridgeHookInstaller,
+    ) : this(
         chatRoomResolver = ChatRoomResolver(registry)::resolve,
-        sendInvocationFactory = KakaoSendInvocationFactory(registry),
+        sendInvocationFactory = KakaoSendInvocationFactory(registry, hookInstaller),
     )
 
     fun send(request: ImageSendRequest) {

@@ -16,6 +16,7 @@ data class ImageBridgeResponse(
     val checks: List<ImageBridgeCheck> = emptyList(),
     val discovery: ImageBridgeDiscovery? = null,
     val inspectionJson: String? = null,
+    val payloadJson: String? = null,
     val memberSnapshot: ChatRoomMembersSnapshot? = null,
     val capabilities: ImageBridgeCapabilities? = null,
     val metrics: ImageBridgeMetrics? = null,

@@ -11,6 +11,7 @@ data class ImageBridgeRequest(
     val message: String? = null,
     val markdown: Boolean? = null,
     val mentionsJson: String? = null,
+    val attachmentJson: String? = null,
     val threadId: Long? = null,
     val threadScope: Int? = null,
     val requestId: String? = null,

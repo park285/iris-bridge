@@ -1,8 +1,8 @@
 package party.qwer.iris.imagebridge.runtime.discovery
 
 import android.util.Log
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
+import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.BridgeHookInvocation
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -16,6 +16,7 @@ private const val HOOK_MANAGER_BROAD = "ChatRoomManager#broadResolve"
 internal const val HOOK_REPLY_MARKDOWN_INGRESS = "ReplyMarkdown#ingress"
 internal const val HOOK_REPLY_MARKDOWN_REUSE = "ReplyMarkdown#reuseIntent"
 internal const val HOOK_REPLY_MARKDOWN_REQUEST = "ReplyMarkdown#requestDispatch"
+internal const val HOOK_REPLY_LEVERAGE_COMMIT = "ReplyLeverage#chatLogCommit"
 internal const val HOOK_SEND_SINGLE = "ChatMediaSender#sendSingle"
 internal const val HOOK_SEND_MULTIPLE = "ChatMediaSender#sendMultiple"
 internal const val HOOK_SEND_THREADED_ENTRY = "ChatMediaSender#threadedEntry"
@@ -32,32 +33,36 @@ internal object BridgeDiscovery {
             HOOK_REPLY_MARKDOWN_INGRESS,
             HOOK_REPLY_MARKDOWN_REUSE,
             HOOK_REPLY_MARKDOWN_REQUEST,
+            HOOK_REPLY_LEVERAGE_COMMIT,
             HOOK_SEND_SINGLE,
             HOOK_SEND_MULTIPLE,
             HOOK_SEND_THREADED_ENTRY,
             HOOK_SEND_THREADED_INJECT,
         ).associateWith { DiscoveryHookState() }.toMutableMap()
 
-    fun install(registry: KakaoClassRegistry) {
+    fun install(
+        registry: KakaoClassRegistry,
+        hookInstaller: BridgeHookInstaller,
+    ) {
         installAttempted.set(true)
         if (!installStarted.compareAndSet(false, true)) return
-        installMethodHook(HOOK_ROOM_DAO, registry.roomDaoMethod) {
+        installMethodHook(HOOK_ROOM_DAO, registry.roomDaoMethod, hookInstaller) {
             "roomDao requested"
         }
 
-        installMethodHook(HOOK_MANAGER_DIRECT, registry.directRoomResolverMethod) { param ->
+        installMethodHook(HOOK_MANAGER_DIRECT, registry.directRoomResolverMethod, hookInstaller) { param ->
             "roomId=${param.args.getOrNull(0)}"
         }
 
-        installMethodHook(HOOK_MANAGER_BROAD, registry.broadRoomResolverMethod) { param ->
+        installMethodHook(HOOK_MANAGER_BROAD, registry.broadRoomResolverMethod, hookInstaller) { param ->
             "roomId=${param.args.getOrNull(0)} includeMembers=${param.args.getOrNull(1)} includeOpenLink=${param.args.getOrNull(2)}"
         }
 
-        installMethodHook(HOOK_SEND_SINGLE, registry.singleSendMethod) { param ->
+        installMethodHook(HOOK_SEND_SINGLE, registry.singleSendMethod, hookInstaller) { param ->
             "mediaItem=${param.args.getOrNull(0)} suppressAnimation=${param.args.getOrNull(1)}"
         }
 
-        installMethodHook(HOOK_SEND_MULTIPLE, registry.multiSendMethod) { param ->
+        installMethodHook(HOOK_SEND_MULTIPLE, registry.multiSendMethod, hookInstaller) { param ->
             val uriCount = (param.args.getOrNull(0) as? List<*>)?.size ?: -1
             "uris=$uriCount type=${param.args.getOrNull(1)} shareOriginal=${param.args.getOrNull(6)} highQuality=${param.args.getOrNull(7)}"
         }
@@ -111,8 +116,9 @@ internal object BridgeDiscovery {
     private fun installMethodHook(
         hookName: String,
         method: Method,
-        summarize: (XC_MethodHook.MethodHookParam) -> String,
-    ) = installDiscoveryMethodHook(hookName, method, stateFor(hookName), summarize, ::record)
+        hookInstaller: BridgeHookInstaller,
+        summarize: (BridgeHookInvocation) -> String,
+    ) = installDiscoveryMethodHook(hookName, method, hookInstaller, stateFor(hookName), summarize, ::record)
 
     private fun record(
         hookName: String,
@@ -127,8 +133,9 @@ internal object BridgeDiscovery {
 private fun installDiscoveryMethodHook(
     hookName: String,
     method: Method,
+    hookInstaller: BridgeHookInstaller,
     state: DiscoveryHookState,
-    summarize: (XC_MethodHook.MethodHookParam) -> String,
+    summarize: (BridgeHookInvocation) -> String,
     record: (String, String) -> Unit,
 ) {
     if (Modifier.isAbstract(method.modifiers)) {
@@ -137,14 +144,9 @@ private fun installDiscoveryMethodHook(
         return
     }
     try {
-        XposedBridge.hookMethod(
-            method,
-            object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    record(hookName, summarize(param))
-                }
-            },
-        )
+        hookInstaller.hookBefore(method) { invocation ->
+            record(hookName, summarize(invocation))
+        }
         state.markInstalled()
     } catch (error: Throwable) {
         state.markInstallError(error.message ?: error.javaClass.name)

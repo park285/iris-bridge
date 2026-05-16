@@ -22,6 +22,7 @@ internal interface KakaoTextSendInvoker {
         threadId: Long?,
         threadScope: Int?,
         mentionsJson: String?,
+        attachmentJson: String?,
         requestId: String?,
     )
 }
@@ -30,19 +31,24 @@ internal data class KakaoTextSendBinding(
     val requestMethod: Method,
     val requestTarget: Any?,
     val sendingLogFactory: KakaoSendingLogFactory,
+    val leverageSendingLogFactory: KakaoSendingLogFactory,
     val shareManagerTextInvoker: KakaoShareManagerTextInvoker?,
     val writeType: Any?,
+    val leverageSchemeWriteType: Any?,
     val listener: Any?,
+    val kakaoLinkSpecSender: KakaoLinkSpecSender?,
+    val leverageAttachmentPatcher: KakaoLeverageAttachmentPatcher?,
 ) {
     fun invoke(
         chatRoom: Any,
         sendingLog: Any,
+        writeTypeOverride: Any? = writeType,
     ) {
         requestMethod.apply { isAccessible = true }.invoke(
             requestTarget,
             chatRoom,
             sendingLog,
-            writeType,
+            writeTypeOverride,
             listener,
             false,
         )

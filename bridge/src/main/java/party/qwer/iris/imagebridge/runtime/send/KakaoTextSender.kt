@@ -3,6 +3,7 @@ package party.qwer.iris.imagebridge.runtime.send
 import android.content.Context
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 
@@ -15,6 +16,8 @@ internal class KakaoTextSender(
         context: Context,
         registry: KakaoClassRegistry,
         mentionPendingContexts: ReplyMentionPendingContextStore? = null,
+        leveragePendingContexts: ReplyLeveragePendingContextStore? = null,
+        leverageCommitPendingContexts: ReplyLeveragePendingContextStore? = null,
     ) : this(
         chatRoomResolver = ChatRoomResolver(registry)::resolve,
         invoker =
@@ -22,6 +25,8 @@ internal class KakaoTextSender(
                 registry,
                 context = context,
                 mentionPendingContexts = mentionPendingContexts,
+                leveragePendingContexts = leveragePendingContexts,
+                leverageCommitPendingContexts = leverageCommitPendingContexts,
             ),
     )
 
@@ -42,6 +47,7 @@ internal class KakaoTextSender(
             threadId = request.threadId,
             threadScope = request.threadScope,
             mentionsJson = request.mentionsJson,
+            attachmentJson = request.attachmentJson,
             requestId = request.requestId,
         )
         logInfo(TAG, "text send completed room=${request.roomId} requestId=${request.requestId}")

@@ -1,5 +1,6 @@
 package party.qwer.iris.imagebridge.runtime.send
 
+import org.json.JSONObject
 import party.qwer.iris.ReplyAttachmentProtocol
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
 
@@ -49,11 +50,13 @@ internal fun discoverSendingLogFactory(
         selectBuilderMethod(builderClass, String::class.java, preferredNames = setOf("j"))
             ?: error("ChatSendingLog builder message method not found")
     val tagMethod = selectBuilderMethod(builderClass, Class::class.java, String::class.java, preferredNames = setOf("l"))
+    val attachmentMethod = selectBuilderMethod(builderClass, JSONObject::class.java, preferredNames = setOf("c"))
     logInfo(
         KAKAO_TEXT_SEND_TAG,
         "text send discovery builder=${builderClass.name} constructor=${constructor.constructor.toGenericString()} " +
             "buildMethod=${buildMethod.toGenericString()} messageMethod=${messageMethod.toGenericString()} " +
-            "tagMethod=${tagMethod?.toGenericString() ?: "<missing>"}",
+            "tagMethod=${tagMethod?.toGenericString() ?: "<missing>"} " +
+            "attachmentMethod=${attachmentMethod?.toGenericString() ?: "<missing>"}",
     )
 
     return object : KakaoSendingLogFactory {
@@ -69,6 +72,9 @@ internal fun discoverSendingLogFactory(
             val builder = newBuilder(constructor, roomId, chatRoom, messageType)
             messageMethod.apply { isAccessible = true }.invoke(builder, message)
             tagMethod?.apply { isAccessible = true }?.invoke(builder, origin.sourceClass, origin.tag)
+            replyAttachment?.let { attachment ->
+                attachmentMethod?.apply { isAccessible = true }?.invoke(builder, JSONObject(attachment))
+            }
             val sendingLog =
                 requireNotNull(buildMethod.apply { isAccessible = true }.invoke(builder)) {
                     "sendingLog builder returned null"

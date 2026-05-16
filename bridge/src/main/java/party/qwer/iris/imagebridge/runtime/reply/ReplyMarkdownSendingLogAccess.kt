@@ -64,4 +64,24 @@ internal object ReplyMarkdownSendingLogAccess {
             threadField.set(sendingLog, threadIdValue)
         }
     }
+
+    fun writeMessageType(
+        sendingLog: Any,
+        messageType: Any,
+    ) {
+        val sendingLogClass = sendingLog.javaClass
+        runCatching {
+            sendingLogClass
+                .getDeclaredField("D")
+                .apply { isAccessible = true }
+                .set(sendingLog, messageType)
+            return
+        }
+        val messageTypeClass = messageType.javaClass
+        val field =
+            sendingLogClass.declaredFields
+                .firstOrNull { candidate -> messageTypeClass.isAssignableFrom(candidate.type) }
+                ?: error("sendingLog message type field not found")
+        field.apply { isAccessible = true }.set(sendingLog, messageType)
+    }
 }

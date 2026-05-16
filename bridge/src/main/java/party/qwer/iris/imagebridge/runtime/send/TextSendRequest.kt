@@ -7,5 +7,6 @@ internal data class TextSendRequest(
     val threadId: Long?,
     val threadScope: Int?,
     val mentionsJson: String?,
+    val attachmentJson: String?,
     val requestId: String?,
 )

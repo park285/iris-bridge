@@ -86,7 +86,11 @@ private fun writeStringFieldCandidate(
             }.getOrDefault(false)
         }
 
-private fun isAttachmentText(value: String): Boolean = value.contains("irisSessionId") || value.contains("callingPkg") || value.contains("\"mentions\"")
+private fun isAttachmentText(value: String): Boolean =
+    value.contains("irisSessionId") ||
+        value.contains("callingPkg") ||
+        value.contains("\"mentions\"") ||
+        (value.contains("\"P\"") && value.contains("\"C\""))
 
 internal fun extractAttachmentSessionId(attachmentText: String): String? =
     runCatching {

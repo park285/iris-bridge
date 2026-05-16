@@ -1,8 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.send
 
 import android.util.Log
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
+import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_INJECT
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
@@ -28,7 +27,10 @@ internal object ThreadedImageXposedInjector {
         val source: String,
     )
 
-    fun install(registry: KakaoClassRegistry) {
+    fun install(
+        registry: KakaoClassRegistry,
+        hookInstaller: BridgeHookInstaller,
+    ) {
         if (!installed.compareAndSet(false, true)) return
         val bindings =
             runCatching {
@@ -60,7 +62,11 @@ internal object ThreadedImageXposedInjector {
         var anyInstalled = false
         bindings.forEach { binding ->
             runCatching {
-                XposedBridge.hookMethod(binding.method, createThreadedImageInjectHook(binding, pendingContext, TAG))
+                hookInstaller.hookBefore(binding.method) { invocation ->
+                    val context = pendingContext.get() ?: return@hookBefore
+                    val sendingLog = invocation.args.getOrNull(binding.sendingLogArgIndex) ?: return@hookBefore
+                    injectThreadMetadata(TAG, binding, sendingLog, context)
+                }
                 anyInstalled = true
             }.onFailure { error ->
                 runCatching { Log.e(TAG, "threaded image inject hook install failed source=${binding.source}", error) }
@@ -88,19 +94,6 @@ internal object ThreadedImageXposedInjector {
         }
     }
 }
-
-private fun createThreadedImageInjectHook(
-    binding: ThreadedImageXposedInjector.InjectHookBinding,
-    pendingContext: ThreadLocal<ThreadedImagePendingContext?>,
-    tag: String,
-): XC_MethodHook =
-    object : XC_MethodHook() {
-        override fun beforeHookedMethod(param: MethodHookParam) {
-            val context = pendingContext.get() ?: return
-            val sendingLog = param.args.getOrNull(binding.sendingLogArgIndex) ?: return
-            injectThreadMetadata(tag, binding, sendingLog, context)
-        }
-    }
 
 private fun injectThreadMetadata(
     tag: String,

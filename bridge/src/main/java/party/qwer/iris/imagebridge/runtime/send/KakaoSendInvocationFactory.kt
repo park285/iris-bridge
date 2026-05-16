@@ -3,6 +3,8 @@
 package party.qwer.iris.imagebridge.runtime.send
 
 import android.net.Uri
+import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import java.io.File
 
@@ -32,13 +34,14 @@ internal interface KakaoSendInvoker {
 
 internal class KakaoSendInvocationFactory(
     private val registry: KakaoClassRegistry,
+    private val hookInstaller: BridgeHookInstaller = NoopBridgeHookInstaller,
     private val pathArgumentFactory: (String) -> Any = { path -> Uri.fromFile(File(path)) },
 ) : KakaoSendInvoker {
     private val senderFactory = ChatMediaSenderInstanceFactory(registry)
     private val threadedEntryInvoker = ThreadedChatMediaEntryInvoker(registry, pathArgumentFactory)
 
     init {
-        ThreadedImageXposedInjector.install(registry)
+        ThreadedImageXposedInjector.install(registry, hookInstaller)
         threadedEntryInvoker.warmUp()
     }
 

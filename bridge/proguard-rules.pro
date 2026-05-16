@@ -4,12 +4,12 @@
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# ── Xposed 진입점 (xposed_init에 명시) ────────────────────────────────────
+# ── modern LSPosed 진입점 (META-INF/xposed/java_init.list에 명시) ─────────
 -keep class party.qwer.iris.imagebridge.runtime.IrisBridgeModule { *; }
 
 # ── Xposed API (compileOnly — 런타임은 프레임워크 제공) ────────────────────
--dontwarn de.robv.android.xposed.**
--keep class de.robv.android.xposed.** { *; }
+-dontwarn io.github.libxposed.api.**
+-keep class io.github.libxposed.api.** { *; }
 
 # ── ImageBridge protocol (공유 모듈) ───────────────────────────────────────
 -keep class party.qwer.iris.ImageBridgeProtocol { *; }

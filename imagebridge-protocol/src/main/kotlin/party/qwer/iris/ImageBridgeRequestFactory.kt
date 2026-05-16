@@ -28,6 +28,7 @@ interface ImageBridgeRequestFactory {
         mentionsJson: String? = null,
         requestId: String? = null,
         token: String? = null,
+        attachmentJson: String? = null,
     ): ImageBridgeRequest =
         textRequest(
             action = ImageBridgeProtocol.ACTION_SEND_TEXT,
@@ -36,6 +37,7 @@ interface ImageBridgeRequestFactory {
             threadId = threadId,
             threadScope = threadScope,
             mentionsJson = mentionsJson,
+            attachmentJson = attachmentJson,
             requestId = requestId,
             token = token,
             markdown = false,
@@ -57,6 +59,7 @@ interface ImageBridgeRequestFactory {
             threadId = threadId,
             threadScope = threadScope,
             mentionsJson = mentionsJson,
+            attachmentJson = null,
             requestId = requestId,
             token = token,
             markdown = true,
@@ -79,6 +82,13 @@ interface ImageBridgeRequestFactory {
         requestId: String? = null,
         token: String? = null,
     ): ImageBridgeRequest = roomRequest(ImageBridgeProtocol.ACTION_OPEN_CHATROOM, roomId, token, requestId)
+
+    fun buildKaringAotRequest(token: String? = null): ImageBridgeRequest =
+        ImageBridgeRequest(
+            action = ImageBridgeProtocol.ACTION_KARING_AOT,
+            protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
+            token = token,
+        )
 
     fun buildSnapshotChatRoomMembersRequest(
         roomId: Long,
@@ -105,6 +115,7 @@ private fun textRequest(
     threadId: Long?,
     threadScope: Int?,
     mentionsJson: String?,
+    attachmentJson: String?,
     requestId: String?,
     token: String?,
     markdown: Boolean,
@@ -116,6 +127,7 @@ private fun textRequest(
         message = message,
         markdown = markdown,
         mentionsJson = mentionsJson,
+        attachmentJson = attachmentJson,
         threadId = threadId,
         threadScope = threadScope,
         requestId = requestId,

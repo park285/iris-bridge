@@ -55,6 +55,23 @@ internal fun selectTextMessageType(registry: KakaoClassRegistry): Any =
         ?.firstOrNull { constant -> constant.toString().equals("Text", ignoreCase = true) }
         ?: error("message type Text not found")
 
+internal fun selectLeverageMessageType(registry: KakaoClassRegistry): Any =
+    registry.messageTypeClass.enumConstants
+        ?.firstOrNull { constant -> constant.toString().equals("Leverage", ignoreCase = true) }
+        ?: error("message type Leverage not found")
+
 internal fun selectTextWriteType(): Any? =
     // Kakao ShareManager 일반 텍스트 경로는 writeType enum이 아니라 null을 넘긴다.
     null
+
+internal fun selectLeverageSchemeWriteType(registry: KakaoClassRegistry): Any? = selectWriteTypeByName(registry, "LeverageScheme")
+
+internal fun selectConnectWriteType(registry: KakaoClassRegistry): Any? = selectWriteTypeByName(registry, "Connect")
+
+private fun selectWriteTypeByName(
+    registry: KakaoClassRegistry,
+    name: String,
+): Any? =
+    registry.writeTypeClass.enumConstants?.firstOrNull { constant ->
+        constant.toString().equals(name, ignoreCase = true)
+    }

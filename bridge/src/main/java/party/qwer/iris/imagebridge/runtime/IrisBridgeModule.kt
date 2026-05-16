@@ -1,47 +1,45 @@
 package party.qwer.iris.imagebridge.runtime
 
-import android.app.Activity
 import android.app.Application
-import android.content.Intent
 import android.util.Log
-import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import io.github.libxposed.api.XposedInterface
+import io.github.libxposed.api.XposedModule
+import io.github.libxposed.api.XposedModuleInterface
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
 import java.lang.reflect.Method
 
-class IrisBridgeModule : IXposedHookLoadPackage {
+class IrisBridgeModule : XposedModule() {
     companion object {
         private const val TAG = "IrisBridge"
         private const val TARGET_PACKAGE = "com.kakao.talk"
         private val markdownPendingContexts = ReplyMarkdownPendingContextStore()
         private val mentionPendingContexts = ReplyMentionPendingContextStore()
+        private val leveragePendingContexts = ReplyLeveragePendingContextStore()
+        private val leverageCommitPendingContexts = ReplyLeveragePendingContextStore()
         private val markdownHooks =
             ReplyMarkdownHookInstaller(
                 tag = TAG,
                 markdownPendingContexts = markdownPendingContexts,
                 mentionPendingContexts = mentionPendingContexts,
+                leveragePendingContexts = leveragePendingContexts,
+                leverageCommitPendingContexts = leverageCommitPendingContexts,
             )
     }
 
-    override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (lpparam.packageName != TARGET_PACKAGE) return
+    private val hookInstaller = ModernBridgeHookInstaller(this)
+
+    override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
+        if (param.packageName != TARGET_PACKAGE) return
         Log.i(TAG, "loaded into $TARGET_PACKAGE, hooking Application.onCreate")
-        XposedHelpers.findAndHookMethod(
-            Application::class.java,
-            "onCreate",
-            object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    startBridge(param.thisObject as Application, lpparam.classLoader)
-                }
-            },
-        )
+        val onCreate = Application::class.java.getDeclaredMethod("onCreate")
+        hookInstaller.hookAfter(onCreate) { invocation ->
+            startBridge(invocation.thisObject as Application, param.classLoader)
+        }
     }
 
     private fun startBridge(
@@ -50,66 +48,54 @@ class IrisBridgeModule : IXposedHookLoadPackage {
     ) {
         Log.i(TAG, "Application.onCreate — starting image bridge server")
         val registry = runCatching { KakaoClassRegistry.discover(classLoader) }
-        registry.getOrNull()?.let { BridgeDiscovery.install(it) }
-        markdownHooks.install(classLoader, registry.getOrNull())
+        registry.getOrNull()?.let { BridgeDiscovery.install(it, hookInstaller) }
+        markdownHooks.install(classLoader, registry.getOrNull(), hookInstaller)
         ImageBridgeServer.start(
             app,
             registry.getOrNull(),
             registry.exceptionOrNull()?.message,
             mentionPendingContexts,
+            leveragePendingContexts,
+            leverageCommitPendingContexts,
+            hookInstaller,
         )
     }
 }
 
-internal fun installReplyMarkdownIngressMethodHook(
-    method: Method,
-    onActivity: (Activity) -> Unit,
-) {
-    XposedBridge.hookMethod(
-        method,
-        object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val activity = param.thisObject as? Activity ?: return
-                onActivity(activity)
+private class ModernBridgeHookInstaller(
+    private val module: XposedModule,
+) : BridgeHookInstaller {
+    override fun hookBefore(
+        method: Method,
+        callback: (BridgeHookInvocation) -> Unit,
+    ) {
+        module
+            .hook(method)
+            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+            .intercept { chain ->
+                callback(chain.toBridgeInvocation())
+                chain.proceed()
             }
-        },
-    )
-}
+    }
 
-internal fun installReplyMarkdownReuseMethodHook(
-    method: Method,
-    activityClassName: String,
-    onIntent: (Intent?) -> Unit,
-) {
-    XposedBridge.hookMethod(
-        method,
-        object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val activity = param.thisObject as? Activity ?: return
-                if (activity.javaClass.name != activityClassName) return
-                onIntent(param.args.getOrNull(0) as? Intent)
+    override fun hookAfter(
+        method: Method,
+        callback: (BridgeHookInvocation) -> Unit,
+    ) {
+        module
+            .hook(method)
+            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+            .intercept { chain ->
+                val invocation = chain.toBridgeInvocation()
+                val result = chain.proceed()
+                callback(invocation)
+                result
             }
-        },
-    )
-}
+    }
 
-internal fun installReplyMarkdownRequestDispatchHook(
-    method: Method,
-    tag: String,
-    markdownPendingContexts: ReplyMarkdownPendingContextStore,
-    mentionPendingContexts: ReplyMentionPendingContextStore,
-) {
-    XposedBridge.hookMethod(
-        method,
-        object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                handleReplyMarkdownRequestArgs(
-                    param.args,
-                    tag,
-                    markdownPendingContexts,
-                    mentionPendingContexts,
-                )
-            }
-        },
-    )
+    private fun XposedInterface.Chain.toBridgeInvocation(): BridgeHookInvocation =
+        BridgeHookInvocation(
+            thisObject = thisObject,
+            args = args.toTypedArray(),
+        )
 }

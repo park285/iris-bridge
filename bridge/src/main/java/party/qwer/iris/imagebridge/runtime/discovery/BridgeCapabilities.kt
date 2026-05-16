@@ -11,6 +11,7 @@ internal fun currentBridgeCapabilities(
     textSendCapability: KakaoTextSendCapability? = null,
     sendTextEnabled: Boolean = true,
     sendMarkdownEnabled: Boolean = true,
+    karingAotAvailable: Boolean = false,
 ): ImageBridgeCapabilitiesSnapshot {
     val readinessReason =
         when {
@@ -53,6 +54,12 @@ internal fun currentBridgeCapabilities(
                 textSendCapability = textSendCapability,
                 enabled = sendMarkdownEnabled,
                 disabledReason = "text bridge send_markdown disabled",
+            ),
+        karingAot =
+            ImageBridgeCapabilitySnapshot(
+                supported = true,
+                ready = karingAotAvailable,
+                reason = if (karingAotAvailable) null else "karing aot provider unavailable",
             ),
     )
 }

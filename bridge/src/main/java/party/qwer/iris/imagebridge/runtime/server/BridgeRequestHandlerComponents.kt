@@ -1,7 +1,11 @@
 package party.qwer.iris.imagebridge.runtime.server
 
 import android.content.Context
+import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.karing.KaringAotBridgeProvider
+import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntentMetadataResolver
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntrospector
@@ -16,6 +20,7 @@ internal data class BridgeRequestHandlerComponents(
     val requestHandler: ImageBridgeRequestHandler,
     val initialSpecStatus: BridgeSpecStatus,
     val textSendCapability: KakaoTextSendCapability?,
+    val karingAotAvailable: Boolean,
 )
 
 internal fun buildBridgeRequestHandlerComponents(
@@ -23,14 +28,18 @@ internal fun buildBridgeRequestHandlerComponents(
     registry: KakaoClassRegistry?,
     registryError: String?,
     mentionPendingContexts: ReplyMentionPendingContextStore?,
+    leveragePendingContexts: ReplyLeveragePendingContextStore?,
+    leverageCommitPendingContexts: ReplyLeveragePendingContextStore?,
+    hookInstaller: BridgeHookInstaller = NoopBridgeHookInstaller,
     healthProvider: () -> ImageBridgeHealthSnapshot,
     bridgeMetrics: BridgeMetrics,
 ): BridgeRequestHandlerComponents {
-    val imageSender = registry?.let { KakaoImageSender(it) }
-    val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts) }
+    val imageSender = registry?.let { KakaoImageSender(it, hookInstaller) }
+    val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts) }
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
     val chatRoomOpener = chatRoomOpener(context, chatRoomResolver)
     val memberExtractor = ChatRoomMemberExtractor()
+    val karingAotProvider = KaringAotBridgeProvider(context.classLoader)
     val initialSpecStatus = BridgeHookSpecVerifier(registry, registryError).verify()
     return BridgeRequestHandlerComponents(
         requestHandler =
@@ -44,10 +53,12 @@ internal fun buildBridgeRequestHandlerComponents(
                     val room = resolveFreshChatRoom(chatRoomResolver, registryError, roomId)
                     memberExtractor.snapshot(roomId, room, expectedMemberHints, preferredPlan)
                 },
+                karingAotProvider = karingAotProvider::payloadJson,
                 metrics = bridgeMetrics,
             ),
         initialSpecStatus = initialSpecStatus,
         textSendCapability = textSender?.capability(),
+        karingAotAvailable = karingAotProvider.isAvailable(),
     )
 }
 

@@ -51,6 +51,7 @@ private fun ImageBridgeCapabilitiesSnapshot.toJson(): JSONObject =
         put("snapshotChatRoomMembers", snapshotChatRoomMembers.toJson())
         put("sendText", sendText.toJson())
         put("sendMarkdown", sendMarkdown.toJson())
+        put("karingAot", karingAot.toJson())
     }
 
 private fun ImageBridgeCapabilitySnapshot.toJson(): JSONObject =

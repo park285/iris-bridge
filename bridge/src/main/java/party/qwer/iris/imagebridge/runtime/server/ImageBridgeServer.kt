@@ -2,7 +2,10 @@ package party.qwer.iris.imagebridge.runtime.server
 
 import android.content.Context
 import android.util.Log
+import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendCapability
 import java.util.concurrent.ExecutorService
@@ -24,6 +27,7 @@ internal object ImageBridgeServer {
     private val textSendCapability = AtomicReference<KakaoTextSendCapability?>(null)
     private val textBridgeSendTextEnabled = AtomicBoolean(false)
     private val textBridgeSendMarkdownEnabled = AtomicBoolean(false)
+    private val karingAotAvailable = AtomicBoolean(false)
     private val peerIdentityValidator = BridgePeerIdentityValidator()
     private val bridgeMetrics = BridgeMetrics()
     private val muxClientDispatcher = newBridgeMuxClientDispatcher({ clientExecutor }, { requestHandler }, { running.get() }, peerIdentityValidator, bridgeMetrics)
@@ -39,6 +43,9 @@ internal object ImageBridgeServer {
         registry: KakaoClassRegistry?,
         registryError: String? = null,
         mentionPendingContexts: ReplyMentionPendingContextStore? = null,
+        leveragePendingContexts: ReplyLeveragePendingContextStore? = null,
+        leverageCommitPendingContexts: ReplyLeveragePendingContextStore? = null,
+        hookInstaller: BridgeHookInstaller = NoopBridgeHookInstaller,
     ) {
         if (!running.compareAndSet(false, true)) {
             Log.w(TAG, "bridge server already running")
@@ -56,10 +63,14 @@ internal object ImageBridgeServer {
                 registry,
                 registryError,
                 mentionPendingContexts,
+                leveragePendingContexts,
+                leverageCommitPendingContexts,
+                hookInstaller,
                 ::healthSnapshot,
                 bridgeMetrics,
             )
         textSendCapability.set(components.textSendCapability)
+        karingAotAvailable.set(components.karingAotAvailable)
         specStatus.set(components.initialSpecStatus)
         logBridgeSpecFailure(TAG, components.initialSpecStatus)
         requestHandler = components.requestHandler
@@ -86,6 +97,7 @@ internal object ImageBridgeServer {
             textSendCapability = textSendCapability.get(),
             textBridgeSendTextEnabled = textBridgeSendTextEnabled.get(),
             textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled.get(),
+            karingAotAvailable = karingAotAvailable.get(),
             metrics = bridgeMetrics.snapshot(),
             restartCount = restartCount.get(),
             lastCrashMessage = lastCrashMessage.get(),

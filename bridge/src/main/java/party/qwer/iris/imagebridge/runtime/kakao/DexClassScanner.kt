@@ -20,7 +20,7 @@ internal class DexClassScanner(
                 "com.google.",
                 "org.json.",
                 "dalvik.",
-                "de.robv.android.xposed.",
+                "io.github.libxposed.",
                 "party.qwer.iris.",
             )
     }
