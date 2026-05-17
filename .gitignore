@@ -40,6 +40,7 @@ __pycache__/
 !/docs/legacy_kotlin_coverage_map.md
 !/docs/http2-multiplexing.md
 !/docs/karing-runtime-integration.md
+!/docs/karing-message-send.md
 !/docs/reply-mentions.md
 !/docs/read-model.md
 !/docs/stats.md
