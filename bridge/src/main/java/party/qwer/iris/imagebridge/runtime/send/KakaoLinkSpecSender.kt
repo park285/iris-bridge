@@ -40,7 +40,7 @@ internal class ReflectiveKakaoLinkSpecSender(
             logInfo(
                 KAKAO_TEXT_SEND_TAG,
                 "text send kakaolink spec failed requestId=$requestId room=$roomId " +
-                    "error=${error.javaClass.name}: ${error.message}",
+                    "error=${describeThrowable(error)}",
             )
         }.getOrDefault(false)
 
