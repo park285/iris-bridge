@@ -4,7 +4,6 @@ import android.content.Context
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
-import party.qwer.iris.imagebridge.runtime.karing.KaringAotBridgeProvider
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntentMetadataResolver
@@ -20,8 +19,6 @@ internal data class BridgeRequestHandlerComponents(
     val requestHandler: ImageBridgeRequestHandler,
     val initialSpecStatus: BridgeSpecStatus,
     val textSendCapability: KakaoTextSendCapability?,
-    val karingAotAvailable: Boolean,
-    val karingAotReason: String?,
 )
 
 internal fun buildBridgeRequestHandlerComponents(
@@ -40,7 +37,6 @@ internal fun buildBridgeRequestHandlerComponents(
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
     val chatRoomOpener = chatRoomOpener(context, chatRoomResolver)
     val memberExtractor = ChatRoomMemberExtractor()
-    val karingAotProvider = KaringAotBridgeProvider(context.classLoader)
     val initialSpecStatus = BridgeHookSpecVerifier(registry, registryError).verify()
     return BridgeRequestHandlerComponents(
         requestHandler =
@@ -54,13 +50,10 @@ internal fun buildBridgeRequestHandlerComponents(
                     val room = resolveFreshChatRoom(chatRoomResolver, registryError, roomId)
                     memberExtractor.snapshot(roomId, room, expectedMemberHints, preferredPlan)
                 },
-                karingAotProvider = karingAotProvider::payloadJson,
                 metrics = bridgeMetrics,
             ),
         initialSpecStatus = initialSpecStatus,
         textSendCapability = textSender?.capability(),
-        karingAotAvailable = karingAotProvider.isAvailable(),
-        karingAotReason = karingAotProvider.availabilityError(),
     )
 }
 

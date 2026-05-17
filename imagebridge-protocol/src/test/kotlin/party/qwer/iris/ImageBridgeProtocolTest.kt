@@ -206,32 +206,4 @@ class ImageBridgeProtocolTest {
         val restored = ImageBridgeProtocol.readRequestFrame(ByteArrayInputStream(buffer.toByteArray()))
         assertEquals("profile.mentionUserId", restored.preferredMemberPlan?.mentionUserIdPath)
     }
-
-    @Test
-    fun `karing aot request uses bridge control action`() {
-        val request = ImageBridgeProtocol.buildKaringAotRequest(token = "bridge-token")
-        val buffer = ByteArrayOutputStream()
-
-        ImageBridgeProtocol.writeFrame(buffer, request)
-
-        val restored = ImageBridgeProtocol.readRequestFrame(ByteArrayInputStream(buffer.toByteArray()))
-        assertEquals(ImageBridgeProtocol.ACTION_KARING_AOT, restored.action)
-        assertEquals(ImageBridgeProtocol.PROTOCOL_VERSION, restored.protocolVersion)
-        assertEquals("bridge-token", restored.token)
-    }
-
-    @Test
-    fun `karing aot response preserves opaque payload json`() {
-        val response =
-            ImageBridgeProtocol.ImageBridgeResponse(
-                status = ImageBridgeProtocol.STATUS_OK,
-                payloadJson = """{"aot":{"access_token":"access-token","d_id":"device-id"}}""",
-            )
-        val buffer = ByteArrayOutputStream()
-
-        ImageBridgeProtocol.writeFrame(buffer, response)
-
-        val restored = ImageBridgeProtocol.readResponseFrame(ByteArrayInputStream(buffer.toByteArray()))
-        assertEquals("""{"aot":{"access_token":"access-token","d_id":"device-id"}}""", restored.payloadJson)
-    }
 }

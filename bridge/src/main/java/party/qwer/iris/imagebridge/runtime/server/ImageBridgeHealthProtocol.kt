@@ -44,7 +44,6 @@ private fun ImageBridgeCapabilitiesSnapshot.toProtocol(): ImageBridgeProtocol.Im
         snapshotChatRoomMembers = snapshotChatRoomMembers.toProtocol(),
         sendText = sendText.toProtocol(),
         sendMarkdown = sendMarkdown.toProtocol(),
-        karingAot = karingAot.toProtocol(),
     )
 
 private fun ImageBridgeCapabilitySnapshot.toProtocol(): ImageBridgeProtocol.ImageBridgeCapability =

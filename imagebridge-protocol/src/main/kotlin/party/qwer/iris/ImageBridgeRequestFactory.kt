@@ -83,13 +83,6 @@ interface ImageBridgeRequestFactory {
         token: String? = null,
     ): ImageBridgeRequest = roomRequest(ImageBridgeProtocol.ACTION_OPEN_CHATROOM, roomId, token, requestId)
 
-    fun buildKaringAotRequest(token: String? = null): ImageBridgeRequest =
-        ImageBridgeRequest(
-            action = ImageBridgeProtocol.ACTION_KARING_AOT,
-            protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
-            token = token,
-        )
-
     fun buildSnapshotChatRoomMembersRequest(
         roomId: Long,
         memberIds: List<Long> = emptyList(),

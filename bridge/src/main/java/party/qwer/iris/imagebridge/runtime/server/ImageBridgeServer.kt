@@ -27,8 +27,6 @@ internal object ImageBridgeServer {
     private val textSendCapability = AtomicReference<KakaoTextSendCapability?>(null)
     private val textBridgeSendTextEnabled = AtomicBoolean(false)
     private val textBridgeSendMarkdownEnabled = AtomicBoolean(false)
-    private val karingAotAvailable = AtomicBoolean(false)
-    private val karingAotReason = AtomicReference<String?>(null)
     private val peerIdentityValidator = BridgePeerIdentityValidator()
     private val bridgeMetrics = BridgeMetrics()
     private val muxClientDispatcher = newBridgeMuxClientDispatcher({ clientExecutor }, { requestHandler }, { running.get() }, peerIdentityValidator, bridgeMetrics)
@@ -71,8 +69,6 @@ internal object ImageBridgeServer {
                 bridgeMetrics,
             )
         textSendCapability.set(components.textSendCapability)
-        karingAotAvailable.set(components.karingAotAvailable)
-        karingAotReason.set(components.karingAotReason)
         specStatus.set(components.initialSpecStatus)
         logBridgeSpecFailure(TAG, components.initialSpecStatus)
         requestHandler = components.requestHandler
@@ -99,8 +95,6 @@ internal object ImageBridgeServer {
             textSendCapability = textSendCapability.get(),
             textBridgeSendTextEnabled = textBridgeSendTextEnabled.get(),
             textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled.get(),
-            karingAotAvailable = karingAotAvailable.get(),
-            karingAotReason = karingAotReason.get(),
             metrics = bridgeMetrics.snapshot(),
             restartCount = restartCount.get(),
             lastCrashMessage = lastCrashMessage.get(),

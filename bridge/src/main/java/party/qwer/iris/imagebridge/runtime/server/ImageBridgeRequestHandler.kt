@@ -13,7 +13,6 @@ internal class ImageBridgeRequestHandler(
     private val chatRoomInspector: ((Long) -> String)? = null,
     private val chatRoomOpener: ((Long) -> Unit)? = null,
     private val chatRoomMemberSnapshotProvider: ((Long, List<ImageBridgeProtocol.ChatRoomMemberHint>, ImageBridgeProtocol.ChatRoomMemberExtractionPlan?) -> ImageBridgeProtocol.ChatRoomMembersSnapshot)? = null,
-    private val karingAotProvider: (() -> String)? = null,
     private val handshakeValidator: BridgeHandshakeValidator = BridgeHandshakeValidator(),
     private val serialExecutor: RoomThreadSerialExecutor = RoomThreadSerialExecutor(),
     private val pathValidator: BridgeImagePathValidator = BridgeImagePathValidator(),
@@ -59,7 +58,6 @@ internal class ImageBridgeRequestHandler(
             ImageBridgeProtocol.ACTION_INSPECT_CHATROOM -> handleInspectChatRoom(request)
             ImageBridgeProtocol.ACTION_OPEN_CHATROOM -> handleOpenChatRoom(request)
             ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS -> handleSnapshotChatRoomMembers(request)
-            ImageBridgeProtocol.ACTION_KARING_AOT -> handleKaringAot(request)
             else ->
                 bridgeFailureResponse(
                     error = "unknown action: $action",
@@ -104,15 +102,6 @@ internal class ImageBridgeRequestHandler(
                     },
                     request.preferredMemberPlan,
                 ),
-        )
-    }
-
-    private fun handleKaringAot(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse {
-        val provider = checkNotNull(karingAotProvider) { "karing aot provider unavailable" }
-        return ImageBridgeProtocol.ImageBridgeResponse(
-            status = ImageBridgeProtocol.STATUS_OK,
-            requestId = request.requestId,
-            payloadJson = provider(),
         )
     }
 }

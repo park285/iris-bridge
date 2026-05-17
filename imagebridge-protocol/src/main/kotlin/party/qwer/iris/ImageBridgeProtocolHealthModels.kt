@@ -16,7 +16,6 @@ data class ImageBridgeCapabilities(
     val snapshotChatRoomMembers: ImageBridgeCapability = ImageBridgeCapability(),
     val sendText: ImageBridgeCapability = ImageBridgeCapability(),
     val sendMarkdown: ImageBridgeCapability = ImageBridgeCapability(),
-    val karingAot: ImageBridgeCapability = ImageBridgeCapability(),
 )
 
 @Serializable

@@ -61,11 +61,6 @@ class ImageBridgeRequestHandlerHealthTest {
                                 ready = false,
                                 reason = "text sender unavailable",
                             ),
-                        karingAot =
-                            ImageBridgeCapabilitySnapshot(
-                                supported = true,
-                                ready = true,
-                            ),
                     ),
                 restartCount = 3,
                 lastCrashMessage = "bind failed",
@@ -95,7 +90,6 @@ class ImageBridgeRequestHandlerHealthTest {
         val jsonCapabilities = healthSnapshot.toJson().getJSONObject("capabilities")
         assertFalse(jsonCapabilities.getJSONObject("sendText").getBoolean("supported"))
         assertFalse(jsonCapabilities.getJSONObject("sendMarkdown").getBoolean("ready"))
-        assertTrue(jsonCapabilities.getJSONObject("karingAot").getBoolean("supported"))
-        assertTrue(jsonCapabilities.getJSONObject("karingAot").getBoolean("ready"))
+        assertFalse(jsonCapabilities.has("karingAot"))
     }
 }

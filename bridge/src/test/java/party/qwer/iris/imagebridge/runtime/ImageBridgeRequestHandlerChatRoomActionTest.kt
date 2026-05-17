@@ -172,23 +172,4 @@ class ImageBridgeRequestHandlerChatRoomActionTest {
         )
         assertTrue(response.memberSnapshot?.usedPreferredPlan == true)
     }
-
-    @Test
-    fun `karing aot action returns opaque auth payload`() {
-        val handler =
-            ImageBridgeRequestHandler(
-                imageSender = { error("should not be called") },
-                healthProvider = { readyHealthSnapshot() },
-                karingAotProvider = { """{"aot":{"access_token":"access-token","d_id":"device-id"}}""" },
-                handshakeValidator = developmentHandshakeValidator(),
-            )
-
-        val response =
-            handler.handle(
-                ImageBridgeProtocol.buildKaringAotRequest(token = "bridge-token"),
-            )
-
-        assertEquals(ImageBridgeProtocol.STATUS_OK, response.status)
-        assertEquals("""{"aot":{"access_token":"access-token","d_id":"device-id"}}""", response.payloadJson)
-    }
 }
