@@ -2,6 +2,7 @@ package party.qwer.iris.imagebridge.runtime.send
 
 import android.util.Log
 import org.json.JSONObject
+import java.lang.reflect.InvocationTargetException
 import java.net.URLEncoder
 
 internal interface KakaoLinkSpecSender {
@@ -47,6 +48,7 @@ internal class ReflectiveKakaoLinkSpecSender(
         spec: Any,
         roomId: Long,
     ): String {
+        val failures = mutableListOf<Throwable>()
         val sendByExistingChatIdMethod =
             spec.javaClass.methods
                 .firstOrNull { method ->
@@ -56,8 +58,13 @@ internal class ReflectiveKakaoLinkSpecSender(
                         types[0] == Long::class.javaPrimitiveType
                 }
         if (sendByExistingChatIdMethod != null) {
-            sendByExistingChatIdMethod.apply { isAccessible = true }.invoke(spec, roomId)
-            return sendByExistingChatIdMethod.name
+            runCatching {
+                sendByExistingChatIdMethod.apply { isAccessible = true }.invoke(spec, roomId)
+            }.onSuccess {
+                return sendByExistingChatIdMethod.name
+            }.onFailure { error ->
+                failures += error
+            }
         }
         val sendToReceiverMethod =
             spec.javaClass.methods
@@ -70,9 +77,15 @@ internal class ReflectiveKakaoLinkSpecSender(
                         (listener == null || types[2].isAssignableFrom(listener.javaClass))
                 }
         if (sendToReceiverMethod != null) {
-            sendToReceiverMethod.apply { isAccessible = true }.invoke(spec, roomId, null, listener)
-            return sendToReceiverMethod.name
+            runCatching {
+                sendToReceiverMethod.apply { isAccessible = true }.invoke(spec, roomId, LongArray(0), listener)
+            }.onSuccess {
+                return sendToReceiverMethod.name
+            }.onFailure { error ->
+                failures += error
+            }
         }
+        failures.firstOrNull()?.let { error("KakaoLinkSpec send failed: ${describeThrowable(it)}") }
         error("KakaoLinkSpec send method not found")
     }
 
@@ -158,6 +171,16 @@ private fun extractKakaoLinkAppKey(rawAttachment: String): String? =
 private fun firstNonBlank(vararg values: String?): String? = values.firstOrNull { value -> !value.isNullOrBlank() }
 
 private fun urlEncode(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+private fun describeThrowable(error: Throwable): String {
+    val root =
+        if (error is InvocationTargetException && error.targetException != null) {
+            error.targetException
+        } else {
+            error
+        }
+    return "${root.javaClass.name}: ${root.message ?: ""}".trimEnd()
+}
 
 private val KAKAO_SCHEME_APP_KEY = Regex("""kakao([0-9a-fA-F]{16,64})://kakaolink""")
 private val APP_KEY_QUERY = Regex("""(?:[?&]|\\b)app_key=([0-9a-fA-F]{16,64})""")
