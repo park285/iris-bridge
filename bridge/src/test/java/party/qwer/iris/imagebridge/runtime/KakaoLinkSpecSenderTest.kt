@@ -136,6 +136,7 @@ class KakaoLinkSpecSenderTest {
 
         assertEquals("bfbfe8b641716d3f45e01a3b7a03f13d", params["appkey"])
         assertEquals("133218", params["template_id"])
+        assertFalse(params.containsKey("template_json"))
         assertEquals("5분 전 알림", templateArgs.getString("alarm_title"))
         assertEquals("테스트 방송", templateArgs.getString("stream_title"))
         assertEquals("watch?v=abc", templateArgs.getString("web_url"))

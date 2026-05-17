@@ -97,15 +97,18 @@ internal fun buildKakaoLinkV4EncodedQuery(rawAttachment: String): String {
             platform.optString("SDID"),
         )
             ?: error("KakaoLink template id not found")
+    val templateArgs = explicitTemplateArgs(attachment)
     val queryParams =
         mutableListOf(
             "linkver" to "4.0",
             "appver" to appVer,
             "appkey" to appKey,
             "template_id" to templateId,
-            "template_json" to attachment.toString(),
         )
-    (explicitTemplateArgs(attachment) ?: inferTemplateArgs(attachment))?.let { templateArgs ->
+    if (templateArgs == null) {
+        queryParams += "template_json" to attachment.toString()
+    }
+    (templateArgs ?: inferTemplateArgs(attachment))?.let { templateArgs ->
         queryParams += "template_args" to templateArgs.toString()
     }
     return queryParams.joinToString("&") { (key, value) -> "${urlEncode(key)}=${urlEncode(value)}" }
