@@ -19,7 +19,7 @@ class BridgeRuntimeConfigTest {
         assertEquals("bridge-secret", resolution.token)
         assertEquals(BridgeTokenSource.ENV_FALLBACK, resolution.source)
         assertEquals("/tmp/missing.json", resolution.configPath)
-        assertEquals("/data/iris-tmp/reply-images", resolution.replyImageDir)
+        assertEquals(IrisRuntimePathPolicy.resolve(emptyMap()).replyImageDir, resolution.replyImageDir)
     }
 
     @Test
@@ -79,6 +79,7 @@ class BridgeRuntimeConfigTest {
         assertEquals("", resolution.token)
         assertEquals(BridgeTokenSource.NONE, resolution.source)
         assertEquals("/data/iris/config.json", resolution.configPath)
+        assertEquals(true, resolution.bridgeMuxServerEnabled)
         assertEquals(true, resolution.textBridgeSendTextEnabled)
         assertEquals(true, resolution.textBridgeSendMarkdownEnabled)
     }
@@ -147,7 +148,10 @@ class BridgeRuntimeConfigTest {
                 fileReader = { """{"replyImageDir":"   "}""" },
             )
 
-        assertEquals("/data/iris-tmp/reply-images", resolution.replyImageDir)
+        assertEquals(
+            IrisRuntimePathPolicy.resolve(mapOf("IRIS_DATA_DIR" to "/env/iris")).replyImageDir,
+            resolution.replyImageDir,
+        )
     }
 
     @Test
@@ -188,5 +192,40 @@ class BridgeRuntimeConfigTest {
 
         assertEquals(false, envResolution.textBridgeSendTextEnabled)
         assertEquals(true, envResolution.textBridgeSendMarkdownEnabled)
+    }
+
+    @Test
+    fun `resolves bridge mux server flag from config and lets env override`() {
+        val configResolution =
+            BridgeBootstrapConfigResolver.resolve(
+                env = mapOf("IRIS_CONFIG_PATH" to "/tmp/config.json"),
+                fileReader = {
+                    """
+                    {
+                      "bridgeMuxServerEnabled": false
+                    }
+                    """.trimIndent()
+                },
+            )
+
+        assertEquals(false, configResolution.bridgeMuxServerEnabled)
+
+        val envResolution =
+            BridgeBootstrapConfigResolver.resolve(
+                env =
+                    mapOf(
+                        "IRIS_CONFIG_PATH" to "/tmp/config.json",
+                        "IRIS_BRIDGE_MUX_SERVER_ENABLED" to "yes",
+                    ),
+                fileReader = {
+                    """
+                    {
+                      "bridgeMuxServerEnabled": false
+                    }
+                    """.trimIndent()
+                },
+            )
+
+        assertEquals(true, envResolution.bridgeMuxServerEnabled)
     }
 }

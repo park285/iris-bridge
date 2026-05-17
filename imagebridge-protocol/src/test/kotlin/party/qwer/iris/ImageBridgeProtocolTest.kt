@@ -225,13 +225,13 @@ class ImageBridgeProtocolTest {
         val response =
             ImageBridgeProtocol.ImageBridgeResponse(
                 status = ImageBridgeProtocol.STATUS_OK,
-                payloadJson = """{"ka_tgt":"tgt-token"}""",
+                payloadJson = """{"aot":{"access_token":"access-token","d_id":"device-id"}}""",
             )
         val buffer = ByteArrayOutputStream()
 
         ImageBridgeProtocol.writeFrame(buffer, response)
 
         val restored = ImageBridgeProtocol.readResponseFrame(ByteArrayInputStream(buffer.toByteArray()))
-        assertEquals("""{"ka_tgt":"tgt-token"}""", restored.payloadJson)
+        assertEquals("""{"aot":{"access_token":"access-token","d_id":"device-id"}}""", restored.payloadJson)
     }
 }

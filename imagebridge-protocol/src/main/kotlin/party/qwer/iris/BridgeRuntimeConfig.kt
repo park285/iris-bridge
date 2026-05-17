@@ -11,6 +11,7 @@ data class BridgeTokenResolution(
     val source: BridgeTokenSource,
     val configPath: String,
     val replyImageDir: String,
+    val bridgeMuxServerEnabled: Boolean,
     val textBridgeSendTextEnabled: Boolean,
     val textBridgeSendMarkdownEnabled: Boolean,
 )
@@ -33,6 +34,11 @@ fun resolveBridgeReplyImageDir(
     env: Map<String, String> = System.getenv(),
     fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
 ): String = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).replyImageDir
+
+fun resolveBridgeMuxServerEnabled(
+    env: Map<String, String> = System.getenv(),
+    fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
+): Boolean = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).bridgeMuxServerEnabled
 
 fun resolveBridgeTextSendTextEnabled(
     env: Map<String, String> = System.getenv(),
