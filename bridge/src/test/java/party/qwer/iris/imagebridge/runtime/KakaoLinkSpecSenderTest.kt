@@ -2,20 +2,55 @@
 
 package party.qwer.iris.imagebridge.runtime
 
+import com.kakao.talk.model.kakaolink.FakeKakaoLinkSpecRecorder
 import org.json.JSONObject
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContext
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.send.KakaoChatLogAttachmentCrypto
+import party.qwer.iris.imagebridge.runtime.send.ReflectiveKakaoLinkSpecSender
 import party.qwer.iris.imagebridge.runtime.send.buildKakaoLinkV4EncodedQuery
 import java.net.URLDecoder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class KakaoLinkSpecSenderTest {
+    @Test
+    fun `reflective sender prefers receiver method with listener over existing chat id method`() {
+        FakeKakaoLinkSpecRecorder.clear()
+        val sender =
+            ReflectiveKakaoLinkSpecSender(
+                loader = checkNotNull(KakaoLinkSpecSenderTest::class.java.classLoader),
+                listener = null,
+                logInfo = { _, _ -> },
+            )
+
+        val sent =
+            sender.send(
+                roomId = 18478615493603057L,
+                message = "테스트",
+                rawAttachment =
+                    """
+                    {
+                      "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+                      "template_id": "133220",
+                      "P": {"VA": "6.0.0", "SDID": "133220"},
+                      "C": {"HD": {"TD": {"T": "테스트"}}},
+                      "K": {"ti": "133220"},
+                      "template_args": {"title": "테스트"}
+                    }
+                    """.trimIndent(),
+                requestId = "req-karing-target-room",
+            )
+
+        assertTrue(sent)
+        assertEquals(listOf("b:18478615493603057"), FakeKakaoLinkSpecRecorder.calls)
+    }
+
     @Test
     fun `builds KakaoLink V4 query from raw card attachment`() {
         val query =

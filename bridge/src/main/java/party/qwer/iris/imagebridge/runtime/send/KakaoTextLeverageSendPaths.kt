@@ -103,7 +103,7 @@ private fun sendWithLeverageSchemePath(
     runCatching {
         val writeType = binding.leverageSchemeWriteType ?: return false
         val sendingLog =
-            binding.sendingLogFactory.newSendingLog(
+            binding.leverageSendingLogFactory.newSendingLog(
                 roomId = roomId,
                 chatRoom = chatRoom,
                 message = message,

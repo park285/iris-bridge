@@ -201,7 +201,7 @@ class KakaoTextSendInvocationFactoryTest {
     }
 
     @Test
-    fun `factory does not patch server generated custom template attachment`() {
+    fun `factory sends server generated custom template through KakaoLinkSpec path`() {
         FakeTextRequestRecorder.reset()
         ShareManager.reset()
         val registry = buildFakeRegistry()
@@ -248,10 +248,14 @@ class KakaoTextSendInvocationFactoryTest {
         )
 
         assertEquals(123L, linkSender.roomId)
+        assertEquals("5분 전 알림", linkSender.message)
         assertEquals(attachment, linkSender.rawAttachment)
+        assertEquals("req-template", linkSender.requestId)
         assertEquals(null, patcher.roomId)
         assertEquals(null, patcher.rawAttachment)
         assertEquals(null, leverageCommitContexts.match(123L, "5분 전 알림", "req-template"))
+        assertEquals(null, ShareManager.chatRoom)
+        assertEquals(null, ShareManager.message)
     }
 
     @Test

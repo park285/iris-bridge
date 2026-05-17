@@ -29,10 +29,10 @@ internal class ReflectiveKakaoLinkSpecSender(
             val helperClass = Class.forName(KAKAO_LINK_HELPER_CLASS, false, loader)
             val spec = helperClass.getDeclaredMethod("b", String::class.java).apply { isAccessible = true }.invoke(null, query)
             requireNotNull(spec) { "KakaoLinkSpec parser returned null" }
-            invokeKakaoLinkSpecSend(spec, roomId)
+            val methodName = invokeKakaoLinkSpecSend(spec, roomId)
             logInfo(
                 KAKAO_TEXT_SEND_TAG,
-                "text send kakaolink spec invoked requestId=$requestId room=$roomId messageLength=${message.length}",
+                "text send kakaolink spec invoked method=$methodName requestId=$requestId room=$roomId messageLength=${message.length}",
             )
             true
         }.onFailure { error ->
@@ -46,20 +46,8 @@ internal class ReflectiveKakaoLinkSpecSender(
     private fun invokeKakaoLinkSpecSend(
         spec: Any,
         roomId: Long,
-    ) {
-        val sendByRoomIdMethod =
-            spec.javaClass.methods
-                .firstOrNull { method ->
-                    val types = method.parameterTypes
-                    method.name == "c" &&
-                        types.size == 1 &&
-                        types[0] == Long::class.javaPrimitiveType
-                }
-        if (sendByRoomIdMethod != null) {
-            sendByRoomIdMethod.apply { isAccessible = true }.invoke(spec, roomId)
-            return
-        }
-        val sendToChatMethod =
+    ): String {
+        val sendToReceiverMethod =
             spec.javaClass.methods
                 .firstOrNull { method ->
                     val types = method.parameterTypes
@@ -69,9 +57,21 @@ internal class ReflectiveKakaoLinkSpecSender(
                         types[1] == LongArray::class.java &&
                         (listener == null || types[2].isAssignableFrom(listener.javaClass))
                 }
-        if (sendToChatMethod != null) {
-            sendToChatMethod.apply { isAccessible = true }.invoke(spec, roomId, null, listener)
-            return
+        if (sendToReceiverMethod != null) {
+            sendToReceiverMethod.apply { isAccessible = true }.invoke(spec, roomId, null, listener)
+            return sendToReceiverMethod.name
+        }
+        val sendByExistingChatIdMethod =
+            spec.javaClass.methods
+                .firstOrNull { method ->
+                    val types = method.parameterTypes
+                    method.name == "c" &&
+                        types.size == 1 &&
+                        types[0] == Long::class.javaPrimitiveType
+                }
+        if (sendByExistingChatIdMethod != null) {
+            sendByExistingChatIdMethod.apply { isAccessible = true }.invoke(spec, roomId)
+            return sendByExistingChatIdMethod.name
         }
         error("KakaoLinkSpec send method not found")
     }

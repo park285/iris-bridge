@@ -21,6 +21,7 @@ internal data class BridgeRequestHandlerComponents(
     val initialSpecStatus: BridgeSpecStatus,
     val textSendCapability: KakaoTextSendCapability?,
     val karingAotAvailable: Boolean,
+    val karingAotReason: String?,
 )
 
 internal fun buildBridgeRequestHandlerComponents(
@@ -59,6 +60,7 @@ internal fun buildBridgeRequestHandlerComponents(
         initialSpecStatus = initialSpecStatus,
         textSendCapability = textSender?.capability(),
         karingAotAvailable = karingAotProvider.isAvailable(),
+        karingAotReason = karingAotProvider.availabilityError(),
     )
 }
 

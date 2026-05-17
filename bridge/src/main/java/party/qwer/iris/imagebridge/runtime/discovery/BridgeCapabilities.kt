@@ -12,6 +12,7 @@ internal fun currentBridgeCapabilities(
     sendTextEnabled: Boolean = true,
     sendMarkdownEnabled: Boolean = true,
     karingAotAvailable: Boolean = false,
+    karingAotReason: String? = null,
 ): ImageBridgeCapabilitiesSnapshot {
     val readinessReason =
         when {
@@ -59,7 +60,7 @@ internal fun currentBridgeCapabilities(
             ImageBridgeCapabilitySnapshot(
                 supported = true,
                 ready = karingAotAvailable,
-                reason = if (karingAotAvailable) null else "karing aot provider unavailable",
+                reason = if (karingAotAvailable) null else karingAotReason ?: "karing aot provider unavailable",
             ),
     )
 }

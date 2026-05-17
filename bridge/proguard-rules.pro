@@ -17,3 +17,6 @@
 
 # ── Kotlin ─────────────────────────────────────────────────────────────────
 -keep class kotlin.Metadata { *; }
+
+# Kakao 리플렉션 시그니처와 Xposed callback proxy가 같은 함수 인터페이스 이름을 공유해야 합니다.
+-keep class kotlin.jvm.functions.** { *; }

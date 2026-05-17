@@ -179,7 +179,7 @@ class ImageBridgeRequestHandlerChatRoomActionTest {
             ImageBridgeRequestHandler(
                 imageSender = { error("should not be called") },
                 healthProvider = { readyHealthSnapshot() },
-                karingAotProvider = { """{"ka_tgt":"tgt-token"}""" },
+                karingAotProvider = { """{"aot":{"access_token":"access-token","d_id":"device-id"}}""" },
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
@@ -189,6 +189,6 @@ class ImageBridgeRequestHandlerChatRoomActionTest {
             )
 
         assertEquals(ImageBridgeProtocol.STATUS_OK, response.status)
-        assertEquals("""{"ka_tgt":"tgt-token"}""", response.payloadJson)
+        assertEquals("""{"aot":{"access_token":"access-token","d_id":"device-id"}}""", response.payloadJson)
     }
 }
