@@ -47,6 +47,18 @@ internal class ReflectiveKakaoLinkSpecSender(
         spec: Any,
         roomId: Long,
     ): String {
+        val sendByExistingChatIdMethod =
+            spec.javaClass.methods
+                .firstOrNull { method ->
+                    val types = method.parameterTypes
+                    method.name == "c" &&
+                        types.size == 1 &&
+                        types[0] == Long::class.javaPrimitiveType
+                }
+        if (sendByExistingChatIdMethod != null) {
+            sendByExistingChatIdMethod.apply { isAccessible = true }.invoke(spec, roomId)
+            return sendByExistingChatIdMethod.name
+        }
         val sendToReceiverMethod =
             spec.javaClass.methods
                 .firstOrNull { method ->
@@ -60,18 +72,6 @@ internal class ReflectiveKakaoLinkSpecSender(
         if (sendToReceiverMethod != null) {
             sendToReceiverMethod.apply { isAccessible = true }.invoke(spec, roomId, null, listener)
             return sendToReceiverMethod.name
-        }
-        val sendByExistingChatIdMethod =
-            spec.javaClass.methods
-                .firstOrNull { method ->
-                    val types = method.parameterTypes
-                    method.name == "c" &&
-                        types.size == 1 &&
-                        types[0] == Long::class.javaPrimitiveType
-                }
-        if (sendByExistingChatIdMethod != null) {
-            sendByExistingChatIdMethod.apply { isAccessible = true }.invoke(spec, roomId)
-            return sendByExistingChatIdMethod.name
         }
         error("KakaoLinkSpec send method not found")
     }

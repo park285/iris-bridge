@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 
 class KakaoLinkSpecSenderTest {
     @Test
-    fun `reflective sender prefers receiver method with listener over existing chat id method`() {
+    fun `reflective sender prefers existing chat id method over receiver method`() {
         FakeKakaoLinkSpecRecorder.clear()
         val sender =
             ReflectiveKakaoLinkSpecSender(
@@ -48,7 +48,7 @@ class KakaoLinkSpecSenderTest {
             )
 
         assertTrue(sent)
-        assertEquals(listOf("b:18478615493603057"), FakeKakaoLinkSpecRecorder.calls)
+        assertEquals(listOf("c:18478615493603057"), FakeKakaoLinkSpecRecorder.calls)
     }
 
     @Test
