@@ -213,9 +213,10 @@ internal class RecordingKakaoChatLogCommitVerifier(
         this.requestId = requestId
         this.rawAttachment = rawAttachment
         rawAttachments += rawAttachment
-        val result = listOf(result, *additionalResults.toTypedArray()).getOrElse(awaitCalls) {
-            additionalResults.lastOrNull() ?: result
-        }
+        val result =
+            listOf(result, *additionalResults.toTypedArray()).getOrElse(awaitCalls) {
+                additionalResults.lastOrNull() ?: result
+            }
         awaitCalls += 1
         return result
     }

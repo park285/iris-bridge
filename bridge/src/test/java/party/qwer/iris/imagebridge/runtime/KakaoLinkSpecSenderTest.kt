@@ -420,7 +420,13 @@ class KakaoLinkSpecSenderTest {
         assertEquals("133220", templateJson.getJSONObject("P").getString("SDID"))
         assertEquals(1, templateJson.getJSONObject("C").getJSONArray("ITL").length())
         assertFalse(templateJson.getJSONObject("C").has("BUL"))
-        assertFalse(templateJson.getJSONObject("C").getJSONArray("ITL").getJSONObject(0).has("L"))
+        assertFalse(
+            templateJson
+                .getJSONObject("C")
+                .getJSONArray("ITL")
+                .getJSONObject(0)
+                .has("L"),
+        )
         assertEquals("133220", JSONObject(kakaoLinkSpecCommitVerificationAttachment(attachment)).getJSONObject("K").getString("ti"))
         assertEquals(listOf(JSONObject(attachment).toString()), kakaoLinkSpecPatchMatchAttachments(attachment).map { JSONObject(it).toString() })
     }
@@ -459,7 +465,7 @@ class KakaoLinkSpecSenderTest {
                 .associate { entry ->
                     val parts = entry.split("=", limit = 2)
                     URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8")
-        }
+                }
         val templateArgs = JSONObject(params.getValue("template_args"))
         val templateJson = JSONObject(params.getValue("template_json"))
 
@@ -469,7 +475,13 @@ class KakaoLinkSpecSenderTest {
         assertEquals("133218", templateJson.getJSONObject("P").getString("SDID"))
         assertEquals(4, templateJson.getJSONObject("C").getJSONArray("ITL").length())
         assertFalse(templateJson.getJSONObject("C").has("BUL"))
-        assertFalse(templateJson.getJSONObject("C").getJSONArray("ITL").getJSONObject(0).has("L"))
+        assertFalse(
+            templateJson
+                .getJSONObject("C")
+                .getJSONArray("ITL")
+                .getJSONObject(0)
+                .has("L"),
+        )
         assertEquals("4", templateArgs.getString("visible_stream_count"))
         assertEquals(
             "4",

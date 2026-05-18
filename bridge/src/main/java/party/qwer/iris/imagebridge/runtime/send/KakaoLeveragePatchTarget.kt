@@ -105,7 +105,7 @@ internal fun kakaoLinkAttachmentsMatch(
     }.getOrDefault(false)
 
 private fun templateId(attachment: JSONObject): String? =
-    firstNonBlank(
+    firstNonBlankPatchValue(
         attachment.optString("template_id"),
         attachment.optString("templateId"),
         attachment.optJSONObject("K")?.optString("ti"),
@@ -173,4 +173,4 @@ private fun leverageEncryptionType(value: String): Int =
 private const val DEFAULT_ENCRYPTION_TYPE = 31
 private val ENCRYPTION_TYPE_REGEX = Regex(""""enc"\s*:\s*(\d+)""")
 
-private fun firstNonBlank(vararg values: String?): String? = values.firstOrNull { value -> !value.isNullOrBlank() }
+private fun firstNonBlankPatchValue(vararg values: String?): String? = values.firstOrNull { value -> !value.isNullOrBlank() }
