@@ -16,6 +16,13 @@ internal interface KakaoChatLogCommitVerifier {
         requestId: String?,
         rawAttachment: String? = null,
     ): Boolean
+
+    fun cleanupPendingKakaoLinkSendingLogs(
+        roomId: Long,
+        minimumCreatedAt: Long,
+        requestId: String?,
+        rawAttachment: String,
+    ): Boolean = true
 }
 
 internal class KakaoChatLogDbCommitVerifier(
@@ -79,6 +86,34 @@ internal class KakaoChatLogDbCommitVerifier(
             error(message)
         }
 
+    override fun cleanupPendingKakaoLinkSendingLogs(
+        roomId: Long,
+        minimumCreatedAt: Long,
+        requestId: String?,
+        rawAttachment: String,
+    ): Boolean {
+        repeat(CLEANUP_ATTEMPTS) { attempt ->
+            runCatching {
+                cleanupMatchedPendingSendingLogs(roomId, minimumCreatedAt, rawAttachment)
+            }.onSuccess { deleted ->
+                if (deleted > 0) {
+                    logInfo(KAKAO_TEXT_SEND_TAG, "kakaolink pending sending logs cleaned requestId=$requestId room=$roomId count=$deleted")
+                }
+                return true
+            }.onFailure { error ->
+                logInfo(
+                    KAKAO_TEXT_SEND_TAG,
+                    "kakaolink pending sending log cleanup failed requestId=$requestId room=$roomId " +
+                        "attempt=${attempt + 1} error=${error.javaClass.name}: ${error.message}",
+                )
+                if (attempt + 1 < CLEANUP_ATTEMPTS && !sleepBeforeCleanupRetry(requestId, roomId)) {
+                    return false
+                }
+            }
+        }
+        return false
+    }
+
     private fun hasCommittedRow(
         roomId: Long,
         message: String,
@@ -100,6 +135,44 @@ internal class KakaoChatLogDbCommitVerifier(
         }
     }
 
+    private fun cleanupMatchedPendingSendingLogs(
+        roomId: Long,
+        minimumCreatedAt: Long,
+        rawAttachment: String,
+    ): Int {
+        val db =
+            SQLiteDatabase.openDatabase(
+                databasePath,
+                null,
+                SQLiteDatabase.OPEN_READWRITE,
+            )
+        db.use { database ->
+            val rowIds = mutableListOf<Long>()
+            database
+                .rawQuery(
+                    """
+                    select _id,attachment
+                    from chat_sending_logs
+                    where chat_id=? and type=71 and created_at>=?
+                    order by _id desc
+                    limit 10
+                    """.trimIndent(),
+                    arrayOf(roomId.toString(), minimumCreatedAt.toString()),
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val rowId = cursor.getLong(0)
+                        val attachment = cursor.getString(1)
+                        if (!attachment.isNullOrBlank() && kakaoLinkPendingCleanupAttachmentsMatch(rawAttachment, attachment)) {
+                            rowIds += rowId
+                        }
+                    }
+                }
+            return rowIds.sumOf { rowId ->
+                database.delete("chat_sending_logs", "_id=?", arrayOf(rowId.toString()))
+            }
+        }
+    }
+
     private fun sleepBeforeRetry(
         requestId: String?,
         roomId: Long,
@@ -114,8 +187,24 @@ internal class KakaoChatLogDbCommitVerifier(
         }
     }
 
+    private fun sleepBeforeCleanupRetry(
+        requestId: String?,
+        roomId: Long,
+    ): Boolean {
+        try {
+            sleeper(CLEANUP_RETRY_DELAY_MS)
+            return true
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            logInfo(KAKAO_TEXT_SEND_TAG, "kakaolink pending sending log cleanup interrupted requestId=$requestId room=$roomId")
+            return false
+        }
+    }
+
     private companion object {
         private const val COMMIT_ATTEMPTS = 12
         private const val COMMIT_RETRY_DELAY_MS = 250L
+        private const val CLEANUP_ATTEMPTS = 3
+        private const val CLEANUP_RETRY_DELAY_MS = 100L
     }
 }

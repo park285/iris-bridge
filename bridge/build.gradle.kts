@@ -96,6 +96,8 @@ dependencies {
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.org.json)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.sqlite.jdbc)
 }
 
 tasks.withType<Test>().configureEach {

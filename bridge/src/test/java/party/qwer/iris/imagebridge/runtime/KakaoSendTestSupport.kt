@@ -182,6 +182,7 @@ internal class RecordingKakaoLeverageAttachmentPatcher : KakaoLeverageAttachment
 internal class RecordingKakaoChatLogCommitVerifier(
     private val result: Boolean,
     private vararg val additionalResults: Boolean,
+    private val cleanupResult: Boolean = true,
 ) : KakaoChatLogCommitVerifier {
     var roomId: Long? = null
     var message: String? = null
@@ -190,7 +191,12 @@ internal class RecordingKakaoChatLogCommitVerifier(
     var requestId: String? = null
     var rawAttachment: String? = null
     var latestRowRoomId: Long? = null
+    var cleanupRoomId: Long? = null
+    var cleanupMinimumCreatedAt: Long? = null
+    var cleanupRequestId: String? = null
+    var cleanupRawAttachment: String? = null
     val rawAttachments = mutableListOf<String?>()
+    val cleanupRawAttachments = mutableListOf<String>()
     private var awaitCalls = 0
 
     override fun latestCommittedRowId(roomId: Long): Long {
@@ -219,6 +225,20 @@ internal class RecordingKakaoChatLogCommitVerifier(
             }
         awaitCalls += 1
         return result
+    }
+
+    override fun cleanupPendingKakaoLinkSendingLogs(
+        roomId: Long,
+        minimumCreatedAt: Long,
+        requestId: String?,
+        rawAttachment: String,
+    ): Boolean {
+        cleanupRoomId = roomId
+        cleanupMinimumCreatedAt = minimumCreatedAt
+        cleanupRequestId = requestId
+        cleanupRawAttachment = rawAttachment
+        cleanupRawAttachments += rawAttachment
+        return cleanupResult
     }
 }
 

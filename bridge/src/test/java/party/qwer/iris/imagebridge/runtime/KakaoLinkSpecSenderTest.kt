@@ -13,6 +13,7 @@ import party.qwer.iris.imagebridge.runtime.send.ReflectiveKakaoLinkSpecSender
 import party.qwer.iris.imagebridge.runtime.send.buildKakaoLinkV4EncodedQuery
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkAttachmentsMatch
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkDisplayPatchAttachment
+import party.qwer.iris.imagebridge.runtime.send.kakaoLinkPendingCleanupAttachmentsMatch
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecCommitVerificationAttachment
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecPatchMatchAttachments
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecSendAttachment
@@ -123,6 +124,105 @@ class KakaoLinkSpecSenderTest {
             """.trimIndent()
 
         assertFalse(kakaoLinkAttachmentsMatch(expected, committed))
+    }
+
+    @Test
+    fun `kakaolink pending cleanup match rejects same template with different header`() {
+        val expected =
+            """
+            {
+              "template_id": "133266",
+              "C": {"HD": {"TD": {"T": "첫 번째 알림"}}},
+              "K": {"ti": "133266"},
+              "template_args": {"alarm_title": "첫 번째 알림"}
+            }
+            """.trimIndent()
+        val stale =
+            """
+            {
+              "ti": "133266",
+              "C": {"HD": {"TD": {"T": "다른 알림"}}},
+              "ta": {"alarm_title": "다른 알림"}
+            }
+            """.trimIndent()
+
+        assertFalse(kakaoLinkPendingCleanupAttachmentsMatch(expected, stale))
+    }
+
+    @Test
+    fun `kakaolink match rejects same template and header with different web url`() {
+        val expected =
+            """
+            {
+              "template_id": "133266",
+              "C": {"HD": {"TD": {"T": "동일한 알림"}}},
+              "K": {"ti": "133266"},
+              "template_args": {
+                "alarm_title": "동일한 알림",
+                "web_url": "watch?v=expected01"
+              }
+            }
+            """.trimIndent()
+        val stale =
+            """
+            {
+              "ti": "133266",
+              "C": {"HD": {"TD": {"T": "동일한 알림"}}},
+              "ta": {
+                "alarm_title": "동일한 알림",
+                "web_url": "watch?v=stale00002"
+              }
+            }
+            """.trimIndent()
+
+        assertFalse(kakaoLinkAttachmentsMatch(expected, stale))
+        assertFalse(kakaoLinkPendingCleanupAttachmentsMatch(expected, stale))
+    }
+
+    @Test
+    fun `kakaolink pending cleanup match rejects attachments without template id`() {
+        val expected =
+            """
+            {
+              "C": {"HD": {"TD": {"T": "방송 알림"}}},
+              "template_args": {"alarm_title": "방송 알림"}
+            }
+            """.trimIndent()
+        val pending =
+            """
+            {
+              "C": {"HD": {"TD": {"T": "방송 알림"}}},
+              "ta": {"alarm_title": "방송 알림"}
+            }
+            """.trimIndent()
+
+        assertFalse(kakaoLinkPendingCleanupAttachmentsMatch(expected, pending))
+        assertFalse(kakaoLinkAttachmentsMatch(expected, pending))
+    }
+
+    @Test
+    fun `kakaolink pending cleanup match accepts same template and item titles`() {
+        val expected =
+            """
+            {
+              "template_id": "133266",
+              "C": {"HD": {"TD": {"T": "방송 알림"}}, "ITL": [
+                {"TD": {"T": "첫 번째"}}
+              ]},
+              "K": {"ti": "133266"}
+            }
+            """.trimIndent()
+        val pending =
+            """
+            {
+              "ti": "133266",
+              "C": {"HD": {"TD": {"T": "방송 알림"}}, "ITL": [
+                {"TD": {"T": "첫 번째"}}
+              ]}
+            }
+            """.trimIndent()
+
+        assertTrue(kakaoLinkPendingCleanupAttachmentsMatch(expected, pending))
     }
 
     @Test

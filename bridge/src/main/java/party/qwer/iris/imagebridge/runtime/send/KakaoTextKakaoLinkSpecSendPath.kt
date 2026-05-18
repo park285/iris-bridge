@@ -88,7 +88,6 @@ internal fun sendWithKakaoLinkSpecPath(
         return sendServerGeneratedKakaoLinkSpecPath(
             sender,
             verifier,
-            leverageAttachmentPatcher ?: binding.leverageAttachmentPatcher,
             KakaoLinkSpecCommitAttempt(roomId, chatRoom, message, rawAttachment, requestId, sendAttachment, commitVerificationAttachment, minimumCreatedAt, minimumRowId),
             logInfo,
         )
@@ -103,7 +102,6 @@ internal fun sendWithKakaoLinkSpecPath(
 private fun sendServerGeneratedKakaoLinkSpecPath(
     sender: KakaoLinkSpecSender,
     verifier: KakaoChatLogCommitVerifier?,
-    patcher: KakaoLeverageAttachmentPatcher?,
     attempt: KakaoLinkSpecCommitAttempt,
     logInfo: (String, String) -> Unit,
 ): Boolean {
@@ -114,10 +112,19 @@ private fun sendServerGeneratedKakaoLinkSpecPath(
         }
         sentAtLeastOnce = true
         if (verifier?.awaitCommitted(attempt.roomId, attempt.message, attempt.minimumCreatedAt, attempt.minimumRowId, attempt.requestId, attempt.commitVerificationAttachment) == true) {
-            patcher?.patchAsync(attempt.roomId, attempt.message, attempt.rawAttachment, attempt.requestId)
+            if (!verifier.cleanupPendingKakaoLinkSendingLogs(attempt.roomId, attempt.minimumCreatedAt, attempt.requestId, attempt.commitVerificationAttachment)) {
+                logInfo(
+                    KAKAO_TEXT_SEND_TAG,
+                    "kakaolink pending sending log cleanup failed after chat log commit " +
+                        "requestId=${attempt.requestId} room=${attempt.roomId}",
+                )
+            }
             return true
         }
         logMissingKakaoLinkCommit(index, attempt, logInfo)
+    }
+    if (verifier?.cleanupPendingKakaoLinkSendingLogs(attempt.roomId, attempt.minimumCreatedAt, attempt.requestId, attempt.commitVerificationAttachment) == false) {
+        error("KakaoLinkSpec pending sending log cleanup failed before chat log commit")
     }
     if (!sentAtLeastOnce) {
         error("KakaoLinkSpec server template send failed before chat log commit")
@@ -167,4 +174,4 @@ private data class KakaoLinkSpecCommitAttempt(
 )
 
 private const val KAKAO_LINK_COMMIT_CREATED_AT_GRACE_SECONDS = 5L
-private const val KAKAO_LINK_SPEC_SEND_ATTEMPTS = 3
+private const val KAKAO_LINK_SPEC_SEND_ATTEMPTS = 1
