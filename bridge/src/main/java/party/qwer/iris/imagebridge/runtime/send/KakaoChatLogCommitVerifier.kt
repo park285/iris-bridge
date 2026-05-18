@@ -30,6 +30,8 @@ internal class KakaoChatLogDbCommitVerifier(
     private val databasePath: String = KAKAO_TALK_DATABASE_PATH,
     private val sleeper: (Long) -> Unit = { delayMs -> Thread.sleep(delayMs) },
 ) : KakaoChatLogCommitVerifier {
+    private val pendingCleaner = KakaoPendingSendingLogCleaner(databasePath)
+
     override fun awaitCommitted(
         roomId: Long,
         message: String,
@@ -39,7 +41,9 @@ internal class KakaoChatLogDbCommitVerifier(
         rawAttachment: String?,
     ): Boolean {
         repeat(COMMIT_ATTEMPTS) { attempt ->
-            if (!sleepBeforeRetry(requestId, roomId)) return false
+            if (!sleepBeforeKakaoLinkRetry(sleeper, COMMIT_RETRY_DELAY_MS, requestId, roomId, "kakaolink commit check interrupted", logInfo)) {
+                return false
+            }
             val committed =
                 runCatching {
                     hasCommittedRow(roomId, message, minimumCreatedAt, minimumRowId, rawAttachment)
@@ -94,7 +98,7 @@ internal class KakaoChatLogDbCommitVerifier(
     ): Boolean {
         repeat(CLEANUP_ATTEMPTS) { attempt ->
             runCatching {
-                cleanupMatchedPendingSendingLogs(roomId, minimumCreatedAt, rawAttachment)
+                pendingCleaner.cleanupMatchedPendingSendingLogs(roomId, minimumCreatedAt, rawAttachment)
             }.onSuccess { deleted ->
                 if (deleted > 0) {
                     logInfo(KAKAO_TEXT_SEND_TAG, "kakaolink pending sending logs cleaned requestId=$requestId room=$roomId count=$deleted")
@@ -106,7 +110,17 @@ internal class KakaoChatLogDbCommitVerifier(
                     "kakaolink pending sending log cleanup failed requestId=$requestId room=$roomId " +
                         "attempt=${attempt + 1} error=${error.javaClass.name}: ${error.message}",
                 )
-                if (attempt + 1 < CLEANUP_ATTEMPTS && !sleepBeforeCleanupRetry(requestId, roomId)) {
+                if (
+                    attempt + 1 < CLEANUP_ATTEMPTS &&
+                    !sleepBeforeKakaoLinkRetry(
+                        sleeper,
+                        CLEANUP_RETRY_DELAY_MS,
+                        requestId,
+                        roomId,
+                        "kakaolink pending sending log cleanup interrupted",
+                        logInfo,
+                    )
+                ) {
                     return false
                 }
             }
@@ -132,72 +146,6 @@ internal class KakaoChatLogDbCommitVerifier(
                 return findCommittedKakaoLinkChatLog(database, roomId, minimumCreatedAt, minimumRowId, rawAttachment) != null
             }
             return findCommittedChatLogMessage(database, roomId, message, minimumCreatedAt) != null
-        }
-    }
-
-    private fun cleanupMatchedPendingSendingLogs(
-        roomId: Long,
-        minimumCreatedAt: Long,
-        rawAttachment: String,
-    ): Int {
-        val db =
-            SQLiteDatabase.openDatabase(
-                databasePath,
-                null,
-                SQLiteDatabase.OPEN_READWRITE,
-            )
-        db.use { database ->
-            val rowIds = mutableListOf<Long>()
-            database
-                .rawQuery(
-                    """
-                    select _id,attachment
-                    from chat_sending_logs
-                    where chat_id=? and type=71 and created_at>=?
-                    order by _id desc
-                    limit 10
-                    """.trimIndent(),
-                    arrayOf(roomId.toString(), minimumCreatedAt.toString()),
-                ).use { cursor ->
-                    while (cursor.moveToNext()) {
-                        val rowId = cursor.getLong(0)
-                        val attachment = cursor.getString(1)
-                        if (!attachment.isNullOrBlank() && kakaoLinkPendingCleanupAttachmentsMatch(rawAttachment, attachment)) {
-                            rowIds += rowId
-                        }
-                    }
-                }
-            return rowIds.sumOf { rowId ->
-                database.delete("chat_sending_logs", "_id=?", arrayOf(rowId.toString()))
-            }
-        }
-    }
-
-    private fun sleepBeforeRetry(
-        requestId: String?,
-        roomId: Long,
-    ): Boolean {
-        try {
-            sleeper(COMMIT_RETRY_DELAY_MS)
-            return true
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            logInfo(KAKAO_TEXT_SEND_TAG, "kakaolink commit check interrupted requestId=$requestId room=$roomId")
-            return false
-        }
-    }
-
-    private fun sleepBeforeCleanupRetry(
-        requestId: String?,
-        roomId: Long,
-    ): Boolean {
-        try {
-            sleeper(CLEANUP_RETRY_DELAY_MS)
-            return true
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            logInfo(KAKAO_TEXT_SEND_TAG, "kakaolink pending sending log cleanup interrupted requestId=$requestId room=$roomId")
-            return false
         }
     }
 
