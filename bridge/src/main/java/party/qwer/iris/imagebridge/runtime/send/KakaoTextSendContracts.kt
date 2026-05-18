@@ -38,6 +38,7 @@ internal data class KakaoTextSendBinding(
     val listener: Any?,
     val kakaoLinkSpecSender: KakaoLinkSpecSender?,
     val leverageAttachmentPatcher: KakaoLeverageAttachmentPatcher?,
+    val kakaoLinkCommitVerifier: KakaoChatLogCommitVerifier?,
 ) {
     fun invoke(
         chatRoom: Any,

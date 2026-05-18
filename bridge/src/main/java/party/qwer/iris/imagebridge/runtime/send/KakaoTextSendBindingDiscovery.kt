@@ -49,6 +49,7 @@ internal fun discoverKakaoTextSendBinding(
                 logInfo = logInfo,
             ),
         leverageAttachmentPatcher = KakaoLeverageAttachmentDbPatcher(logInfo = logInfo),
+        kakaoLinkCommitVerifier = KakaoChatLogDbCommitVerifier(logInfo = logInfo),
     )
 }
 

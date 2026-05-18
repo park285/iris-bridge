@@ -15,6 +15,7 @@ internal class KakaoTextSendInvocationFactory(
     private val leverageCommitPendingContexts: ReplyLeveragePendingContextStore? = null,
     private val kakaoLinkSpecSender: KakaoLinkSpecSender? = null,
     private val leverageAttachmentPatcher: KakaoLeverageAttachmentPatcher? = null,
+    private val kakaoLinkCommitVerifier: KakaoChatLogCommitVerifier? = null,
     private val logInfo: (String, String) -> Unit = { tag, message -> Log.i(tag, message) },
     private val requestCompanionClassProvider: () -> Class<*> = {
         Class.forName(
@@ -82,6 +83,7 @@ internal class KakaoTextSendInvocationFactory(
                 leverageCommitPendingContexts = leverageCommitPendingContexts,
                 kakaoLinkSpecSender = kakaoLinkSpecSender,
                 leverageAttachmentPatcher = leverageAttachmentPatcher,
+                kakaoLinkCommitVerifier = kakaoLinkCommitVerifier,
                 logInfo = logInfo,
             )
         ) {

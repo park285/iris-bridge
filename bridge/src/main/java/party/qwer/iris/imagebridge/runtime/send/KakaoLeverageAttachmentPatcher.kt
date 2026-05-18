@@ -21,7 +21,7 @@ internal interface KakaoLeverageAttachmentPatcher {
 
 internal class KakaoLeverageAttachmentDbPatcher(
     private val logInfo: (String, String) -> Unit = { tag, message -> Log.i(tag, message) },
-    private val databasePath: String = KAKAO_DATABASE_PATH,
+    private val databasePath: String = KAKAO_TALK_DATABASE_PATH,
     private val clock: () -> Long = System::currentTimeMillis,
     private val executor: Executor = newPatchExecutor(logInfo),
 ) : KakaoLeverageAttachmentPatcher {
@@ -101,8 +101,21 @@ internal class KakaoLeverageAttachmentDbPatcher(
                 SQLiteDatabase.OPEN_READWRITE,
             )
         db.use { database ->
-            val row = findLeverageAttachmentPatchTarget(database, roomId, message, minimumCreatedAt) ?: return false
-            return updateAttachment(database, row, rawAttachment)
+            val row =
+                kakaoLinkSpecPatchMatchAttachments(rawAttachment)
+                    .asSequence()
+                    .mapNotNull { candidateAttachment ->
+                        findCommittedKakaoLinkChatLog(
+                            database = database,
+                            roomId = roomId,
+                            minimumCreatedAt = minimumCreatedAt,
+                            minimumRowId = 0L,
+                            rawAttachment = candidateAttachment,
+                        )
+                    }.firstOrNull()
+                    ?: findLeverageAttachmentPatchTarget(database, roomId, message, minimumCreatedAt)
+                    ?: return false
+            return updateAttachment(database, row, kakaoLinkDisplayPatchAttachment(row.committedAttachment, rawAttachment))
         }
     }
 
@@ -120,7 +133,6 @@ internal class KakaoLeverageAttachmentDbPatcher(
     }
 
     private companion object {
-        private const val KAKAO_DATABASE_PATH = "/data/data/com.kakao.talk/databases/KakaoTalk.db"
         private const val PATCH_ATTEMPTS = 12
         private const val PATCH_RETRY_DELAY_MS = 250L
         private const val PATCH_CREATED_AT_GRACE_SECONDS = 5L

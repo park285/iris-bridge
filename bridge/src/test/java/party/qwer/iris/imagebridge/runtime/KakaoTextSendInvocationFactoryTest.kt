@@ -10,6 +10,8 @@ import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStor
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendCapability
 import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendInvocationFactory
+import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecCommitVerificationAttachment
+import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecSendAttachment
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -157,6 +159,77 @@ class KakaoTextSendInvocationFactoryTest {
     }
 
     @Test
+    fun `factory sends resolved Iris content list with explicit args through KakaoLinkSpec path`() {
+        FakeTextRequestRecorder.reset()
+        ShareManager.reset()
+        val registry = buildFakeRegistry()
+        val leverageContexts = ReplyLeveragePendingContextStore()
+        val leverageCommitContexts = ReplyLeveragePendingContextStore()
+        val linkSender = RecordingKakaoLinkSpecSender(result = true)
+        val patcher = RecordingKakaoLeverageAttachmentPatcher()
+        val commitVerifier = RecordingKakaoChatLogCommitVerifier(result = true)
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                context = Application(),
+                leveragePendingContexts = leverageContexts,
+                leverageCommitPendingContexts = leverageCommitContexts,
+                kakaoLinkSpecSender = linkSender,
+                leverageAttachmentPatcher = patcher,
+                kakaoLinkCommitVerifier = commitVerifier,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+        val attachment =
+            """
+            {
+              "P": {"TP": "List", "SID": "iris_133220", "SNM": "hololive-bot"},
+              "C": {
+                "HD": {"TD": {"T": "방송 5분 전 알림"}},
+                "ITL": [{"TD": {"T": "테스트 방송", "D": "미오 · 05/18 07:30"}}]
+              },
+              "K": {"ti": "133220"},
+              "ta": {"item1_title": "테스트 방송"}
+            }
+            """.trimIndent()
+
+        factory.send(
+            roomId = 123L,
+            chatRoom = chatRoom,
+            message = "방송 5분 전 알림",
+            markdown = false,
+            threadId = null,
+            threadScope = null,
+            mentionsJson = null,
+            requestId = "req-iris-list",
+            attachmentJson = attachment,
+        )
+
+        assertEquals(123L, linkSender.roomId)
+        assertEquals("방송 5분 전 알림", linkSender.message)
+        assertEquals(kakaoLinkSpecSendAttachment(attachment), linkSender.rawAttachment)
+        assertEquals("req-iris-list", linkSender.requestId)
+        assertEquals(123L, commitVerifier.roomId)
+        assertEquals("방송 5분 전 알림", commitVerifier.message)
+        assertEquals(123L, commitVerifier.latestRowRoomId)
+        assertEquals(900L, commitVerifier.minimumRowId)
+        assertEquals("req-iris-list", commitVerifier.requestId)
+        assertEquals(kakaoLinkSpecCommitVerificationAttachment(attachment), commitVerifier.rawAttachment)
+        assertEquals(123L, patcher.roomId)
+        assertEquals("방송 5분 전 알림", patcher.message)
+        assertEquals(attachment, patcher.rawAttachment)
+        assertEquals("req-iris-list", patcher.requestId)
+        assertEquals(null, ShareManager.chatRoom)
+        assertEquals(null, ShareManager.message)
+        assertEquals(null, FakeTextRequestRecorder.chatRoom)
+        assertEquals(null, FakeTextRequestRecorder.writeType)
+        assertEquals(null, FakeTextRequestRecorder.sendingLog)
+        assertEquals(null, leverageCommitContexts.match(123L, "방송 5분 전 알림", "req-iris-list"))
+        assertEquals(null, leverageContexts.match(123L, "방송 5분 전 알림", "req-iris-list"))
+    }
+
+    @Test
     fun `factory skips KakaoLinkSpec path for threaded raw attachment reply`() {
         FakeTextRequestRecorder.reset()
         ShareManager.reset()
@@ -201,13 +274,14 @@ class KakaoTextSendInvocationFactoryTest {
     }
 
     @Test
-    fun `factory sends server generated custom template through KakaoLinkSpec path`() {
+    fun `factory sends server generated custom template through committed spec path`() {
         FakeTextRequestRecorder.reset()
         ShareManager.reset()
         val registry = buildFakeRegistry()
         val leverageCommitContexts = ReplyLeveragePendingContextStore()
         val linkSender = RecordingKakaoLinkSpecSender(result = true)
         val patcher = RecordingKakaoLeverageAttachmentPatcher()
+        val commitVerifier = RecordingKakaoChatLogCommitVerifier(result = true)
         val factory =
             KakaoTextSendInvocationFactory(
                 registry = registry,
@@ -215,6 +289,7 @@ class KakaoTextSendInvocationFactoryTest {
                 leverageCommitPendingContexts = leverageCommitContexts,
                 kakaoLinkSpecSender = linkSender,
                 leverageAttachmentPatcher = patcher,
+                kakaoLinkCommitVerifier = commitVerifier,
                 logInfo = { _, _ -> },
                 requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
             )
@@ -249,13 +324,299 @@ class KakaoTextSendInvocationFactoryTest {
 
         assertEquals(123L, linkSender.roomId)
         assertEquals("5분 전 알림", linkSender.message)
-        assertEquals(attachment, linkSender.rawAttachment)
+        assertEquals(kakaoLinkSpecSendAttachment(attachment), linkSender.rawAttachment)
         assertEquals("req-template", linkSender.requestId)
-        assertEquals(null, patcher.roomId)
-        assertEquals(null, patcher.rawAttachment)
+        assertEquals(123L, patcher.roomId)
+        assertEquals("5분 전 알림", patcher.message)
+        assertEquals(attachment, patcher.rawAttachment)
+        assertEquals("req-template", patcher.requestId)
+        assertEquals(123L, commitVerifier.roomId)
+        assertEquals("5분 전 알림", commitVerifier.message)
+        assertEquals(123L, commitVerifier.latestRowRoomId)
+        assertEquals(900L, commitVerifier.minimumRowId)
+        assertEquals("req-template", commitVerifier.requestId)
+        assertEquals(kakaoLinkSpecCommitVerificationAttachment(attachment), commitVerifier.rawAttachment)
         assertEquals(null, leverageCommitContexts.match(123L, "5분 전 알림", "req-template"))
         assertEquals(null, ShareManager.chatRoom)
         assertEquals(null, ShareManager.message)
+        assertEquals(null, FakeTextRequestRecorder.chatRoom)
+        assertEquals(null, FakeTextRequestRecorder.writeType)
+        assertEquals(null, FakeTextRequestRecorder.sendingLog)
+    }
+
+    @Test
+    fun `factory sends resolved Iris template through KakaoLinkSpec path`() {
+        FakeTextRequestRecorder.reset()
+        ShareManager.reset()
+        val registry = buildFakeRegistry()
+        val linkSender = RecordingKakaoLinkSpecSender(result = true)
+        val patcher = RecordingKakaoLeverageAttachmentPatcher()
+        val commitVerifier = RecordingKakaoChatLogCommitVerifier(result = true)
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                context = Application(),
+                kakaoLinkSpecSender = linkSender,
+                leverageAttachmentPatcher = patcher,
+                kakaoLinkCommitVerifier = commitVerifier,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+        val attachment =
+            """
+            {
+              "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+              "template_id": "133220",
+              "P": {"TP": "List", "SID": "iris_133220", "SDID": "133220", "SNM": "hololive-bot"},
+              "C": {
+                "HD": {"TD": {"T": "5분 전 알림"}},
+                "ITL": [{"TD": {"T": "테스트 방송", "D": "미오 · 05/18 07:30"}}]
+              },
+              "K": {"ti": "133220"},
+              "template_args": {
+                "alarm_title": "5분 전 알림",
+                "item1_title": "테스트 방송",
+                "item1_desc": "미오 · 05/18 07:30"
+              }
+            }
+            """.trimIndent()
+
+        factory.send(
+            roomId = 123L,
+            chatRoom = chatRoom,
+            message = "5분 전 알림",
+            markdown = false,
+            threadId = null,
+            threadScope = null,
+            mentionsJson = null,
+            requestId = "req-template",
+            attachmentJson = attachment,
+        )
+
+        assertEquals(123L, linkSender.roomId)
+        assertEquals("5분 전 알림", linkSender.message)
+        assertEquals(kakaoLinkSpecSendAttachment(attachment), linkSender.rawAttachment)
+        assertEquals("req-template", linkSender.requestId)
+        assertEquals(1, linkSender.sendCalls)
+        assertEquals(123L, commitVerifier.roomId)
+        assertEquals(123L, commitVerifier.latestRowRoomId)
+        assertEquals(900L, commitVerifier.minimumRowId)
+        assertEquals(kakaoLinkSpecCommitVerificationAttachment(attachment), commitVerifier.rawAttachment)
+        assertEquals(123L, patcher.roomId)
+        assertEquals(attachment, patcher.rawAttachment)
+        assertEquals(null, FakeTextRequestRecorder.chatRoom)
+        assertEquals(null, FakeTextRequestRecorder.writeType)
+        assertEquals(null, FakeTextRequestRecorder.sendingLog)
+    }
+
+    @Test
+    fun `factory retries resolved Iris template when first spec commit is not observed`() {
+        FakeTextRequestRecorder.reset()
+        ShareManager.reset()
+        val registry = buildFakeRegistry()
+        val linkSender = RecordingKakaoLinkSpecSender(result = true)
+        val patcher = RecordingKakaoLeverageAttachmentPatcher()
+        val commitVerifier = RecordingKakaoChatLogCommitVerifier(result = false, true)
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                context = Application(),
+                kakaoLinkSpecSender = linkSender,
+                leverageAttachmentPatcher = patcher,
+                kakaoLinkCommitVerifier = commitVerifier,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+        val attachment =
+            """
+            {
+              "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+              "template_id": "133220",
+              "P": {"TP": "List", "SID": "iris_133220", "SDID": "133220", "SNM": "hololive-bot"},
+              "C": {
+                "HD": {"TD": {"T": "커뮤니티 알림"}},
+                "ITL": [{"TD": {"T": "새 커뮤니티", "D": "호로아나 · 05/18 15:22"}}]
+              },
+              "K": {"ti": "133220"},
+              "template_args": {
+                "thumbnail": "https://example.com/thumb.jpg",
+                "item_title": "새 커뮤니티",
+                "item_web_url": "post/abc",
+                "alarm_title": "커뮤니티 알림",
+                "item_desc": "호로아나 · 05/18 15:22"
+              }
+            }
+            """.trimIndent()
+
+        factory.send(
+            roomId = 123L,
+            chatRoom = chatRoom,
+            message = "커뮤니티 알림",
+            markdown = false,
+            threadId = null,
+            threadScope = null,
+            mentionsJson = null,
+            requestId = "req-retry",
+            attachmentJson = attachment,
+        )
+
+        assertEquals(2, linkSender.sendCalls)
+        assertEquals(
+            listOf(kakaoLinkSpecSendAttachment(attachment), kakaoLinkSpecSendAttachment(attachment)),
+            linkSender.rawAttachments,
+        )
+        assertEquals(
+            listOf<String?>(kakaoLinkSpecCommitVerificationAttachment(attachment), kakaoLinkSpecCommitVerificationAttachment(attachment)),
+            commitVerifier.rawAttachments,
+        )
+        assertEquals(123L, patcher.roomId)
+        assertEquals(attachment, patcher.rawAttachment)
+        assertEquals(null, ShareManager.chatRoom)
+        assertEquals(null, FakeTextRequestRecorder.sendingLog)
+    }
+
+    @Test
+    fun `factory fails resolved Iris template without direct leverage fallback when spec commit is not observed`() {
+        FakeTextRequestRecorder.reset()
+        ShareManager.reset()
+        val registry = buildFakeRegistry()
+        val leverageContexts = ReplyLeveragePendingContextStore()
+        val linkSender = RecordingKakaoLinkSpecSender(result = true)
+        val patcher = RecordingKakaoLeverageAttachmentPatcher()
+        val commitVerifier = RecordingKakaoChatLogCommitVerifier(result = false)
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                context = Application(),
+                leveragePendingContexts = leverageContexts,
+                kakaoLinkSpecSender = linkSender,
+                leverageAttachmentPatcher = patcher,
+                kakaoLinkCommitVerifier = commitVerifier,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+        val attachment =
+            """
+            {
+              "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+              "template_id": "133218",
+              "P": {"TP": "List", "SID": "iris_133218", "SDID": "133218", "SNM": "hololive-bot"},
+              "C": {
+                "HD": {"TD": {"T": "5분 전 알림 · 4건"}},
+                "ITL": [
+                  {"TD": {"T": "첫 번째"}},
+                  {"TD": {"T": "두 번째"}},
+                  {"TD": {"T": "세 번째"}},
+                  {"TD": {"T": "네 번째"}}
+                ]
+              },
+              "K": {"ti": "133218"},
+              "template_args": {"item1_title": "첫 번째", "item4_title": "네 번째"}
+            }
+            """.trimIndent()
+
+        val error =
+            runCatching {
+                factory.send(
+                    roomId = 123L,
+                    chatRoom = chatRoom,
+                    message = "5분 전 알림 · 4건",
+                    markdown = false,
+                    threadId = null,
+                    threadScope = null,
+                    mentionsJson = null,
+                    requestId = "req-iris-fallback",
+                    attachmentJson = attachment,
+                )
+            }.exceptionOrNull()
+
+        assertNotNull(error)
+        assertTrue(error.message?.contains("did not create chat log") == true)
+        assertEquals(3, linkSender.sendCalls)
+        assertEquals(123L, linkSender.roomId)
+        assertEquals(123L, commitVerifier.roomId)
+        assertEquals(kakaoLinkSpecCommitVerificationAttachment(attachment), commitVerifier.rawAttachment)
+        assertEquals(
+            listOf<String?>(
+                kakaoLinkSpecCommitVerificationAttachment(attachment),
+                kakaoLinkSpecCommitVerificationAttachment(attachment),
+                kakaoLinkSpecCommitVerificationAttachment(attachment),
+            ),
+            commitVerifier.rawAttachments,
+        )
+        assertEquals(null, patcher.roomId)
+        assertEquals(null, ShareManager.chatRoom)
+        assertEquals(null, ShareManager.message)
+        assertEquals(null, leverageContexts.match(123L, "5분 전 알림 · 4건", "req-iris-fallback"))
+        assertEquals(null, FakeTextRequestRecorder.chatRoom)
+        assertEquals(null, FakeTextRequestRecorder.writeType)
+        assertEquals(null, FakeTextRequestRecorder.sendingLog)
+    }
+
+    @Test
+    fun `factory fails server generated custom template when chat log commit is not observed`() {
+        FakeTextRequestRecorder.reset()
+        ShareManager.reset()
+        val registry = buildFakeRegistry()
+        val linkSender = RecordingKakaoLinkSpecSender(result = true)
+        val patcher = RecordingKakaoLeverageAttachmentPatcher()
+        val commitVerifier = RecordingKakaoChatLogCommitVerifier(result = false)
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                context = Application(),
+                kakaoLinkSpecSender = linkSender,
+                leverageAttachmentPatcher = patcher,
+                kakaoLinkCommitVerifier = commitVerifier,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { FakeTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+        val attachment =
+            """
+            {
+              "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+              "template_id": "133218",
+              "P": {"TP": "List", "SDID": "133218"},
+              "C": {"HD": {"TD": {"T": "5분 전 알림"}}},
+              "K": {"ti": "133218"},
+              "template_args": {
+                "alarm_title": "5분 전 알림",
+                "stream_title": "테스트 방송",
+                "web_url": "watch?v=abc"
+              }
+            }
+            """.trimIndent()
+
+        val error =
+            runCatching {
+                factory.send(
+                    roomId = 123L,
+                    chatRoom = chatRoom,
+                    message = "5분 전 알림",
+                    markdown = false,
+                    threadId = null,
+                    threadScope = null,
+                    mentionsJson = null,
+                    requestId = "req-template",
+                    attachmentJson = attachment,
+                )
+            }.exceptionOrNull()
+
+        assertNotNull(error)
+        assertTrue(error.message?.contains("did not create chat log") == true)
+        assertEquals(3, linkSender.sendCalls)
+        assertEquals(123L, linkSender.roomId)
+        assertEquals(123L, commitVerifier.roomId)
+        assertEquals(null, patcher.roomId)
+        assertEquals(null, ShareManager.chatRoom)
+        assertEquals(null, ShareManager.message)
+        assertEquals(null, FakeTextRequestRecorder.chatRoom)
+        assertEquals(null, FakeTextRequestRecorder.writeType)
+        assertEquals(null, FakeTextRequestRecorder.sendingLog)
     }
 
     @Test

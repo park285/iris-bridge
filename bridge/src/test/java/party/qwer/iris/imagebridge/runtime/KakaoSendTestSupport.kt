@@ -3,6 +3,7 @@
 package party.qwer.iris.imagebridge.runtime
 
 import org.json.JSONObject
+import party.qwer.iris.imagebridge.runtime.send.KakaoChatLogCommitVerifier
 import party.qwer.iris.imagebridge.runtime.send.KakaoLeverageAttachmentPatcher
 import party.qwer.iris.imagebridge.runtime.send.KakaoLinkSpecSender
 import party.qwer.iris.imagebridge.runtime.send.KakaoSendInvoker
@@ -139,9 +140,12 @@ internal class RecordingKakaoLinkSpecSender(
     var message: String? = null
     var rawAttachment: String? = null
     var requestId: String? = null
+    var sendCalls: Int = 0
+    val rawAttachments = mutableListOf<String>()
 
     override fun send(
         roomId: Long,
+        chatRoom: Any?,
         message: String,
         rawAttachment: String,
         requestId: String?,
@@ -150,6 +154,8 @@ internal class RecordingKakaoLinkSpecSender(
         this.message = message
         this.rawAttachment = rawAttachment
         this.requestId = requestId
+        sendCalls += 1
+        rawAttachments += rawAttachment
         return result
     }
 }
@@ -170,6 +176,48 @@ internal class RecordingKakaoLeverageAttachmentPatcher : KakaoLeverageAttachment
         this.message = message
         this.rawAttachment = rawAttachment
         this.requestId = requestId
+    }
+}
+
+internal class RecordingKakaoChatLogCommitVerifier(
+    private val result: Boolean,
+    private vararg val additionalResults: Boolean,
+) : KakaoChatLogCommitVerifier {
+    var roomId: Long? = null
+    var message: String? = null
+    var minimumCreatedAt: Long? = null
+    var minimumRowId: Long? = null
+    var requestId: String? = null
+    var rawAttachment: String? = null
+    var latestRowRoomId: Long? = null
+    val rawAttachments = mutableListOf<String?>()
+    private var awaitCalls = 0
+
+    override fun latestCommittedRowId(roomId: Long): Long {
+        latestRowRoomId = roomId
+        return 900L
+    }
+
+    override fun awaitCommitted(
+        roomId: Long,
+        message: String,
+        minimumCreatedAt: Long,
+        minimumRowId: Long,
+        requestId: String?,
+        rawAttachment: String?,
+    ): Boolean {
+        this.roomId = roomId
+        this.message = message
+        this.minimumCreatedAt = minimumCreatedAt
+        this.minimumRowId = minimumRowId
+        this.requestId = requestId
+        this.rawAttachment = rawAttachment
+        rawAttachments += rawAttachment
+        val result = listOf(result, *additionalResults.toTypedArray()).getOrElse(awaitCalls) {
+            additionalResults.lastOrNull() ?: result
+        }
+        awaitCalls += 1
+        return result
     }
 }
 

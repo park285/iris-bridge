@@ -11,6 +11,11 @@ import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.send.KakaoChatLogAttachmentCrypto
 import party.qwer.iris.imagebridge.runtime.send.ReflectiveKakaoLinkSpecSender
 import party.qwer.iris.imagebridge.runtime.send.buildKakaoLinkV4EncodedQuery
+import party.qwer.iris.imagebridge.runtime.send.kakaoLinkAttachmentsMatch
+import party.qwer.iris.imagebridge.runtime.send.kakaoLinkDisplayPatchAttachment
+import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecCommitVerificationAttachment
+import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecPatchMatchAttachments
+import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecSendAttachment
 import java.net.URLDecoder
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,18 +25,119 @@ import kotlin.test.assertTrue
 
 class KakaoLinkSpecSenderTest {
     @Test
-    fun `reflective sender prefers existing chat id method over receiver method`() {
+    fun `kakaolink commit match requires same template and item titles`() {
+        val expected =
+            """
+            {
+              "template_id": "133218",
+              "C": {"ITL": [
+                {"TD": {"T": "첫 번째"}},
+                {"TD": {"T": "두 번째"}}
+              ]},
+              "K": {"ti": "133218"}
+            }
+            """.trimIndent()
+        val committed =
+            """
+            {
+              "ti": "133218",
+              "C": {"ITL": [
+                {"TD": {"T": "첫 번째"}},
+                {"TD": {"T": "두 번째"}}
+              ]}
+            }
+            """.trimIndent()
+        val stale =
+            """
+            {
+              "ti": "133218",
+              "C": {"ITL": [
+                {"TD": {"T": "다른 방송"}}
+              ]}
+            }
+            """.trimIndent()
+
+        assertTrue(kakaoLinkAttachmentsMatch(expected, committed))
+        assertFalse(kakaoLinkAttachmentsMatch(expected, stale))
+    }
+
+    @Test
+    fun `kakaolink commit match uses template arg item titles for skeletal list`() {
+        val expected =
+            """
+            {
+              "template_id": "133218",
+              "C": {"ITL": [
+                {"L": {"LPC": "https://example.test/1"}, "TH": {"W": 200, "H": 200}},
+                {"L": {"LPC": "https://example.test/2"}, "TH": {"W": 200, "H": 200}}
+              ]},
+              "K": {"ti": "133218"},
+              "template_args": {
+                "item1_title": "첫 번째",
+                "item2_title": "두 번째"
+              }
+            }
+            """.trimIndent()
+        val committed =
+            """
+            {
+              "ti": "133218",
+              "C": {"ITL": [
+                {"TD": {"T": "첫 번째"}},
+                {"TD": {"T": "두 번째"}}
+              ]}
+            }
+            """.trimIndent()
+        val stale =
+            """
+            {
+              "ti": "133218",
+              "C": {"ITL": [
+                {"TD": {"T": "다른 방송"}}
+              ]}
+            }
+            """.trimIndent()
+
+        assertTrue(kakaoLinkAttachmentsMatch(expected, committed))
+        assertFalse(kakaoLinkAttachmentsMatch(expected, stale))
+    }
+
+    @Test
+    fun `kakaolink commit match rejects single card template without item title`() {
+        val expected =
+            """
+            {
+              "template_id": "133220",
+              "C": {"ITL": [
+                {"TD": {"T": "단건 방송"}}
+              ]},
+              "K": {"ti": "133220"}
+            }
+            """.trimIndent()
+        val committed =
+            """
+            {
+              "ti": "133220",
+              "C": {"HD": {"TD": {"T": "방송 5분 전 알림"}}}
+            }
+            """.trimIndent()
+
+        assertFalse(kakaoLinkAttachmentsMatch(expected, committed))
+    }
+
+    @Test
+    fun `reflective sender prefers existing chat id method for server generated template`() {
         FakeKakaoLinkSpecRecorder.clear()
         val sender =
             ReflectiveKakaoLinkSpecSender(
                 loader = checkNotNull(KakaoLinkSpecSenderTest::class.java.classLoader),
-                listener = null,
                 logInfo = { _, _ -> },
             )
 
         val sent =
             sender.send(
                 roomId = 18478615493603057L,
+                chatRoom = null,
                 message = "테스트",
                 rawAttachment =
                     """
@@ -48,6 +154,111 @@ class KakaoLinkSpecSenderTest {
             )
 
         assertTrue(sent)
+        assertEquals(listOf("c:18478615493603057"), FakeKakaoLinkSpecRecorder.calls)
+    }
+
+    @Test
+    fun `reflective sender keeps existing chat id method for direct chat room`() {
+        FakeKakaoLinkSpecRecorder.clear()
+        val sender =
+            ReflectiveKakaoLinkSpecSender(
+                loader = checkNotNull(KakaoLinkSpecSenderTest::class.java.classLoader),
+                logInfo = { _, _ -> },
+            )
+
+        val sent =
+            sender.send(
+                roomId = 464252100463241L,
+                chatRoom = null,
+                message = "테스트",
+                rawAttachment =
+                    """
+                    {
+                      "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+                      "template_id": "133220",
+                      "P": {"VA": "6.0.0", "SDID": "133220"},
+                      "C": {"HD": {"TD": {"T": "테스트"}}},
+                      "K": {"ti": "133220"},
+                      "template_args": {"title": "테스트"}
+                    }
+                    """.trimIndent(),
+                requestId = "req-karing-direct-room",
+            )
+
+        assertTrue(sent)
+        assertEquals(listOf("c:464252100463241"), FakeKakaoLinkSpecRecorder.calls)
+    }
+
+    @Test
+    fun `reflective sender keeps existing chat id method for four item Iris list`() {
+        FakeKakaoLinkSpecRecorder.clear()
+        val sender =
+            ReflectiveKakaoLinkSpecSender(
+                loader = checkNotNull(KakaoLinkSpecSenderTest::class.java.classLoader),
+                logInfo = { _, _ -> },
+            )
+
+        val sent =
+            sender.send(
+                roomId = 464252100463241L,
+                chatRoom = null,
+                message = "테스트",
+                rawAttachment =
+                    """
+                    {
+                      "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+                      "template_id": "133218",
+                      "P": {"VA": "6.0.0", "SID": "iris_133218", "SDID": "133218", "SNM": "hololive-bot"},
+                      "C": {
+                        "HD": {"TD": {"T": "5분 전 알림 · 4건"}},
+                        "ITL": [
+                          {"TD": {"T": "첫 번째"}},
+                          {"TD": {"T": "두 번째"}},
+                          {"TD": {"T": "세 번째"}},
+                          {"TD": {"T": "네 번째"}}
+                        ]
+                      },
+                      "K": {"ti": "133218"},
+                      "template_args": {"item1_title": "첫 번째", "item4_title": "네 번째"}
+                    }
+                    """.trimIndent(),
+                requestId = "req-karing-four-item-room",
+            )
+
+        assertTrue(sent)
+        assertEquals(listOf("c:464252100463241"), FakeKakaoLinkSpecRecorder.calls)
+    }
+
+    @Test
+    fun `reflective sender does not fall back to receiver method when existing chat id method returns false`() {
+        FakeKakaoLinkSpecRecorder.clear()
+        FakeKakaoLinkSpecRecorder.existingChatIdResult = false
+        val sender =
+            ReflectiveKakaoLinkSpecSender(
+                loader = checkNotNull(KakaoLinkSpecSenderTest::class.java.classLoader),
+                logInfo = { _, _ -> },
+            )
+
+        val sent =
+            sender.send(
+                roomId = 18478615493603057L,
+                chatRoom = null,
+                message = "테스트",
+                rawAttachment =
+                    """
+                    {
+                      "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+                      "template_id": "133220",
+                      "P": {"VA": "6.0.0", "SDID": "133220"},
+                      "C": {"HD": {"TD": {"T": "테스트"}}},
+                      "K": {"ti": "133220"},
+                      "template_args": {"title": "테스트"}
+                    }
+                    """.trimIndent(),
+                requestId = "req-karing-target-room",
+            )
+
+        assertFalse(sent)
         assertEquals(listOf("c:18478615493603057"), FakeKakaoLinkSpecRecorder.calls)
     }
 
@@ -82,6 +293,8 @@ class KakaoLinkSpecSenderTest {
         assertEquals("6.0.0", params["appver"])
         assertEquals("46e8bda79095ab1dea785ef1adad5117", params["appkey"])
         assertEquals("121065", params["template_id"])
+        val templateArgs = JSONObject(params.getValue("template_args"))
+        assertEquals("card", templateArgs.getString("alarm_title"))
         val title =
             JSONObject(params.getValue("template_json"))
                 .getJSONObject("C")
@@ -141,6 +354,283 @@ class KakaoLinkSpecSenderTest {
         assertEquals("테스트 방송", templateArgs.getString("stream_title"))
         assertEquals("watch?v=abc", templateArgs.getString("web_url"))
         assertFalse(templateArgs.has("item1_description"))
+    }
+
+    @Test
+    fun `keeps resolved Iris template json when explicit query template args exist`() {
+        val query =
+            buildKakaoLinkV4EncodedQuery(
+                """
+                {
+                  "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+                  "template_id": "133218",
+                  "P": {
+                    "VA": "6.0.0",
+                    "SID": "iris_133218",
+                    "SDID": "133218",
+                    "SNM": "hololive-bot"
+                  },
+                  "C": {
+                    "HD": {"TD": {"T": "5분 전 알림"}},
+                    "ITL": [{"TD": {"T": "테스트 방송", "D": "테스트 멤버 · 21:00"}}]
+                  },
+                  "K": {"ti": "133218"},
+                  "template_args": {"item1_title": "테스트 방송"}
+                }
+                """.trimIndent(),
+            )
+        val keys =
+            query
+                .split("&")
+                .map { entry -> URLDecoder.decode(entry.substringBefore("="), "UTF-8") }
+                .toSet()
+
+        assertTrue("template_json" in keys)
+        assertTrue("template_args" in keys)
+    }
+
+    @Test
+    fun `uses legacy server template json for single resolved Iris template`() {
+        val attachment =
+            """
+            {
+              "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+              "template_id": "133220",
+              "P": {"VA": "6.0.0", "SID": "iris_133220", "SDID": "133220", "SNM": "hololive-bot"},
+              "C": {
+                "HD": {"TD": {"T": "5분 전 알림"}},
+                "ITL": [{"TD": {"T": "단건 방송", "D": "미오 · 05/18 07:30"}}]
+              },
+              "K": {"ti": "133220"},
+              "template_args": {"item1_title": "단건 방송", "visible_stream_count": "1"}
+            }
+            """.trimIndent()
+        val params =
+            buildKakaoLinkV4EncodedQuery(kakaoLinkSpecSendAttachment(attachment))
+                .split("&")
+                .associate { entry ->
+                    val parts = entry.split("=", limit = 2)
+                    URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8")
+                }
+
+        assertEquals("133220", params["template_id"])
+        val templateJson = JSONObject(params.getValue("template_json"))
+        assertEquals("133220", templateJson.getJSONObject("K").getString("ti"))
+        assertFalse(templateJson.getJSONObject("P").has("SID"))
+        assertEquals("133220", templateJson.getJSONObject("P").getString("SDID"))
+        assertEquals(1, templateJson.getJSONObject("C").getJSONArray("ITL").length())
+        assertFalse(templateJson.getJSONObject("C").has("BUL"))
+        assertFalse(templateJson.getJSONObject("C").getJSONArray("ITL").getJSONObject(0).has("L"))
+        assertEquals("133220", JSONObject(kakaoLinkSpecCommitVerificationAttachment(attachment)).getJSONObject("K").getString("ti"))
+        assertEquals(listOf(JSONObject(attachment).toString()), kakaoLinkSpecPatchMatchAttachments(attachment).map { JSONObject(it).toString() })
+    }
+
+    @Test
+    fun `uses legacy server template json for four item resolved Iris template`() {
+        val attachment =
+            """
+            {
+              "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+              "template_id": "133218",
+              "P": {"VA": "6.0.0", "SID": "iris_133218", "SDID": "133218", "SNM": "hololive-bot"},
+              "C": {
+                "HD": {"TD": {"T": "5분 전 알림 · 4건"}},
+                "ITL": [
+                  {"TD": {"T": "첫 번째"}},
+                  {"TD": {"T": "두 번째"}},
+                  {"TD": {"T": "세 번째"}},
+                  {"TD": {"T": "네 번째"}}
+                ]
+              },
+              "K": {"ti": "133218"},
+              "template_args": {
+                "item1_title": "첫 번째",
+                "item2_title": "두 번째",
+                "item3_title": "세 번째",
+                "item4_title": "네 번째",
+                "visible_stream_count": "4",
+                "stream_count": "4"
+              }
+            }
+            """.trimIndent()
+        val params =
+            buildKakaoLinkV4EncodedQuery(kakaoLinkSpecSendAttachment(attachment))
+                .split("&")
+                .associate { entry ->
+                    val parts = entry.split("=", limit = 2)
+                    URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8")
+        }
+        val templateArgs = JSONObject(params.getValue("template_args"))
+        val templateJson = JSONObject(params.getValue("template_json"))
+
+        assertEquals("133218", params["template_id"])
+        assertEquals("133218", templateJson.getJSONObject("K").getString("ti"))
+        assertFalse(templateJson.getJSONObject("P").has("SID"))
+        assertEquals("133218", templateJson.getJSONObject("P").getString("SDID"))
+        assertEquals(4, templateJson.getJSONObject("C").getJSONArray("ITL").length())
+        assertFalse(templateJson.getJSONObject("C").has("BUL"))
+        assertFalse(templateJson.getJSONObject("C").getJSONArray("ITL").getJSONObject(0).has("L"))
+        assertEquals("4", templateArgs.getString("visible_stream_count"))
+        assertEquals(
+            "4",
+            JSONObject(kakaoLinkSpecCommitVerificationAttachment(attachment))
+                .getJSONObject("C")
+                .getJSONArray("ITL")
+                .length()
+                .toString(),
+        )
+        val matchAttachments = kakaoLinkSpecPatchMatchAttachments(attachment).map(::JSONObject)
+        assertEquals(1, matchAttachments.size)
+        assertEquals("133218", matchAttachments.single().getJSONObject("K").getString("ti"))
+    }
+
+    @Test
+    fun `display patch keeps server envelope while restoring four original items`() {
+        val committedCarrier =
+            """
+            {
+              "P": {
+                "TP": "List",
+                "ME": "5분 전 알림 · 4건",
+                "SID": "capri_1369981",
+                "DID": "https://www.youtube.com/watch?v=first",
+                "SDID": "133222",
+                "SNM": "hololive-bot",
+                "SST": {
+                  "SR": "receiver",
+                  "L": {
+                    "LPC": "https://apps.kakao.com/talk/message/block?msg_type=share&app_key=bfbfe8b641716d3f45e01a3b7a03f13d&tid=133222&rid=carrier",
+                    "LMO": "https://apps.kakao.com/talk/message/block?msg_type=share&app_key=bfbfe8b641716d3f45e01a3b7a03f13d&tid=133222&rid=carrier"
+                  }
+                },
+                "A": {"version": 3},
+                "L": {"LPC": "https://www.youtube.com/watch?v=first", "LMO": "https://www.youtube.com/watch?v=first"}
+              },
+              "C": {
+                "HD": {"TD": {"T": "5분 전 알림 · 4건"}},
+                "ITL": [
+                  {"TD": {"T": "첫 번째"}},
+                  {"TD": {"T": "두 번째"}},
+                  {"TD": {"T": "세 번째"}}
+                ],
+                "BUT": 0
+              },
+              "K": {"ak": "bfbfe8b641716d3f45e01a3b7a03f13d", "av": "6.0.0", "ti": "133222", "lv": "4.0"}
+            }
+            """.trimIndent()
+        val rawOriginal =
+            """
+            {
+              "app_key": "bfbfe8b641716d3f45e01a3b7a03f13d",
+              "template_id": "133218",
+              "P": {"ME": "5분 전 알림 · 4건", "SDID": "133218"},
+              "C": {
+                "HD": {"TD": {"T": "5분 전 알림 · 4건"}},
+                "ITL": [
+                  {"TD": {"T": "첫 번째"}, "L": {"LPC": "https://www.youtube.com/watch?v=one", "LMO": "https://www.youtube.com/watch?v=one"}},
+                  {"TD": {"T": "두 번째"}, "L": {"LPC": "https://www.youtube.com/watch?v=two", "LMO": "https://www.youtube.com/watch?v=two"}},
+                  {"TD": {"T": "세 번째"}, "L": {"LPC": "https://www.youtube.com/watch?v=three", "LMO": "https://www.youtube.com/watch?v=three"}},
+                  {"TD": {"T": "네 번째"}, "L": {"LPC": "https://www.youtube.com/watch?v=four", "LMO": "https://www.youtube.com/watch?v=four"}}
+                ],
+                "BUL": [{"BU": {"T": "더보기"}}]
+              },
+              "K": {"ti": "133218"},
+              "template_args": {"item4_title": "네 번째"}
+            }
+            """.trimIndent()
+
+        val patched = JSONObject(kakaoLinkDisplayPatchAttachment(committedCarrier, rawOriginal))
+
+        assertEquals("capri_1369981", patched.getJSONObject("P").getString("SID"))
+        assertTrue(patched.getJSONObject("P").has("SST"))
+        assertTrue(patched.getJSONObject("P").has("A"))
+        assertEquals("133218", patched.getJSONObject("P").getString("SDID"))
+        assertTrue(
+            patched
+                .getJSONObject("P")
+                .getJSONObject("SST")
+                .getJSONObject("L")
+                .getString("LPC")
+                .contains("tid=133218"),
+        )
+        assertFalse(
+            patched
+                .getJSONObject("P")
+                .getJSONObject("SST")
+                .getJSONObject("L")
+                .getString("LPC")
+                .contains("tid=133222"),
+        )
+        assertEquals("133218", patched.getJSONObject("K").getString("ti"))
+        assertEquals("4.0", patched.getJSONObject("K").getString("lv"))
+        assertFalse(patched.has("template_args"))
+        assertFalse(patched.has("template_id"))
+        assertEquals(4, patched.getJSONObject("C").getJSONArray("ITL").length())
+        assertEquals(0, patched.getJSONObject("C").getInt("BUT"))
+        assertFalse(patched.getJSONObject("C").has("BUL"))
+        assertEquals(
+            "네 번째",
+            patched
+                .getJSONObject("C")
+                .getJSONArray("ITL")
+                .getJSONObject(3)
+                .getJSONObject("TD")
+                .getString("T"),
+        )
+        assertEquals(
+            "https://www.youtube.com/watch?v=one",
+            patched.getJSONObject("P").getJSONObject("L").getString("LPC"),
+        )
+    }
+
+    @Test
+    fun `infers hololive list template args from resolved attachment`() {
+        val query =
+            buildKakaoLinkV4EncodedQuery(
+                """
+                {
+                  "P": {
+                    "VA": "6.0.0",
+                    "SDID": "133220",
+                    "SL": {
+                      "LCA": "kakaobfbfe8b641716d3f45e01a3b7a03f13d://kakaolink"
+                    }
+                  },
+                  "C": {
+                    "HD": {"TD": {"T": "쇼츠 알림 - 테스트 제목"}},
+                    "ITL": [{
+                      "TD": {"T": "테스트 제목", "D": "카푸 · 쇼츠"},
+                      "TH": {"THU": "https://i.ytimg.com/vi/abc/maxresdefault.jpg"},
+                      "L": {
+                        "LPC": "https://www.youtube.com/shorts/abc",
+                        "LMO": "https://www.youtube.com/shorts/abc"
+                      }
+                    }]
+                  },
+                  "K": {"ti": "133220"}
+                }
+                """.trimIndent(),
+            )
+        val params =
+            query
+                .split("&")
+                .associate { entry ->
+                    val parts = entry.split("=", limit = 2)
+                    URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8")
+                }
+        val templateArgs = JSONObject(params.getValue("template_args"))
+
+        assertEquals("쇼츠 알림 - 테스트 제목", templateArgs.getString("alarm_title"))
+        assertEquals("테스트 제목", templateArgs.getString("title"))
+        assertEquals("테스트 제목", templateArgs.getString("stream_title"))
+        assertEquals("테스트 제목", templateArgs.getString("item1_title"))
+        assertEquals("카푸 · 쇼츠", templateArgs.getString("item1_desc"))
+        assertEquals("카푸 · 쇼츠", templateArgs.getString("stream_desc"))
+        assertEquals("https://i.ytimg.com/vi/abc/maxresdefault.jpg", templateArgs.getString("item1_thumbnail"))
+        assertEquals("https://i.ytimg.com/vi/abc/maxresdefault.jpg", templateArgs.getString("thumbnail"))
+        assertEquals("https://www.youtube.com/shorts/abc", templateArgs.getString("item1_full_web_url"))
+        assertEquals("https://www.youtube.com/shorts/abc", templateArgs.getString("web_url"))
+        assertEquals("1", templateArgs.getString("visible_stream_count"))
     }
 
     @Test
