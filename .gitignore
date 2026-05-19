@@ -48,6 +48,8 @@ __pycache__/
 !/docs/testing_surface_policy.md
 !/docs/native/
 !/docs/native/*.md
+!/docs/performance/
+!/docs/performance/*.md
 !/docs/testing/
 !/docs/testing/*.md
 !/docs/github-self-hosted-runner.md
