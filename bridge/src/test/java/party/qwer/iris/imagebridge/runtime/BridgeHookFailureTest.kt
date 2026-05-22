@@ -18,13 +18,13 @@ import kotlin.test.assertTrue
 class BridgeDiscoveryHookFailureTest {
     @Test
     fun `install records failed hook and keeps installing later hooks`() {
-        BridgeDiscovery.resetForTest()
+        val discovery = BridgeDiscovery()
         val registry = buildFakeRegistry()
         val installer = ThrowingBridgeHookInstaller(registry.singleSendMethod)
 
-        BridgeDiscovery.install(registry, installer)
+        discovery.install(registry, installer)
 
-        val hooks = BridgeDiscovery.snapshot().hooks.associateBy { it.name }
+        val hooks = discovery.snapshot().hooks.associateBy { it.name }
         val failedHook = assertNotNull(hooks[HOOK_SEND_SINGLE])
         val laterHook = assertNotNull(hooks[HOOK_SEND_MULTIPLE])
         assertFalse(failedHook.installed)
@@ -35,13 +35,13 @@ class BridgeDiscoveryHookFailureTest {
 
     @Test
     fun `install attempts all hooks even when first hook throws`() {
-        BridgeDiscovery.resetForTest()
+        val discovery = BridgeDiscovery()
         val registry = buildFakeRegistry()
         val installer = ThrowingBridgeHookInstaller(registry.roomDaoMethod)
 
-        BridgeDiscovery.install(registry, installer)
+        discovery.install(registry, installer)
 
-        val hooks = BridgeDiscovery.snapshot().hooks.associateBy { it.name }
+        val hooks = discovery.snapshot().hooks.associateBy { it.name }
         assertFalse(hooks["MasterDatabase#roomDao"]!!.installed)
         assertTrue(hooks["ChatRoomManager#directResolve"]!!.installed)
         assertTrue(hooks["ChatRoomManager#broadResolve"]!!.installed)
@@ -61,13 +61,13 @@ class BridgeDiscoveryHookFailureTest {
 
     @Test
     fun `install records all hooks as failed when all throw`() {
-        BridgeDiscovery.resetForTest()
+        val discovery = BridgeDiscovery()
         val registry = buildFakeRegistry()
         val installer = AllFailingBridgeHookInstaller()
 
-        BridgeDiscovery.install(registry, installer)
+        discovery.install(registry, installer)
 
-        val snapshot = BridgeDiscovery.snapshot()
+        val snapshot = discovery.snapshot()
         assertTrue(snapshot.installAttempted)
         val hooks = snapshot.hooks.associateBy { it.name }
         val discoveryHookNames =
