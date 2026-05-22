@@ -18,6 +18,9 @@ __pycache__/
 # Worktrees
 .worktrees/
 
+# Subagent task checklists
+.agents/
+
 # Assistant local state
 .claude/
 .codex/
