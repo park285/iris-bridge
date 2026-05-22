@@ -1,6 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.server
 
 import android.net.LocalSocket
+import android.util.Log
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -22,7 +23,11 @@ internal class LocalBridgeMuxSocket(
         get() = socket.outputStream
 
     override val peerUid: Int?
-        get() = runCatching { socket.peerCredentials.uid }.getOrNull()
+        get() =
+            runCatching { socket.peerCredentials.uid }
+                .onFailure { error ->
+                    Log.w(TAG, "Bridge mux peer credentials lookup failed", error)
+                }.getOrNull()
 
     override fun setReadTimeout(timeoutMs: Int) {
         runCatching {
@@ -34,5 +39,9 @@ internal class LocalBridgeMuxSocket(
 
     override fun close() {
         socket.close()
+    }
+
+    private companion object {
+        private const val TAG = "IrisBridge"
     }
 }

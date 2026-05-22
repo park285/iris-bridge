@@ -13,9 +13,11 @@ import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
 import java.lang.reflect.Method
 
+private const val IRIS_BRIDGE_TAG = "IrisBridge"
+
 class IrisBridgeModule : XposedModule() {
     companion object {
-        private const val TAG = "IrisBridge"
+        private const val TAG = IRIS_BRIDGE_TAG
         private const val TARGET_PACKAGE = "com.kakao.talk"
         private val markdownPendingContexts = ReplyMarkdownPendingContextStore()
         private val mentionPendingContexts = ReplyMentionPendingContextStore()
@@ -47,19 +49,36 @@ class IrisBridgeModule : XposedModule() {
         classLoader: ClassLoader,
     ) {
         Log.i(TAG, "Application.onCreate — starting image bridge server")
-        val registry = runCatching { KakaoClassRegistry.discover(classLoader) }
-        registry.getOrNull()?.let { BridgeDiscovery.install(it, hookInstaller) }
-        markdownHooks.install(classLoader, registry.getOrNull(), hookInstaller)
+        val discovery = discoverKakaoClassRegistryForBridge { KakaoClassRegistry.discover(classLoader) }
+        discovery.registry?.let { BridgeDiscovery.install(it, hookInstaller) }
+        markdownHooks.install(classLoader, discovery.registry, hookInstaller)
         ImageBridgeServer.start(
             app,
-            registry.getOrNull(),
-            registry.exceptionOrNull()?.message,
+            discovery.registry,
+            discovery.errorMessage,
             mentionPendingContexts,
             leveragePendingContexts,
             leverageCommitPendingContexts,
             hookInstaller,
         )
     }
+}
+
+private data class KakaoClassRegistryDiscoveryResult(
+    val registry: KakaoClassRegistry?,
+    val errorMessage: String?,
+)
+
+private fun discoverKakaoClassRegistryForBridge(discover: () -> KakaoClassRegistry): KakaoClassRegistryDiscoveryResult {
+    val registry =
+        runCatching { discover() }
+            .onFailure { error ->
+                Log.w(IRIS_BRIDGE_TAG, "KakaoClassRegistry discovery failed", error)
+            }
+    return KakaoClassRegistryDiscoveryResult(
+        registry = registry.getOrNull(),
+        errorMessage = registry.exceptionOrNull()?.message,
+    )
 }
 
 private class ModernBridgeHookInstaller(

@@ -11,7 +11,7 @@ internal class ChatRoomIntentMetadataResolver(
             val room = resolveRoom(roomId) ?: return null
             readChatRoomType(room)
         }.onFailure { error ->
-            Log.w(TAG, "failed to resolve chatroom type roomId=$roomId: ${error.message}")
+            Log.w(TAG, "ChatRoom intent metadata resolution failed roomId=$roomId", error)
         }.getOrNull()
 
     private fun readChatRoomType(room: Any): String? {
