@@ -2,8 +2,8 @@ package party.qwer.iris.imagebridge.runtime
 
 import android.util.Log
 import org.json.JSONObject
-import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_MARKDOWN_REQUEST
+import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContext
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
@@ -42,12 +42,12 @@ internal fun handleReplyMarkdownRequestArgs(
     val context =
         markdownPendingContexts.match(roomId, messageText, sessionId)
             ?: run {
-                if (mentionInjected) BridgeDiscovery.recordHook(HOOK_REPLY_MARKDOWN_REQUEST, "room=$roomId mention=true")
+                if (mentionInjected) defaultBridgeDiscovery.recordHook(HOOK_REPLY_MARKDOWN_REQUEST, "room=$roomId mention=true")
                 return
             }
     runCatching {
         ReplyMarkdownSendingLogAccess.writeThreadMetadata(sendingLog, context.threadId, context.threadScope)
-        BridgeDiscovery.recordHook(
+        defaultBridgeDiscovery.recordHook(
             HOOK_REPLY_MARKDOWN_REQUEST,
             "room=${context.roomId} threadId=${context.threadId} scope=${context.threadScope} mention=$mentionInjected",
         )
@@ -81,7 +81,7 @@ private fun injectLeverageAttachment(
             "reply leverage attachment injected room=${context.roomId} generated=${generatedAttachment != null} " +
                 "connectWriteType=${leverageWriteType != null}",
         )
-        BridgeDiscovery.recordHook(
+        defaultBridgeDiscovery.recordHook(
             HOOK_REPLY_MARKDOWN_REQUEST,
             "room=${context.roomId} leverage=true threadId=${context.threadId} scope=${context.threadScope}",
         )

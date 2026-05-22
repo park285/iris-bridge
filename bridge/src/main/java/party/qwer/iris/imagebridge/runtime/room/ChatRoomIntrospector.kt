@@ -1,7 +1,8 @@
 package party.qwer.iris.imagebridge.runtime.room
 
-object ChatRoomIntrospector {
-    private val scanner = ChatRoomFieldScanner()
+internal class ChatRoomIntrospector(
+    private val scanner: ChatRoomFieldScanner = ChatRoomFieldScanner(),
+) {
 
     data class ScanResult(
         val className: String,
@@ -34,3 +35,5 @@ object ChatRoomIntrospector {
         maxDepth: Int = 1,
     ): String = scan(obj, maxDepth).toJson().toString()
 }
+
+internal val defaultChatRoomIntrospector = ChatRoomIntrospector()

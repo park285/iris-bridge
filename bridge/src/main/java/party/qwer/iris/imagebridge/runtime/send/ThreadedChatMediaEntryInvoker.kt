@@ -1,8 +1,8 @@
 package party.qwer.iris.imagebridge.runtime.send
 
 import org.json.JSONObject
-import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_ENTRY
+import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -23,9 +23,9 @@ internal class ThreadedChatMediaEntryInvoker(
     fun warmUp() {
         runCatching { entryMethod }
             .onSuccess {
-                BridgeDiscovery.markInstalled(HOOK_SEND_THREADED_ENTRY)
+                defaultBridgeDiscovery.markInstalled(HOOK_SEND_THREADED_ENTRY)
             }.onFailure { error ->
-                BridgeDiscovery.markInstallError(HOOK_SEND_THREADED_ENTRY, error.message ?: error.javaClass.name)
+                defaultBridgeDiscovery.markInstallError(HOOK_SEND_THREADED_ENTRY, error.message ?: error.javaClass.name)
             }
     }
 
@@ -73,7 +73,7 @@ internal class ThreadedChatMediaEntryInvoker(
                 (constant as Enum<*>).name == "Connect"
             } ?: registry.writeTypeNone
 
-        BridgeDiscovery.recordHook(HOOK_SEND_THREADED_ENTRY, "uris=${uris.size} type=$type")
+        defaultBridgeDiscovery.recordHook(HOOK_SEND_THREADED_ENTRY, "uris=${uris.size} type=$type")
         method.invoke(
             sender,
             uris,

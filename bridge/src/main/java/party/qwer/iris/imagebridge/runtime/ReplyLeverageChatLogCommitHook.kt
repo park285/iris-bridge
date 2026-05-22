@@ -1,8 +1,8 @@
 package party.qwer.iris.imagebridge.runtime
 
 import android.util.Log
-import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_LEVERAGE_COMMIT
+import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
 import java.lang.reflect.Method
@@ -53,7 +53,7 @@ internal fun handleReplyLeverageChatLogCommitArgs(
             "reply leverage chatlog attachment injected room=${leverageContext.roomId} " +
                 "generated=${generatedAttachment != null}",
         )
-        BridgeDiscovery.recordHook(
+        defaultBridgeDiscovery.recordHook(
             HOOK_REPLY_LEVERAGE_COMMIT,
             "room=${leverageContext.roomId} leverage=true threadId=${leverageContext.threadId} scope=${leverageContext.threadScope}",
         )

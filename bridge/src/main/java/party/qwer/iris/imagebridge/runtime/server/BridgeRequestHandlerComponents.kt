@@ -7,10 +7,10 @@ import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntentMetadataResolver
-import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntrospector
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberExtractor
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomOpener
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
+import party.qwer.iris.imagebridge.runtime.room.defaultChatRoomIntrospector
 import party.qwer.iris.imagebridge.runtime.send.KakaoImageSender
 import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendCapability
 import party.qwer.iris.imagebridge.runtime.send.KakaoTextSender
@@ -74,7 +74,7 @@ private fun inspectChatRoom(
     roomId: Long,
 ): String {
     val room = resolveChatRoom(chatRoomResolver, registryError, roomId)
-    return ChatRoomIntrospector.scanJson(room, maxDepth = 2)
+    return defaultChatRoomIntrospector.scanJson(room, maxDepth = 2)
 }
 
 private fun resolveChatRoom(

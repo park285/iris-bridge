@@ -1,6 +1,8 @@
 package party.qwer.iris.imagebridge.runtime
 
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntrospector
+import party.qwer.iris.imagebridge.runtime.room.ChatRoomFieldScanner
+import party.qwer.iris.imagebridge.runtime.room.defaultChatRoomIntrospector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -14,8 +16,23 @@ class ChatRoomIntrospectorTest {
     )
 
     @Test
+    fun `instances use independent scanner dependencies`() {
+        data class Room(
+            val members: List<String> = listOf("a", "b"),
+        )
+        val first = ChatRoomIntrospector(ChatRoomFieldScanner(maxCollectionSampleSize = 1))
+        val second = ChatRoomIntrospector(ChatRoomFieldScanner(maxCollectionSampleSize = 2))
+
+        val firstMembers = first.scan(Room(), maxDepth = 1).fields.first { it.name == "members" }
+        val secondMembers = second.scan(Room(), maxDepth = 1).fields.first { it.name == "members" }
+
+        assertEquals(1, firstMembers.elements.size)
+        assertEquals(2, secondMembers.elements.size)
+    }
+
+    @Test
     fun `scans all fields of a simple object`() {
-        val result = ChatRoomIntrospector.scan(FakeRoom())
+        val result = defaultChatRoomIntrospector.scan(FakeRoom())
         assertEquals("FakeRoom", result.className.substringAfterLast('.'))
         assertTrue(result.fields.any { it.name == "id" && it.type == "long" })
         assertTrue(result.fields.any { it.name == "name" && it.type.contains("String") })
@@ -28,7 +45,7 @@ class ChatRoomIntrospectorTest {
         data class Nested(
             val inner: FakeRoom = FakeRoom(),
         )
-        val result = ChatRoomIntrospector.scan(Nested(), maxDepth = 0)
+        val result = defaultChatRoomIntrospector.scan(Nested(), maxDepth = 0)
         val innerField = result.fields.first { it.name == "inner" }
         assertTrue(innerField.nested.isEmpty())
     }
@@ -38,7 +55,7 @@ class ChatRoomIntrospectorTest {
         data class Nested(
             val inner: FakeRoom = FakeRoom(),
         )
-        val result = ChatRoomIntrospector.scan(Nested(), maxDepth = 1)
+        val result = defaultChatRoomIntrospector.scan(Nested(), maxDepth = 1)
         val innerField = result.fields.first { it.name == "inner" }
         assertTrue(innerField.nested.isNotEmpty())
         assertTrue(innerField.nested.any { it.name == "id" })
@@ -54,7 +71,7 @@ class ChatRoomIntrospectorTest {
             val members: List<Member>,
         )
 
-        val result = ChatRoomIntrospector.scan(Room(members = listOf(Member("alpha"))), maxDepth = 1)
+        val result = defaultChatRoomIntrospector.scan(Room(members = listOf(Member("alpha"))), maxDepth = 1)
 
         val membersField = result.fields.first { it.name == "members" }
         val firstMember = membersField.elements.first()
@@ -66,7 +83,7 @@ class ChatRoomIntrospectorTest {
 
     @Test
     fun `scanJson serializes collection samples`() {
-        val json = ChatRoomIntrospector.scanJson(FakeRoom(), maxDepth = 1)
+        val json = defaultChatRoomIntrospector.scanJson(FakeRoom(), maxDepth = 1)
 
         assertTrue(json.contains("\"members\""))
         assertTrue(json.contains("\"elements\""))

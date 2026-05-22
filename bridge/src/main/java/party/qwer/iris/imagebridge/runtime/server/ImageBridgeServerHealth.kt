@@ -1,7 +1,8 @@
 package party.qwer.iris.imagebridge.runtime.server
 
-import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
+import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscoverySnapshot
 import party.qwer.iris.imagebridge.runtime.discovery.currentBridgeCapabilities
+import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendCapability
 
 internal fun buildImageBridgeHealthSnapshot(
@@ -15,11 +16,12 @@ internal fun buildImageBridgeHealthSnapshot(
     metrics: party.qwer.iris.ImageBridgeProtocol.ImageBridgeMetrics,
     restartCount: Int,
     lastCrashMessage: String?,
+    discoverySnapshot: BridgeDiscoverySnapshot = defaultBridgeDiscovery.snapshot(),
 ): ImageBridgeHealthSnapshot =
     ImageBridgeHealthSnapshot(
         running = running,
         specStatus = specStatus ?: BridgeSpecStatus(ready = false, checkedAtEpochMs = 0L, checks = emptyList()),
-        discoverySnapshot = BridgeDiscovery.snapshot(),
+        discoverySnapshot = discoverySnapshot,
         capabilities =
             currentBridgeCapabilities(
                 registryAvailable,

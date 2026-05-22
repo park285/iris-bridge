@@ -5,12 +5,12 @@ import android.util.Log
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
-import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
+import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
-import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
+import party.qwer.iris.imagebridge.runtime.server.defaultImageBridgeServer
 import java.lang.reflect.Method
 
 private const val IRIS_BRIDGE_TAG = "IrisBridge"
@@ -50,9 +50,9 @@ class IrisBridgeModule : XposedModule() {
     ) {
         Log.i(TAG, "Application.onCreate — starting image bridge server")
         val discovery = discoverKakaoClassRegistryForBridge { KakaoClassRegistry.discover(classLoader) }
-        discovery.registry?.let { BridgeDiscovery.install(it, hookInstaller) }
+        discovery.registry?.let { defaultBridgeDiscovery.install(it, hookInstaller) }
         markdownHooks.install(classLoader, discovery.registry, hookInstaller)
-        ImageBridgeServer.start(
+        defaultImageBridgeServer.start(
             app,
             discovery.registry,
             discovery.errorMessage,

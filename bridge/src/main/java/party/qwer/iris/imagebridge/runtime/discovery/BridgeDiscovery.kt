@@ -22,23 +22,27 @@ internal const val HOOK_SEND_MULTIPLE = "ChatMediaSender#sendMultiple"
 internal const val HOOK_SEND_THREADED_ENTRY = "ChatMediaSender#threadedEntry"
 internal const val HOOK_SEND_THREADED_INJECT = "ChatMediaSender#threadedInject"
 
-internal object BridgeDiscovery {
+private val defaultDiscoveryHookNames =
+    listOf(
+        HOOK_ROOM_DAO,
+        HOOK_MANAGER_DIRECT,
+        HOOK_MANAGER_BROAD,
+        HOOK_REPLY_MARKDOWN_INGRESS,
+        HOOK_REPLY_MARKDOWN_REUSE,
+        HOOK_REPLY_MARKDOWN_REQUEST,
+        HOOK_REPLY_LEVERAGE_COMMIT,
+        HOOK_SEND_SINGLE,
+        HOOK_SEND_MULTIPLE,
+        HOOK_SEND_THREADED_ENTRY,
+        HOOK_SEND_THREADED_INJECT,
+    )
+
+internal class BridgeDiscovery(
+    private val hookStateFactory: () -> DiscoveryHookState = { DiscoveryHookState() },
+) {
     private val installStarted = AtomicBoolean(false)
     private val installAttempted = AtomicBoolean(false)
-    private val states =
-        listOf(
-            HOOK_ROOM_DAO,
-            HOOK_MANAGER_DIRECT,
-            HOOK_MANAGER_BROAD,
-            HOOK_REPLY_MARKDOWN_INGRESS,
-            HOOK_REPLY_MARKDOWN_REUSE,
-            HOOK_REPLY_MARKDOWN_REQUEST,
-            HOOK_REPLY_LEVERAGE_COMMIT,
-            HOOK_SEND_SINGLE,
-            HOOK_SEND_MULTIPLE,
-            HOOK_SEND_THREADED_ENTRY,
-            HOOK_SEND_THREADED_INJECT,
-        ).associateWith { DiscoveryHookState() }.toMutableMap()
+    private val states = defaultDiscoveryHookNames.associateWith { hookStateFactory() }.toMutableMap()
 
     fun install(
         registry: KakaoClassRegistry,
@@ -127,8 +131,10 @@ internal object BridgeDiscovery {
         stateFor(hookName).record(summary)
     }
 
-    private fun stateFor(hookName: String): DiscoveryHookState = states.computeIfAbsent(hookName) { DiscoveryHookState() }
+    private fun stateFor(hookName: String): DiscoveryHookState = states.computeIfAbsent(hookName) { hookStateFactory() }
 }
+
+internal val defaultBridgeDiscovery = BridgeDiscovery()
 
 private fun installDiscoveryMethodHook(
     hookName: String,

@@ -12,7 +12,7 @@ import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendCapability
 import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendInvocationFactory
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecCommitVerificationAttachment
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecSendAttachment
-import party.qwer.iris.imagebridge.runtime.server.ImageBridgeServer
+import party.qwer.iris.imagebridge.runtime.server.defaultImageBridgeServer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -840,9 +840,9 @@ class KakaoTextSendInvocationFactoryTest {
 
     @Test
     fun `text bridge rollout flags parse truthy values`() {
-        assertTrue(ImageBridgeServer.isTextBridgeSendTextEnabled("yes"))
-        assertTrue(ImageBridgeServer.isTextBridgeSendMarkdownEnabled("1"))
-        assertFalse(ImageBridgeServer.isTextBridgeSendTextEnabled("false"))
-        assertTrue(ImageBridgeServer.isTextBridgeSendMarkdownEnabled(null))
+        assertTrue(defaultImageBridgeServer.isTextBridgeSendTextEnabled("yes"))
+        assertTrue(defaultImageBridgeServer.isTextBridgeSendMarkdownEnabled("1"))
+        assertFalse(defaultImageBridgeServer.isTextBridgeSendTextEnabled("false"))
+        assertTrue(defaultImageBridgeServer.isTextBridgeSendMarkdownEnabled(null))
     }
 }

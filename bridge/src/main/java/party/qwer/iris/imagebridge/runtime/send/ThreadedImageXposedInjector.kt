@@ -2,8 +2,8 @@ package party.qwer.iris.imagebridge.runtime.send
 
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
-import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_INJECT
+import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownSendingLogAccess
 import java.lang.reflect.Method
@@ -49,13 +49,13 @@ internal object ThreadedImageXposedInjector {
                     listenerClass = registry.listenerClass,
                 )
             }.onFailure { error ->
-                BridgeDiscovery.markInstallError(HOOK_SEND_THREADED_INJECT, error.message ?: error.javaClass.name)
+                defaultBridgeDiscovery.markInstallError(HOOK_SEND_THREADED_INJECT, error.message ?: error.javaClass.name)
                 runCatching { Log.e(TAG, "threaded image inject method resolution failed", error) }
             }.getOrNull()
                 .orEmpty()
 
         if (bindings.isEmpty()) {
-            BridgeDiscovery.markInstallError(HOOK_SEND_THREADED_INJECT, "no threaded inject hook candidate found")
+            defaultBridgeDiscovery.markInstallError(HOOK_SEND_THREADED_INJECT, "no threaded inject hook candidate found")
             return
         }
 
@@ -74,9 +74,9 @@ internal object ThreadedImageXposedInjector {
         }
 
         if (anyInstalled) {
-            BridgeDiscovery.markInstalled(HOOK_SEND_THREADED_INJECT)
+            defaultBridgeDiscovery.markInstalled(HOOK_SEND_THREADED_INJECT)
         } else {
-            BridgeDiscovery.markInstallError(HOOK_SEND_THREADED_INJECT, "threaded inject hook install failed")
+            defaultBridgeDiscovery.markInstallError(HOOK_SEND_THREADED_INJECT, "threaded inject hook install failed")
         }
     }
 
@@ -107,7 +107,7 @@ private fun injectThreadMetadata(
             threadId = context.threadId,
             threadScope = context.threadScope,
         )
-        BridgeDiscovery.recordHook(
+        defaultBridgeDiscovery.recordHook(
             HOOK_SEND_THREADED_INJECT,
             "source=${binding.source} room=${context.roomId} threadId=${context.threadId} scope=${context.threadScope}",
         )

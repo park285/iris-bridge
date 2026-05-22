@@ -4,11 +4,11 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_LEVERAGE_COMMIT
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_MARKDOWN_INGRESS
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_MARKDOWN_REQUEST
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_MARKDOWN_REUSE
+import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
@@ -53,9 +53,9 @@ internal class ReplyMarkdownHookInstaller(
             installReplyMarkdownIngressMethodHook(onCreateMethod, hookInstaller) { activity ->
                 rememberReplyMarkdownIntent(activity.intent, HOOK_REPLY_MARKDOWN_INGRESS, mentionPendingContexts, markdownPendingContexts)
             }
-            BridgeDiscovery.markInstalled(HOOK_REPLY_MARKDOWN_INGRESS)
+            defaultBridgeDiscovery.markInstalled(HOOK_REPLY_MARKDOWN_INGRESS)
         } catch (error: Throwable) {
-            BridgeDiscovery.markInstallError(HOOK_REPLY_MARKDOWN_INGRESS, error.message ?: error.javaClass.name)
+            defaultBridgeDiscovery.markInstallError(HOOK_REPLY_MARKDOWN_INGRESS, error.message ?: error.javaClass.name)
             Log.e(tag, "reply-markdown ingress hook install failed", error)
         }
     }
@@ -66,9 +66,9 @@ internal class ReplyMarkdownHookInstaller(
             installReplyMarkdownReuseMethodHook(onNewIntentMethod, hookInstaller, MARKDOWN_SHARE_ACTIVITY) { intent ->
                 rememberReplyMarkdownIntent(intent, HOOK_REPLY_MARKDOWN_REUSE, mentionPendingContexts, markdownPendingContexts)
             }
-            BridgeDiscovery.markInstalled(HOOK_REPLY_MARKDOWN_REUSE)
+            defaultBridgeDiscovery.markInstalled(HOOK_REPLY_MARKDOWN_REUSE)
         } catch (error: Throwable) {
-            BridgeDiscovery.markInstallError(HOOK_REPLY_MARKDOWN_REUSE, error.message ?: error.javaClass.name)
+            defaultBridgeDiscovery.markInstallError(HOOK_REPLY_MARKDOWN_REUSE, error.message ?: error.javaClass.name)
             Log.e(tag, "reply-markdown reuse hook install failed", error)
         }
     }
@@ -100,9 +100,9 @@ internal class ReplyMarkdownHookInstaller(
                 )
             }
             Log.i(tag, "reply-markdown request hooks installed: ${injectMethods.joinToString { it.name }}")
-            BridgeDiscovery.markInstalled(HOOK_REPLY_MARKDOWN_REQUEST)
+            defaultBridgeDiscovery.markInstalled(HOOK_REPLY_MARKDOWN_REQUEST)
         } catch (error: Throwable) {
-            BridgeDiscovery.markInstallError(HOOK_REPLY_MARKDOWN_REQUEST, error.message ?: error.javaClass.name)
+            defaultBridgeDiscovery.markInstallError(HOOK_REPLY_MARKDOWN_REQUEST, error.message ?: error.javaClass.name)
             Log.e(tag, "reply-markdown request hook install failed", error)
         }
     }
@@ -124,9 +124,9 @@ internal class ReplyMarkdownHookInstaller(
                 )
             }
             Log.i(tag, "reply leverage chatlog commit hooks installed: ${commitMethods.joinToString { it.name }}")
-            BridgeDiscovery.markInstalled(HOOK_REPLY_LEVERAGE_COMMIT)
+            defaultBridgeDiscovery.markInstalled(HOOK_REPLY_LEVERAGE_COMMIT)
         } catch (error: Throwable) {
-            BridgeDiscovery.markInstallError(HOOK_REPLY_LEVERAGE_COMMIT, error.message ?: error.javaClass.name)
+            defaultBridgeDiscovery.markInstallError(HOOK_REPLY_LEVERAGE_COMMIT, error.message ?: error.javaClass.name)
             Log.e(tag, "reply leverage chatlog commit hook install failed", error)
         }
     }
@@ -139,13 +139,13 @@ private fun rememberReplyMarkdownIntent(
     markdownPendingContexts: ReplyMarkdownPendingContextStore,
 ) {
     ReplyMentionIngressCapture.capture(intent, mentionPendingContexts) { context ->
-        BridgeDiscovery.recordHook(
+        defaultBridgeDiscovery.recordHook(
             hookName,
             "room=${context.roomId} mention=true textLength=${context.messageText.length}",
         )
     }
     ReplyMarkdownIngressCapture.capture(intent, markdownPendingContexts) { context ->
-        BridgeDiscovery.recordHook(
+        defaultBridgeDiscovery.recordHook(
             hookName,
             "room=${context.roomId} scope=${context.threadScope} textLength=${context.messageText.length}",
         )
