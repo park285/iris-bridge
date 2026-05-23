@@ -3,7 +3,6 @@ package party.qwer.iris.imagebridge.runtime.room
 internal class ChatRoomIntrospector(
     private val scanner: ChatRoomFieldScanner = ChatRoomFieldScanner(),
 ) {
-
     data class ScanResult(
         val className: String,
         val scannedAt: Long,

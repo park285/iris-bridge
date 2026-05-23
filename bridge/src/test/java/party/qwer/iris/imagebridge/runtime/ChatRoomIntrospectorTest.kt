@@ -1,7 +1,7 @@
 package party.qwer.iris.imagebridge.runtime
 
-import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntrospector
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomFieldScanner
+import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntrospector
 import party.qwer.iris.imagebridge.runtime.room.defaultChatRoomIntrospector
 import kotlin.test.Test
 import kotlin.test.assertEquals
