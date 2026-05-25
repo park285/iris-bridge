@@ -58,6 +58,11 @@ __pycache__/
 !/docs/testing/
 !/docs/testing/*.md
 !/docs/github-self-hosted-runner.md
+!/docs/agent-workflows/
+docs/agent-workflows/*
+!/docs/agent-workflows/plans/
+docs/agent-workflows/plans/*
+!/docs/agent-workflows/plans/2026-05-26-iris-control-rust-cutover.md
 
 # Backup files
 *.backup
