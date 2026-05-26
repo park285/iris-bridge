@@ -37,33 +37,6 @@ __pycache__/
 **/build/
 /imagebridge-protocol/bin/
 
-# Docs are local-only by default. Release evidence docs below are published.
-/docs/*
-!/docs/legacy_kotlin_decommission_closeout.md
-!/docs/legacy_kotlin_coverage_map.md
-!/docs/http2-multiplexing.md
-!/docs/karing-runtime-integration.md
-!/docs/karing-message-send.md
-!/docs/reply-mentions.md
-!/docs/read-model.md
-!/docs/stats.md
-!/docs/nickname-events.md
-!/docs/testing_surface_policy.md
-!/docs/auth-contract.md
-!/docs/webhook-lane-state.md
-!/docs/native/
-!/docs/native/*.md
-!/docs/performance/
-!/docs/performance/*.md
-!/docs/testing/
-!/docs/testing/*.md
-!/docs/github-self-hosted-runner.md
-!/docs/agent-workflows/
-docs/agent-workflows/*
-!/docs/agent-workflows/plans/
-docs/agent-workflows/plans/*
-!/docs/agent-workflows/plans/2026-05-26-iris-control-rust-cutover.md
-
 # Backup files
 *.backup
 *.bak
