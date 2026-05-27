@@ -27,7 +27,14 @@ object ImageBridgeMuxProtocol {
     fun writeFrame(
         output: OutputStream,
         frame: ImageBridgeMuxFrame,
-    ) = LengthPrefixedFrameCodec.writePayload(output, json.encodeToString(frame))
+    ) = writeFrameBytes(output, encodeFrameBytes(frame))
+
+    fun encodeFrameBytes(frame: ImageBridgeMuxFrame): ByteArray = json.encodeToString(frame).toByteArray(Charsets.UTF_8)
+
+    fun writeFrameBytes(
+        output: OutputStream,
+        frameBytes: ByteArray,
+    ) = LengthPrefixedFrameCodec.writePayloadBytes(output, frameBytes)
 
     fun readFrame(input: InputStream): ImageBridgeMuxFrame = json.decodeFromString(LengthPrefixedFrameCodec.readPayload(input))
 }

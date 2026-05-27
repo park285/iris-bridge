@@ -3,9 +3,13 @@ package party.qwer.iris
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
+import java.nio.ByteBuffer
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ImageBridgeMuxProtocolTest {
     @Test
@@ -79,5 +83,39 @@ class ImageBridgeMuxProtocolTest {
         assertFailsWith<Exception> {
             ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(buffer.toByteArray()))
         }
+    }
+
+    @Test
+    fun `payload bytes writer preserves big endian length prefix`() {
+        val bytes = "payload".toByteArray(Charsets.UTF_8)
+        val buffer = ByteArrayOutputStream()
+
+        LengthPrefixedFrameCodec.writePayloadBytes(buffer, bytes)
+
+        val framed = buffer.toByteArray()
+        assertEquals(bytes.size, ByteBuffer.wrap(framed, 0, Int.SIZE_BYTES).int)
+        assertContentEquals(bytes, framed.copyOfRange(Int.SIZE_BYTES, framed.size))
+    }
+
+    @Test
+    fun `preencoded mux frame bytes preserve wire shape`() {
+        val frame =
+            ImageBridgeMuxFrame(
+                type = ImageBridgeMuxProtocol.TYPE_REQUEST,
+                correlationId = "mux-preencoded",
+                request = ImageBridgeProtocol.buildHealthRequest(token = "bridge-token"),
+            )
+        val encoded = ImageBridgeMuxProtocol.encodeFrameBytes(frame)
+        val encodedJson = encoded.toString(Charsets.UTF_8)
+        val buffer = ByteArrayOutputStream()
+
+        ImageBridgeMuxProtocol.writeFrameBytes(buffer, encoded)
+
+        assertTrue(encodedJson.contains(""""muxVersion":${ImageBridgeMuxProtocol.MUX_VERSION}"""))
+        assertFalse(encodedJson.contains(""""response":null"""))
+        val restored = ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(buffer.toByteArray()))
+        assertEquals(frame.type, restored.type)
+        assertEquals(frame.correlationId, restored.correlationId)
+        assertEquals(ImageBridgeProtocol.ACTION_HEALTH, restored.request?.action)
     }
 }

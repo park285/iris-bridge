@@ -25,7 +25,7 @@ internal class BridgeMuxSession(
     private val inFlight = AtomicInteger(0)
     private val activeRequests = ConcurrentHashMap<String, ActiveMuxRequest>()
     private val writeLock = Any()
-    private val writer = BridgeMuxSessionWriter(client, writeLock, ::close)
+    private val writer = BridgeMuxSessionWriter(client, writeLock, ::close, metrics)
 
     fun run() {
         metrics.recordClientStart()
@@ -98,9 +98,11 @@ internal class BridgeMuxSession(
 
     private fun handleAcceptedRequest(active: ActiveMuxRequest) {
         try {
-            if (!active.cancelled.get()) {
-                writeResponseOrClose(active, handleRequestSafely(active.request))
+            if (active.cancelled.get()) {
+                metrics.recordMuxLateResponse()
+                return
             }
+            writeResponseOrClose(active, handleRequestSafely(active.request))
         } finally {
             activeRequests.remove(active.correlationId)
             inFlight.decrementAndGet()
@@ -131,7 +133,10 @@ internal class BridgeMuxSession(
         active: ActiveMuxRequest,
         response: ImageBridgeProtocol.ImageBridgeResponse,
     ) {
-        if (closed.get() || active.cancelled.get()) return
+        if (closed.get() || active.cancelled.get()) {
+            metrics.recordMuxLateResponse()
+            return
+        }
         try {
             writer.writeResponse(active.correlationId, response)
         } catch (error: Exception) {

@@ -9,6 +9,7 @@ import party.qwer.iris.imagebridge.runtime.server.BridgeMetrics
 import party.qwer.iris.imagebridge.runtime.server.BridgeMuxSession
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
 import java.io.ByteArrayInputStream
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -33,13 +34,14 @@ class BridgeMuxSessionTest {
                 healthProvider = { readyHealthSnapshot() },
                 handshakeValidator = developmentHandshakeValidator(),
             )
+        val metrics = BridgeMetrics()
 
         BridgeMuxSession(
             client = socket,
             executor = DirectExecutorService(),
             handler = handler,
             isRunning = { true },
-            metrics = BridgeMetrics(),
+            metrics = metrics,
             logError = { _, _, _ -> },
         ).run()
 
@@ -47,6 +49,8 @@ class BridgeMuxSessionTest {
         assertEquals(ImageBridgeMuxProtocol.TYPE_RESPONSE, response.type)
         assertEquals("corr-1", response.correlationId)
         assertEquals(ImageBridgeProtocol.STATUS_OK, response.response?.status)
+        assertEquals(1, metrics.muxSessionSnapshot().writeCount)
+        assertTrue(metrics.muxSessionSnapshot().writeLatencyNanosTotal >= 0)
     }
 
     @Test
@@ -116,6 +120,7 @@ class BridgeMuxSessionTest {
         assertEquals("busy-1", response.correlationId)
         assertEquals(ImageBridgeProtocol.ERROR_BRIDGE_BUSY, response.response?.errorCode)
         assertEquals(1, metrics.snapshot().bridgeBusy)
+        assertEquals(1, metrics.muxSessionSnapshot().busyCount)
     }
 
     @Test
@@ -157,6 +162,8 @@ class BridgeMuxSessionTest {
 
         assertEquals(0, sendCount)
         assertEquals(1, metrics.snapshot().muxRequestCancelled)
+        assertEquals(1, metrics.muxSessionSnapshot().cancelCount)
+        assertEquals(1, metrics.muxSessionSnapshot().lateResponseCount)
         assertEquals(0, socket.outputStream.size())
     }
 
@@ -264,4 +271,28 @@ class BridgeMuxSessionTest {
         assertTrue(logged)
         assertTrue(socket.closed)
     }
+
+    @Test
+    fun `mux session writer encodes outside write lock`() {
+        val source =
+            sourceFile(
+                "src/main/java/party/qwer/iris/imagebridge/runtime/server/BridgeMuxSessionWriter.kt",
+                "bridge/src/main/java/party/qwer/iris/imagebridge/runtime/server/BridgeMuxSessionWriter.kt",
+            ).readText()
+        val encodeIndex = source.indexOf("ImageBridgeMuxProtocol.encodeFrameBytes(frame)")
+        val lockIndex = source.indexOf("synchronized(writeLock)")
+
+        assertTrue(encodeIndex >= 0, "writer should pre-encode frame bytes")
+        assertTrue(lockIndex >= 0, "writer should keep a write lock for frame ordering")
+        assertTrue(encodeIndex < lockIndex, "JSON encoding must happen before taking writeLock")
+        assertFalse(
+            source.substring(lockIndex).contains("ImageBridgeMuxProtocol.writeFrame("),
+            "writeLock scope should only write pre-encoded bytes",
+        )
+    }
+
+    private fun sourceFile(
+        moduleRelative: String,
+        rootRelative: String,
+    ): File = listOf(File(moduleRelative), File(rootRelative)).first { it.exists() }
 }

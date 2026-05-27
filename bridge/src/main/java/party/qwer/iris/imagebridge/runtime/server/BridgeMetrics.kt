@@ -16,9 +16,7 @@ internal class BridgeMetrics {
     private val rejectedClient = AtomicLong()
     private val activeClient = AtomicLong()
     private val queuedClient = AtomicLong()
-    private val muxRequestCancelled = AtomicLong()
-    private val muxRequestDeduplicated = AtomicLong()
-    private val muxGoawaySent = AtomicLong()
+    private val muxMetrics = BridgeMuxMetrics()
     private val lastSendRequestId = AtomicReference<String?>()
     private val lastSendStartedAtEpochMs = AtomicReference<Long?>()
     private val lastSendCompletedAtEpochMs = AtomicReference<Long?>()
@@ -80,11 +78,15 @@ internal class BridgeMetrics {
         queuedClient.set(count.coerceAtLeast(0))
     }
 
-    fun recordMuxRequestCancelled() = muxRequestCancelled.incrementAndGet()
+    fun recordMuxRequestCancelled() = muxMetrics.recordRequestCancelled()
 
-    fun recordMuxRequestDeduplicated() = muxRequestDeduplicated.incrementAndGet()
+    fun recordMuxRequestDeduplicated() = muxMetrics.recordRequestDeduplicated()
 
-    fun recordMuxGoawaySent() = muxGoawaySent.incrementAndGet()
+    fun recordMuxGoawaySent() = muxMetrics.recordGoawaySent()
+
+    fun recordMuxWrite(durationNanos: Long) = muxMetrics.recordWrite(durationNanos)
+
+    fun recordMuxLateResponse() = muxMetrics.recordLateResponse()
 
     fun snapshot(): ImageBridgeProtocol.ImageBridgeMetrics =
         ImageBridgeProtocol.ImageBridgeMetrics(
@@ -99,13 +101,24 @@ internal class BridgeMetrics {
             rejectedClient = rejectedClient.get(),
             activeClient = activeClient.get(),
             queuedClient = queuedClient.get(),
-            muxRequestCancelled = muxRequestCancelled.get(),
-            muxRequestDeduplicated = muxRequestDeduplicated.get(),
-            muxGoawaySent = muxGoawaySent.get(),
+            muxRequestCancelled = muxMetrics.cancelCount(),
+            muxRequestDeduplicated = muxMetrics.deduplicatedCount(),
+            muxGoawaySent = muxMetrics.goawayCount(),
             lastSendRequestId = lastSendRequestId.get(),
             lastSendStartedAtEpochMs = lastSendStartedAtEpochMs.get(),
             lastSendCompletedAtEpochMs = lastSendCompletedAtEpochMs.get(),
             lastSendDurationMs = lastSendDurationMs.get(),
             lastSendErrorCode = lastSendErrorCode.get(),
         )
+
+    fun muxSessionSnapshot(): BridgeMuxSessionMetricsSnapshot = muxMetrics.sessionSnapshot(bridgeBusy.get())
 }
+
+internal data class BridgeMuxSessionMetricsSnapshot(
+    val writeCount: Long,
+    val writeLatencyNanosTotal: Long,
+    val writeLatencyNanosMax: Long,
+    val busyCount: Long,
+    val cancelCount: Long,
+    val lateResponseCount: Long,
+)

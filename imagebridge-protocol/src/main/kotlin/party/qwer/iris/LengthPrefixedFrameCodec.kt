@@ -25,8 +25,12 @@ object LengthPrefixedFrameCodec {
     fun writePayload(
         output: OutputStream,
         payload: String,
+    ) = writePayloadBytes(output, payload.toByteArray(Charsets.UTF_8))
+
+    fun writePayloadBytes(
+        output: OutputStream,
+        bytes: ByteArray,
     ) {
-        val bytes = payload.toByteArray(Charsets.UTF_8)
         require(bytes.size in 1..MAX_FRAME_SIZE) { "invalid frame size: ${bytes.size}" }
         val dos = DataOutputStream(output)
         dos.writeInt(bytes.size)

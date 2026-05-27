@@ -8,6 +8,7 @@ internal class BridgeMuxSessionWriter(
     private val client: BridgeMuxSocket,
     private val writeLock: Any,
     private val closeSession: () -> Unit,
+    private val metrics: BridgeMetrics,
 ) {
     fun writeResponse(
         correlationId: String,
@@ -40,8 +41,11 @@ internal class BridgeMuxSessionWriter(
     }
 
     fun writeFrame(frame: ImageBridgeMuxFrame) {
+        val frameBytes = ImageBridgeMuxProtocol.encodeFrameBytes(frame)
+        val startedAtNanos = System.nanoTime()
         synchronized(writeLock) {
-            ImageBridgeMuxProtocol.writeFrame(client.outputStream, frame)
+            ImageBridgeMuxProtocol.writeFrameBytes(client.outputStream, frameBytes)
         }
+        metrics.recordMuxWrite(System.nanoTime() - startedAtNanos)
     }
 }

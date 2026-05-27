@@ -55,10 +55,13 @@ internal class KakaoChatLogDbCommitVerifier(
                 }
                 val committed =
                     runCatching {
-                        val database = db ?: databaseOpener(SQLiteDatabase.OPEN_READONLY).also { opened -> db = opened }
+                        val database = db ?: databaseOpener(SQLiteDatabase.OPEN_READONLY)
+                        if (db == null) db = database
                         hasCommittedRow(database, roomId, message, minimumCreatedAt, minimumRowId, rawAttachment)
                     }.onFailure { error ->
-                        db.closeAndClear { db = null }
+                        val failedDb = db
+                        db = null
+                        failedDb?.close()
                         logInfo(
                             KAKAO_TEXT_SEND_TAG,
                             "kakaolink commit check failed requestId=$requestId room=$roomId " +
@@ -71,7 +74,9 @@ internal class KakaoChatLogDbCommitVerifier(
                 }
             }
         } finally {
-            db.closeAndClear { db = null }
+            val openDb = db
+            db = null
+            openDb?.close()
         }
         logInfo(KAKAO_TEXT_SEND_TAG, "kakaolink commit not found requestId=$requestId room=$roomId minimumRowId=$minimumRowId")
         return false
@@ -156,13 +161,5 @@ internal class KakaoChatLogDbCommitVerifier(
         private const val COMMIT_RETRY_DELAY_MS = 250L
         private const val CLEANUP_ATTEMPTS = 3
         private const val CLEANUP_RETRY_DELAY_MS = 100L
-    }
-}
-
-private fun SQLiteDatabase?.closeAndClear(clear: () -> Unit) {
-    try {
-        this?.close()
-    } finally {
-        clear()
     }
 }
