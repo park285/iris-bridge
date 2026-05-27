@@ -6,6 +6,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import party.qwer.iris.imagebridge.runtime.send.KakaoChatLogDbCommitVerifier
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -13,6 +14,73 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class KakaoChatLogDbCommitVerifierTest {
+    @Test
+    fun `awaitCommitted reuses read database across retry batch and sees later committed rows`() {
+        val databasePath = Files.createTempDirectory("iris-kakao-db-test").resolve("KakaoTalk.db")
+        seedChatLogs(databasePath)
+        var openCount = 0
+        var sleepCount = 0
+        val verifier =
+            KakaoChatLogDbCommitVerifier(
+                databasePath = databasePath.toString(),
+                sleeper = {
+                    sleepCount += 1
+                    if (sleepCount == 2) {
+                        insertChatLog(databasePath, id = 7L, chatId = 123L, createdAt = 101L, message = "delayed")
+                    }
+                },
+                databaseOpener = { flags ->
+                    openCount += 1
+                    SQLiteDatabase.openDatabase(databasePath.toString(), null, flags)
+                },
+            )
+
+        val committed =
+            verifier.awaitCommitted(
+                roomId = 123L,
+                message = "delayed",
+                minimumCreatedAt = 100L,
+                minimumRowId = 0L,
+                requestId = "req-delayed",
+            )
+
+        assertTrue(committed)
+        assertEquals(1, openCount)
+    }
+
+    @Test
+    fun `awaitCommitted closes failed open attempt and retries with a fresh database`() {
+        val databasePath = Files.createTempDirectory("iris-kakao-db-test").resolve("KakaoTalk.db")
+        seedChatLogs(databasePath)
+        insertChatLog(databasePath, id = 7L, chatId = 123L, createdAt = 101L, message = "recovered")
+        var openCount = 0
+        val verifier =
+            KakaoChatLogDbCommitVerifier(
+                logInfo = { _, _ -> },
+                databasePath = databasePath.toString(),
+                sleeper = {},
+                databaseOpener = { flags ->
+                    openCount += 1
+                    if (openCount == 1) {
+                        error("transient open failure")
+                    }
+                    SQLiteDatabase.openDatabase(databasePath.toString(), null, flags)
+                },
+            )
+
+        val committed =
+            verifier.awaitCommitted(
+                roomId = 123L,
+                message = "recovered",
+                minimumCreatedAt = 100L,
+                minimumRowId = 0L,
+                requestId = "req-recovered",
+            )
+
+        assertTrue(committed)
+        assertEquals(2, openCount)
+    }
+
     @Test
     fun `cleanupPendingKakaoLinkSendingLogs deletes only matching pending kakaolink rows`() {
         val databasePath = Files.createTempDirectory("iris-kakao-db-test").resolve("KakaoTalk.db")
@@ -29,6 +97,47 @@ class KakaoChatLogDbCommitVerifierTest {
 
         assertTrue(cleaned)
         assertEquals(listOf(1L, 3L, 4L, 5L, 6L), sendingLogIds(databasePath.toString()))
+    }
+
+    private fun seedChatLogs(databasePath: Path) {
+        SQLiteDatabase
+            .openOrCreateDatabase(databasePath.toString(), null)
+            .use { database ->
+                database.execSQL(
+                    """
+                    create table chat_logs (
+                      _id integer primary key,
+                      chat_id integer not null,
+                      type integer not null,
+                      created_at integer not null,
+                      user_id integer not null,
+                      message text,
+                      attachment text,
+                      v text
+                    )
+                    """.trimIndent(),
+                )
+            }
+    }
+
+    private fun insertChatLog(
+        databasePath: Path,
+        id: Long,
+        chatId: Long,
+        createdAt: Long,
+        message: String,
+    ) {
+        SQLiteDatabase
+            .openDatabase(databasePath.toString(), null, SQLiteDatabase.OPEN_READWRITE)
+            .use { database ->
+                database.execSQL(
+                    """
+                    insert into chat_logs (_id, chat_id, type, created_at, user_id, message, attachment, v)
+                    values (?, ?, 71, ?, 1, ?, null, '{}')
+                    """.trimIndent(),
+                    arrayOf<Any>(id, chatId, createdAt, message),
+                )
+            }
     }
 
     private fun seedSendingLogs(databasePath: String) {

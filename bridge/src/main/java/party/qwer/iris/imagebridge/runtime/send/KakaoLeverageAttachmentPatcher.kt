@@ -24,6 +24,14 @@ internal class KakaoLeverageAttachmentDbPatcher(
     private val databasePath: String = KAKAO_TALK_DATABASE_PATH,
     private val clock: () -> Long = System::currentTimeMillis,
     private val executor: Executor = newPatchExecutor(logInfo),
+    private val sleeper: (Long) -> Unit = { delayMs -> Thread.sleep(delayMs) },
+    private val databaseOpener: (Int) -> SQLiteDatabase = { flags ->
+        SQLiteDatabase.openDatabase(
+            databasePath,
+            null,
+            flags,
+        )
+    },
 ) : KakaoLeverageAttachmentPatcher {
     override fun patchAsync(
         roomId: Long,
@@ -51,25 +59,32 @@ internal class KakaoLeverageAttachmentDbPatcher(
         requestId: String?,
         minimumCreatedAt: Long,
     ) {
-        repeat(PATCH_ATTEMPTS) { attempt ->
-            if (!sleepBeforeRetry(requestId, roomId)) return
-            val patched =
-                runCatching {
-                    patchLatest(roomId, message, rawAttachment, minimumCreatedAt)
-                }.onFailure { error ->
+        var db: SQLiteDatabase? = null
+        try {
+            repeat(PATCH_ATTEMPTS) { attempt ->
+                if (!sleepBeforeRetry(requestId, roomId)) return
+                val patched =
+                    runCatching {
+                        val database = db ?: databaseOpener(SQLiteDatabase.OPEN_READWRITE).also { opened -> db = opened }
+                        patchLatest(database, roomId, message, rawAttachment, minimumCreatedAt)
+                    }.onFailure { error ->
+                        db.closeAndClear { db = null }
+                        logInfo(
+                            KAKAO_TEXT_SEND_TAG,
+                            "leverage attachment patch failed requestId=$requestId room=$roomId " +
+                                "attempt=${attempt + 1} error=${error.javaClass.name}: ${error.message}",
+                        )
+                    }.getOrDefault(false)
+                if (patched) {
                     logInfo(
                         KAKAO_TEXT_SEND_TAG,
-                        "leverage attachment patch failed requestId=$requestId room=$roomId " +
-                            "attempt=${attempt + 1} error=${error.javaClass.name}: ${error.message}",
+                        "leverage attachment patched requestId=$requestId room=$roomId attempt=${attempt + 1}",
                     )
-                }.getOrDefault(false)
-            if (patched) {
-                logInfo(
-                    KAKAO_TEXT_SEND_TAG,
-                    "leverage attachment patched requestId=$requestId room=$roomId attempt=${attempt + 1}",
-                )
-                return
+                    return
+                }
             }
+        } finally {
+            db.closeAndClear { db = null }
         }
         logInfo(KAKAO_TEXT_SEND_TAG, "leverage attachment patch row not found requestId=$requestId room=$roomId")
     }
@@ -79,7 +94,7 @@ internal class KakaoLeverageAttachmentDbPatcher(
         roomId: Long,
     ): Boolean {
         try {
-            Thread.sleep(PATCH_RETRY_DELAY_MS)
+            sleeper(PATCH_RETRY_DELAY_MS)
             return true
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
@@ -89,34 +104,27 @@ internal class KakaoLeverageAttachmentDbPatcher(
     }
 
     private fun patchLatest(
+        database: SQLiteDatabase,
         roomId: Long,
         message: String,
         rawAttachment: String,
         minimumCreatedAt: Long,
     ): Boolean {
-        val db =
-            SQLiteDatabase.openDatabase(
-                databasePath,
-                null,
-                SQLiteDatabase.OPEN_READWRITE,
-            )
-        db.use { database ->
-            val row =
-                kakaoLinkSpecPatchMatchAttachments(rawAttachment)
-                    .asSequence()
-                    .mapNotNull { candidateAttachment ->
-                        findCommittedKakaoLinkChatLog(
-                            database = database,
-                            roomId = roomId,
-                            minimumCreatedAt = minimumCreatedAt,
-                            minimumRowId = 0L,
-                            rawAttachment = candidateAttachment,
-                        )
-                    }.firstOrNull()
-                    ?: findLeverageAttachmentPatchTarget(database, roomId, message, minimumCreatedAt)
-                    ?: return false
-            return updateAttachment(database, row, kakaoLinkDisplayPatchAttachment(row.committedAttachment, rawAttachment))
-        }
+        val row =
+            kakaoLinkSpecPatchMatchAttachments(rawAttachment)
+                .asSequence()
+                .mapNotNull { candidateAttachment ->
+                    findCommittedKakaoLinkChatLog(
+                        database = database,
+                        roomId = roomId,
+                        minimumCreatedAt = minimumCreatedAt,
+                        minimumRowId = 0L,
+                        rawAttachment = candidateAttachment,
+                    )
+                }.firstOrNull()
+                ?: findLeverageAttachmentPatchTarget(database, roomId, message, minimumCreatedAt)
+                ?: return false
+        return updateAttachment(database, row, kakaoLinkDisplayPatchAttachment(row.committedAttachment, rawAttachment))
     }
 
     private fun updateAttachment(
@@ -156,5 +164,13 @@ internal class KakaoLeverageAttachmentDbPatcher(
                     "leverage attachment patch queue full active=${executor.activeCount} queued=${executor.queue.size}",
                 )
             }
+    }
+}
+
+private fun SQLiteDatabase?.closeAndClear(clear: () -> Unit) {
+    try {
+        this?.close()
+    } finally {
+        clear()
     }
 }

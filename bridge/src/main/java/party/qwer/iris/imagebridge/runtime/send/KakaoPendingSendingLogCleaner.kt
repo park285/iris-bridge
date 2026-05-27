@@ -4,19 +4,14 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 
 internal class KakaoPendingSendingLogCleaner(
-    private val databasePath: String,
+    private val databaseOpener: (Int) -> SQLiteDatabase,
 ) {
     fun cleanupMatchedPendingSendingLogs(
         roomId: Long,
         minimumCreatedAt: Long,
         rawAttachment: String,
     ): Int {
-        val db =
-            SQLiteDatabase.openDatabase(
-                databasePath,
-                null,
-                SQLiteDatabase.OPEN_READWRITE,
-            )
+        val db = databaseOpener(SQLiteDatabase.OPEN_READWRITE)
         db.use { database ->
             val rowIds = findMatchedPendingRowIds(database, roomId, minimumCreatedAt, rawAttachment)
             return rowIds.sumOf { rowId ->
