@@ -84,5 +84,4 @@ docs/closeout-*.tar.gz
 /scripts/closeout_facts.py
 /scripts/replay_closeout.sh
 /scripts/verify-all.sh
-/scripts/verify-iris-skill-sync.sh
 /scripts/verify_closeout_packet.py
