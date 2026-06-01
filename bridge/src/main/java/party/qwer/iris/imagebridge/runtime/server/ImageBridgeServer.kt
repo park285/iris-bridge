@@ -110,11 +110,6 @@ internal class ImageBridgeServer(
         recordBridgeServerFailure(restartCount, lastCrashMessage, message)
     }
 
-    private fun shutdownClientExecutor() {
-        clientExecutor?.shutdown()
-        clientExecutor = null
-    }
-
     private fun sleepBeforeRestart(delayMs: Long) {
         sleepBeforeBridgeRestart(delayMs, running)
     }
