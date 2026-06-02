@@ -9,11 +9,12 @@ import kotlin.test.assertFailsWith
 
 class KakaoSendInvocationFactoryTest {
     @Test
-    fun `sendSingle caches reflection classes across invocations`() {
+    fun `sendSingle uses high quality photo send path across invocations`() {
         FakeMediaSender.reset()
         val factory =
             KakaoSendInvocationFactory(
                 registry = buildFakeRegistry(),
+                pathArgumentFactory = { path -> "uri:$path" },
             )
         val chatRoom = FakeChatRoom()
 
@@ -30,8 +31,11 @@ class KakaoSendInvocationFactoryTest {
             threadScope = null,
         )
 
-        assertEquals(listOf("/tmp/first.png", "/tmp/second.png"), FakeMediaSender.sentPaths)
-        assertEquals(listOf(true, false), FakeMediaSender.threadFlags)
+        assertEquals(listOf("/tmp/first.png", "/tmp/second.png"), FakeMediaSender.multiSentUris)
+        assertEquals(FakeMessageType.Photo, FakeMediaSender.multiType)
+        assertEquals(FakeWriteType.None, FakeMediaSender.multiWriteType)
+        assertEquals(false, FakeMediaSender.multiShareOriginal)
+        assertEquals(true, FakeMediaSender.multiHighQuality)
     }
 
     @Test
@@ -70,6 +74,8 @@ class KakaoSendInvocationFactoryTest {
         assertEquals(listOf("/tmp/a.png", "/tmp/b.png"), FakeMediaSender.multiSentUris)
         assertEquals(FakeMessageType.MultiPhoto, FakeMediaSender.multiType)
         assertEquals(FakeWriteType.None, FakeMediaSender.multiWriteType)
+        assertEquals(false, FakeMediaSender.multiShareOriginal)
+        assertEquals(true, FakeMediaSender.multiHighQuality)
     }
 
     @Test
@@ -78,6 +84,7 @@ class KakaoSendInvocationFactoryTest {
         val factory =
             KakaoSendInvocationFactory(
                 registry = buildPolymorphicRegistry(),
+                pathArgumentFactory = { path -> "uri:$path" },
             )
 
         factory.sendSingle(
@@ -96,6 +103,7 @@ class KakaoSendInvocationFactoryTest {
         val factory =
             KakaoSendInvocationFactory(
                 registry = buildExactPreferredRegistry(),
+                pathArgumentFactory = { path -> "uri:$path" },
             )
 
         factory.sendSingle(
@@ -115,6 +123,7 @@ class KakaoSendInvocationFactoryTest {
         val factory =
             KakaoSendInvocationFactory(
                 registry = buildPrimitiveThreadParamRegistry(),
+                pathArgumentFactory = { path -> "uri:$path" },
             )
 
         factory.sendSingle(

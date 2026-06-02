@@ -9,12 +9,12 @@ import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 internal fun discoverKakaoClassRegistry(classLoader: ClassLoader): KakaoClassRegistry {
     Log.i(KAKAO_CLASS_REGISTRY_TAG, "KakaoClassRegistry.discover start")
     val scanner = DexClassScanner(classLoader)
-    val mediaItem = stableClass(classLoader, "com.kakao.talk.model.media.MediaItem")
+    val mediaItem = runCatching { stableClass(classLoader, "com.kakao.talk.model.media.MediaItem") }.getOrNull()
     val function0 = stableClass(classLoader, "kotlin.jvm.functions.Function0")
     val function1 = stableClass(classLoader, "kotlin.jvm.functions.Function1")
     val masterDb = stableClass(classLoader, "com.kakao.talk.database.MasterDatabase")
     val messageType = discoverMessageType(classLoader, scanner)
-    val chatMediaSender = discoverChatMediaSender(classLoader, scanner, mediaItem, function0, function1)
+    val chatMediaSender = discoverChatMediaSender(classLoader, scanner, messageType, function0, function1)
     val chatRoomManager = discoverChatRoomManager(classLoader, scanner)
     val broadResolver = resolveBroadRoomResolver(chatRoomManager)
     val chatRoom = broadResolver.returnType
@@ -43,7 +43,7 @@ internal fun discoverKakaoClassRegistry(classLoader: ClassLoader): KakaoClassReg
         chatRoomClass = chatRoom,
         singleSendMethod = singleSend,
         multiSendMethod = multiSend,
-        mediaItemConstructor = mediaItem.getConstructor(String::class.java, Long::class.javaPrimitiveType),
+        mediaItemConstructor = mediaItem?.let { runCatching { it.getConstructor(String::class.java, Long::class.javaPrimitiveType) }.getOrNull() },
         masterDbSingletonField = resolveMasterDatabaseSingleton(masterDb),
         roomDaoMethod = roomDao,
         entityLookupMethod = entityLookup,

@@ -52,9 +52,7 @@ internal class KakaoSendInvocationFactory(
         threadScope: Int?,
     ) {
         require(imagePath.isNotBlank()) { "imagePath is blank" }
-        val sender = senderFactory.newSender(chatRoom, threadId, threadScope)
-        val mediaItem = registry.mediaItemConstructor.apply { isAccessible = true }.newInstance(imagePath, 0L)
-        registry.singleSendMethod.apply { isAccessible = true }.invoke(sender, mediaItem, false)
+        sendPhotoList(chatRoom, listOf(imagePath), threadId, threadScope)
     }
 
     override fun sendMultiple(
@@ -64,6 +62,15 @@ internal class KakaoSendInvocationFactory(
         threadScope: Int?,
     ) {
         require(imagePaths.isNotEmpty()) { "no image paths" }
+        sendPhotoList(chatRoom, imagePaths, threadId, threadScope)
+    }
+
+    private fun sendPhotoList(
+        chatRoom: Any,
+        imagePaths: List<String>,
+        threadId: Long?,
+        threadScope: Int?,
+    ) {
         val sender = senderFactory.newSender(chatRoom, threadId, threadScope)
         val uris =
             ArrayList<Any>(imagePaths.size).apply {
@@ -79,7 +86,7 @@ internal class KakaoSendInvocationFactory(
             null,
             registry.writeTypeNone,
             false,
-            false,
+            true,
             null,
         )
     }

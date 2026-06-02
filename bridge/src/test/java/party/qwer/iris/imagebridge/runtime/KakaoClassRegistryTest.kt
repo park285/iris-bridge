@@ -3,9 +3,11 @@
 package party.qwer.iris.imagebridge.runtime
 
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.server.BridgeHookSpecVerifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -86,7 +88,7 @@ class KakaoClassRegistryTest {
                         AbstractInheritedMediaSender::class.java,
                         ConcreteInheritedMediaSender::class.java,
                     ),
-                mediaItemClass = FakeMediaItem::class.java,
+                messageTypeClass = FakeMessageType::class.java,
                 function0Class = kotlin.jvm.functions.Function0::class.java,
                 function1Class = kotlin.jvm.functions.Function1::class.java,
             )
@@ -104,7 +106,7 @@ class KakaoClassRegistryTest {
                             ConcreteInheritedMediaSender::class.java,
                             AlternateConcreteInheritedMediaSender::class.java,
                         ),
-                    mediaItemClass = FakeMediaItem::class.java,
+                    messageTypeClass = FakeMessageType::class.java,
                     function0Class = kotlin.jvm.functions.Function0::class.java,
                     function1Class = kotlin.jvm.functions.Function1::class.java,
                 )
@@ -122,10 +124,46 @@ class KakaoClassRegistryTest {
                 messageTypeClass = FakeMessageType::class.java,
             )
 
-        assertEquals("n", methods.first.name)
+        val singleSend = assertNotNull(methods.first)
+        assertEquals("n", singleSend.name)
         assertEquals("p", methods.second.name)
-        assertEquals(AbstractInheritedMediaSender::class.java, methods.first.declaringClass)
+        assertEquals(AbstractInheritedMediaSender::class.java, singleSend.declaringClass)
         assertEquals(AbstractInheritedMediaSender::class.java, methods.second.declaringClass)
+    }
+
+    @Test
+    fun `chat media sender selector accepts sender with only multi photo path`() {
+        val selected =
+            KakaoClassRegistry.selectChatMediaSenderCandidateForTest(
+                candidates = listOf(MultiOnlyMediaSender::class.java),
+                messageTypeClass = FakeMessageType::class.java,
+                function0Class = kotlin.jvm.functions.Function0::class.java,
+                function1Class = kotlin.jvm.functions.Function1::class.java,
+            )
+
+        assertEquals(MultiOnlyMediaSender::class.java, selected)
+    }
+
+    @Test
+    fun `chat media sender method resolver treats single send as optional`() {
+        val methods =
+            KakaoClassRegistry.resolveChatMediaSenderMethodsForTest(
+                chatMediaSenderClass = MultiOnlyMediaSender::class.java,
+                mediaItemClass = null,
+                messageTypeClass = FakeMessageType::class.java,
+            )
+
+        assertEquals(null, methods.first)
+        assertEquals("p", methods.second.name)
+    }
+
+    @Test
+    fun `bridge spec remains ready without optional single send media item path`() {
+        val status = BridgeHookSpecVerifier(buildMultiOnlyRegistry()).verify()
+
+        assertTrue(status.ready)
+        assertFalse(status.checks.any { !it.ok && it.name.contains("sendSingle") })
+        assertFalse(status.checks.any { !it.ok && it.name.contains("MediaItem") })
     }
 
     @Test
@@ -137,9 +175,10 @@ class KakaoClassRegistryTest {
                 messageTypeClass = FakeMessageType::class.java,
             )
 
-        assertEquals("n", methods.first.name)
+        val singleSend = assertNotNull(methods.first)
+        assertEquals("n", singleSend.name)
         assertEquals("p", methods.second.name)
-        assertEquals(AbstractProtectedInheritedMediaSender::class.java, methods.first.declaringClass)
+        assertEquals(AbstractProtectedInheritedMediaSender::class.java, singleSend.declaringClass)
         assertEquals(AbstractProtectedInheritedMediaSender::class.java, methods.second.declaringClass)
     }
 }

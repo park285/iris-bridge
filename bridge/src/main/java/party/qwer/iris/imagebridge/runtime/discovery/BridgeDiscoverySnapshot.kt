@@ -14,7 +14,8 @@ internal data class BridgeDiscoverySnapshot(
     val hooks: List<DiscoveryHookStatus>,
 )
 
-internal fun BridgeDiscoverySnapshot.requiredSendHookName(imageCount: Int): String = if (imageCount == 1) HOOK_SEND_SINGLE else HOOK_SEND_MULTIPLE
+@Suppress("UNUSED_PARAMETER")
+internal fun BridgeDiscoverySnapshot.requiredSendHookName(imageCount: Int): String = HOOK_SEND_MULTIPLE
 
 internal fun BridgeDiscoverySnapshot.sendBlockReason(imageCount: Int): String? = sendBlockReason(imageCount, threadId = null, threadScope = null)
 
@@ -26,10 +27,11 @@ internal fun BridgeDiscoverySnapshot.sendBlockReason(
     if (!installAttempted) return "bridge discovery hooks not installed"
     val requiredHookNames =
         buildList {
-            add(requiredSendHookName(imageCount))
             if (threadId != null && (threadScope ?: 0) >= 2) {
                 add(HOOK_SEND_THREADED_ENTRY)
                 add(HOOK_SEND_THREADED_INJECT)
+            } else {
+                add(requiredSendHookName(imageCount))
             }
         }
     requiredHookNames.forEach { requiredHookName ->

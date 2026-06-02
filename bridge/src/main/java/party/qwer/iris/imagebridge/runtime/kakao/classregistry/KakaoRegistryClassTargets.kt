@@ -18,7 +18,7 @@ internal fun discoverMessageType(
 internal fun discoverChatMediaSender(
     classLoader: ClassLoader,
     scanner: DexClassScanner,
-    mediaItem: Class<*>,
+    messageType: Class<*>,
     function0: Class<*>,
     function1: Class<*>,
 ): Class<*> =
@@ -30,7 +30,7 @@ internal fun discoverChatMediaSender(
     ) { clazz ->
         matchesChatMediaSenderClass(
             clazz = clazz,
-            mediaItemClass = mediaItem,
+            messageTypeClass = messageType,
             function0Class = function0,
             function1Class = function1,
         )

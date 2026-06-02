@@ -73,6 +73,8 @@ internal class FakeMediaSender(
         val multiSentUris = mutableListOf<String>()
         var multiType: Any? = null
         var multiWriteType: Any? = null
+        var multiShareOriginal: Boolean? = null
+        var multiHighQuality: Boolean? = null
 
         fun reset() {
             sentPaths.clear()
@@ -81,6 +83,8 @@ internal class FakeMediaSender(
             multiSentUris.clear()
             multiType = null
             multiWriteType = null
+            multiShareOriginal = null
+            multiHighQuality = null
         }
     }
 
@@ -111,11 +115,12 @@ internal class FakeMediaSender(
         multiSentUris += uris.map { uri -> uri.toString().removePrefix("uri:") }
         multiType = type
         multiWriteType = writeType
+        multiShareOriginal = shareOriginal
+        multiHighQuality = highQuality
         check(message == null)
         check(attachment == null)
         check(forwardExtra == null)
         check(!shareOriginal)
-        check(!highQuality)
         check(listener == null)
     }
 }
@@ -419,11 +424,15 @@ internal class RenamedThreadedEntryMediaSender(
         val sentUris = mutableListOf<String>()
         var lastType: FakeMessageType? = null
         var lastWriteType: FakeWriteType? = null
+        var lastShareOriginal: Boolean? = null
+        var lastHighQuality: Boolean? = null
 
         fun reset() {
             sentUris.clear()
             lastType = null
             lastWriteType = null
+            lastShareOriginal = null
+            lastHighQuality = null
         }
     }
 
@@ -460,7 +469,7 @@ internal class RenamedThreadedEntryMediaSender(
         check(forwardExtra == null)
         check(writeType.name.isNotBlank())
         check(!shareOriginal)
-        check(!highQuality)
+        check(highQuality)
         check(listener == null)
     }
 
@@ -480,12 +489,14 @@ internal class RenamedThreadedEntryMediaSender(
         sentUris += uris.map { uri -> uri.toString().removePrefix("uri:") }
         lastType = type
         lastWriteType = writeType
+        lastShareOriginal = shareOriginal
+        lastHighQuality = highQuality
         check(message.isEmpty())
         check(attachment.optString("callingPkg") == "com.kakao.talk")
         check(forwardExtra == null)
         check(writeType == FakeWriteType.Connect)
         check(!shareOriginal)
-        check(!highQuality)
+        check(highQuality)
         assertEquals("ok", onSuccess.invoke("ok"))
         assertEquals(null, onFailure.invoke("ignored"))
     }

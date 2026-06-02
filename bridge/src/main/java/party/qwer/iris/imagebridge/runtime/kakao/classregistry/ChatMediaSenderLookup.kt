@@ -7,7 +7,7 @@ import java.lang.reflect.Modifier
 
 internal fun matchesChatMediaSenderClass(
     clazz: Class<*>,
-    mediaItemClass: Class<*>,
+    messageTypeClass: Class<*>,
     function0Class: Class<*>,
     function1Class: Class<*>,
 ): Boolean =
@@ -19,43 +19,54 @@ internal fun matchesChatMediaSenderClass(
                 ctor.parameterTypes[3] == function1Class
         } &&
         methodsInHierarchy(clazz).any { method ->
-            !Modifier.isStatic(method.modifiers) &&
-                method.parameterTypes.size == 2 &&
-                method.parameterTypes[0] == mediaItemClass &&
-                method.parameterTypes[1] == Boolean::class.javaPrimitiveType
+            isMultiSendMethod(method, messageTypeClass)
         }
 
 internal fun resolveChatMediaSendMethods(
     chatMediaSenderClass: Class<*>,
-    mediaItemClass: Class<*>,
+    mediaItemClass: Class<*>?,
     messageTypeClass: Class<*>,
-): Pair<Method, Method> {
+): Pair<Method?, Method> {
+    val allMethods = methodsInHierarchy(chatMediaSenderClass)
+    val singleSendCandidates =
+        if (mediaItemClass == null) {
+            emptyList()
+        } else {
+            allMethods.filter { method ->
+                !Modifier.isStatic(method.modifiers) &&
+                    method.parameterTypes.size == 2 &&
+                    method.parameterTypes[0] == mediaItemClass &&
+                    method.parameterTypes[1] == Boolean::class.javaPrimitiveType
+            }
+        }
     val singleSend =
-        selectMethodCandidate(
-            label = "ChatMediaSender single send on ${chatMediaSenderClass.name}",
-            candidates =
-                methodsInHierarchy(chatMediaSenderClass).filter { method ->
-                    !Modifier.isStatic(method.modifiers) &&
-                        method.parameterTypes.size == 2 &&
-                        method.parameterTypes[0] == mediaItemClass &&
-                        method.parameterTypes[1] == Boolean::class.javaPrimitiveType
-                },
-            preferredNames = setOf("n"),
-        )
+        singleSendCandidates.takeIf { it.isNotEmpty() }?.let { candidates ->
+            selectMethodCandidate(
+                label = "ChatMediaSender single send on ${chatMediaSenderClass.name}",
+                candidates = candidates,
+                preferredNames = setOf("n"),
+            )
+        }
     val multiSend =
         selectMethodCandidate(
             label = "ChatMediaSender multi send on ${chatMediaSenderClass.name}",
             candidates =
-                methodsInHierarchy(chatMediaSenderClass).filter { method ->
-                    !Modifier.isStatic(method.modifiers) &&
-                        method.parameterCount == 9 &&
-                        method.parameterTypes[0] == List::class.java &&
-                        method.parameterTypes[1] == messageTypeClass
+                allMethods.filter { method ->
+                    isMultiSendMethod(method, messageTypeClass)
                 },
             preferredNames = setOf("p"),
         )
     return singleSend to multiSend
 }
+
+private fun isMultiSendMethod(
+    method: Method,
+    messageTypeClass: Class<*>,
+): Boolean =
+    !Modifier.isStatic(method.modifiers) &&
+        method.parameterCount == 9 &&
+        method.parameterTypes[0] == List::class.java &&
+        method.parameterTypes[1] == messageTypeClass
 
 private fun methodsInHierarchy(clazz: Class<*>): List<Method> {
     val methods = mutableListOf<Method>()

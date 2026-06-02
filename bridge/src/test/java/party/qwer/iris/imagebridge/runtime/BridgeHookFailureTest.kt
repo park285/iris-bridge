@@ -20,7 +20,8 @@ class BridgeDiscoveryHookFailureTest {
     fun `install records failed hook and keeps installing later hooks`() {
         val discovery = BridgeDiscovery()
         val registry = buildFakeRegistry()
-        val installer = ThrowingBridgeHookInstaller(registry.singleSendMethod)
+        val singleSend = assertNotNull(registry.singleSendMethod)
+        val installer = ThrowingBridgeHookInstaller(singleSend)
 
         discovery.install(registry, installer)
 
@@ -28,7 +29,7 @@ class BridgeDiscoveryHookFailureTest {
         val failedHook = assertNotNull(hooks[HOOK_SEND_SINGLE])
         val laterHook = assertNotNull(hooks[HOOK_SEND_MULTIPLE])
         assertFalse(failedHook.installed)
-        assertTrue(failedHook.installError?.contains("boom:${registry.singleSendMethod.name}") == true)
+        assertTrue(failedHook.installError?.contains("boom:${singleSend.name}") == true)
         assertTrue(laterHook.installed)
         assertEquals(null, laterHook.installError)
     }
@@ -37,6 +38,7 @@ class BridgeDiscoveryHookFailureTest {
     fun `install attempts all hooks even when first hook throws`() {
         val discovery = BridgeDiscovery()
         val registry = buildFakeRegistry()
+        val singleSend = assertNotNull(registry.singleSendMethod)
         val installer = ThrowingBridgeHookInstaller(registry.roomDaoMethod)
 
         discovery.install(registry, installer)
@@ -52,11 +54,29 @@ class BridgeDiscoveryHookFailureTest {
                 registry.roomDaoMethod,
                 registry.directRoomResolverMethod,
                 registry.broadRoomResolverMethod,
-                registry.singleSendMethod,
+                singleSend,
                 registry.multiSendMethod,
             ),
             installer.attemptedMethods,
         )
+    }
+
+    @Test
+    fun `install reports optional single send hook as unavailable without claiming installed`() {
+        val discovery = BridgeDiscovery()
+        val registry = buildMultiOnlyRegistry()
+        val installer = RecordingBridgeHookInstaller()
+
+        discovery.install(registry, installer)
+
+        val hooks = discovery.snapshot().hooks.associateBy { it.name }
+        val singleHook = assertNotNull(hooks[HOOK_SEND_SINGLE])
+        val multiHook = assertNotNull(hooks[HOOK_SEND_MULTIPLE])
+        assertFalse(singleHook.installed)
+        assertTrue(singleHook.installError?.contains("optional path unavailable") == true)
+        assertTrue(multiHook.installed)
+        assertFalse(installer.attemptedMethods.any { it.name == "n" })
+        assertTrue(installer.attemptedMethods.any { it.name == "p" })
     }
 
     @Test
@@ -271,6 +291,24 @@ private class AllFailingBridgeHookInstaller : BridgeHookInstaller {
         callback: (BridgeHookInvocation) -> Unit,
     ) {
         error("always fails: ${method.name}")
+    }
+}
+
+private class RecordingBridgeHookInstaller : BridgeHookInstaller {
+    val attemptedMethods = mutableListOf<Method>()
+
+    override fun hookBefore(
+        method: Method,
+        callback: (BridgeHookInvocation) -> Unit,
+    ) {
+        attemptedMethods += method
+    }
+
+    override fun hookAfter(
+        method: Method,
+        callback: (BridgeHookInvocation) -> Unit,
+    ) {
+        attemptedMethods += method
     }
 }
 

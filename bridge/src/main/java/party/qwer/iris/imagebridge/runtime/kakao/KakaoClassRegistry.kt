@@ -12,7 +12,7 @@ import java.lang.reflect.Field
 import java.lang.reflect.Method
 
 internal class KakaoClassRegistry(
-    val mediaItemClass: Class<*>,
+    val mediaItemClass: Class<*>?,
     val function0Class: Class<*>,
     val function1Class: Class<*>,
     val masterDatabaseClass: Class<*>,
@@ -22,9 +22,9 @@ internal class KakaoClassRegistry(
     val messageTypeClass: Class<*>,
     val chatRoomManagerClass: Class<*>,
     val chatRoomClass: Class<*>,
-    val singleSendMethod: Method,
+    val singleSendMethod: Method?,
     val multiSendMethod: Method,
-    val mediaItemConstructor: Constructor<*>,
+    val mediaItemConstructor: Constructor<*>?,
     val masterDbSingletonField: Field,
     val roomDaoMethod: Method,
     val entityLookupMethod: Method,
@@ -45,7 +45,7 @@ internal class KakaoClassRegistry(
 
         internal fun selectChatMediaSenderCandidateForTest(
             candidates: List<Class<*>>,
-            mediaItemClass: Class<*>,
+            messageTypeClass: Class<*>,
             function0Class: Class<*>,
             function1Class: Class<*>,
         ): Class<*> =
@@ -55,7 +55,7 @@ internal class KakaoClassRegistry(
                     candidates.filter { candidate ->
                         matchesChatMediaSenderClass(
                             clazz = candidate,
-                            mediaItemClass = mediaItemClass,
+                            messageTypeClass = messageTypeClass,
                             function0Class = function0Class,
                             function1Class = function1Class,
                         )
@@ -65,9 +65,9 @@ internal class KakaoClassRegistry(
 
         internal fun resolveChatMediaSenderMethodsForTest(
             chatMediaSenderClass: Class<*>,
-            mediaItemClass: Class<*>,
+            mediaItemClass: Class<*>?,
             messageTypeClass: Class<*>,
-        ): Pair<Method, Method> =
+        ): Pair<Method?, Method> =
             resolveChatMediaSendMethods(
                 chatMediaSenderClass = chatMediaSenderClass,
                 mediaItemClass = mediaItemClass,

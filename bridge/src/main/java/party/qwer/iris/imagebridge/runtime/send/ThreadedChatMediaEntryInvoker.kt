@@ -83,7 +83,7 @@ internal class ThreadedChatMediaEntryInvoker(
             null,
             writeTypeConnect,
             false,
-            false,
+            true,
             identityFunctionProxy,
             noopFunctionProxy,
         )

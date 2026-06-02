@@ -35,9 +35,11 @@ internal class BridgeDiscovery(
             "roomId=${param.args.getOrNull(0)} includeMembers=${param.args.getOrNull(1)} includeOpenLink=${param.args.getOrNull(2)}"
         }
 
-        installMethodHook(HOOK_SEND_SINGLE, registry.singleSendMethod, hookInstaller) { param ->
-            "mediaItem=${param.args.getOrNull(0)} suppressAnimation=${param.args.getOrNull(1)}"
-        }
+        registry.singleSendMethod?.let { singleSend ->
+            installMethodHook(HOOK_SEND_SINGLE, singleSend, hookInstaller) { param ->
+                "mediaItem=${param.args.getOrNull(0)} suppressAnimation=${param.args.getOrNull(1)}"
+            }
+        } ?: markInstallError(HOOK_SEND_SINGLE, "optional path unavailable: single-send method not discovered")
 
         installMethodHook(HOOK_SEND_MULTIPLE, registry.multiSendMethod, hookInstaller) { param ->
             val uriCount = (param.args.getOrNull(0) as? List<*>)?.size ?: -1
