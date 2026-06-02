@@ -102,6 +102,10 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
+    // Unit tests that are not lease-policy tests exercise leaseless image sends;
+    // accept the legacy raw path by default so they stay green. Lease-policy tests
+    // inject an explicit BridgeImageLeaseVerifier and ignore this env.
+    environment("IRIS_BRIDGE_ACCEPT_LEGACY_IMAGE_PATH", "1")
     extensions.configure(JacocoTaskExtension::class) {
         isIncludeNoLocationClasses = true
         excludes = listOf("jdk.internal.*")

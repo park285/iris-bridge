@@ -8,12 +8,14 @@ interface ImageBridgeRequestFactory {
         threadScope: Int?,
         requestId: String? = null,
         token: String? = null,
+        imageLeases: List<SignedImageLease> = emptyList(),
     ): ImageBridgeRequest =
         ImageBridgeRequest(
             action = ImageBridgeProtocol.ACTION_SEND_IMAGE,
             protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
             roomId = roomId,
             imagePaths = imagePaths,
+            imageLeases = imageLeases,
             threadId = threadId,
             threadScope = threadScope,
             requestId = requestId,

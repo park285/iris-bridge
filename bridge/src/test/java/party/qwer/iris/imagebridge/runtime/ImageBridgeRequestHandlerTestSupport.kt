@@ -3,6 +3,9 @@
 package party.qwer.iris.imagebridge.runtime
 
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.ImageLease
+import party.qwer.iris.ImageLeasePayload
+import party.qwer.iris.SignedImageLease
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscoverySnapshot
 import party.qwer.iris.imagebridge.runtime.discovery.DiscoveryHookStatus
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_MULTIPLE
@@ -23,6 +26,7 @@ internal fun sendImageRequest(
     threadScope: Int? = null,
     requestId: String? = "image-request",
     token: String? = null,
+    imageLeases: List<SignedImageLease> = emptyList(),
 ): ImageBridgeProtocol.ImageBridgeRequest =
     ImageBridgeProtocol.buildSendImageRequest(
         roomId = roomId,
@@ -31,6 +35,32 @@ internal fun sendImageRequest(
         threadScope = threadScope,
         requestId = requestId,
         token = token,
+        imageLeases = imageLeases,
+    )
+
+internal fun signedImageLease(
+    secret: String,
+    requestId: String,
+    roomId: Long,
+    canonicalPath: String,
+    imageIndex: Int = 0,
+    expiresAtEpochMs: Long = Long.MAX_VALUE,
+): SignedImageLease =
+    ImageLease.issue(
+        secret,
+        ImageLeasePayload(
+            version = ImageLease.VERSION,
+            requestId = requestId,
+            roomId = roomId,
+            imageIndex = imageIndex,
+            canonicalPath = canonicalPath,
+            sha256Hex = "deadbeef",
+            byteLength = 1L,
+            contentType = "image/png",
+            lastModifiedEpochMs = 1L,
+            expiresAtEpochMs = expiresAtEpochMs,
+            nonce = "$requestId:$imageIndex",
+        ),
     )
 
 internal fun sendTextRequest(

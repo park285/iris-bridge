@@ -8,6 +8,7 @@ data class ImageBridgeRequest(
     val protocolVersion: Int? = null,
     val roomId: Long? = null,
     val imagePaths: List<String> = emptyList(),
+    val imageLeases: List<SignedImageLease> = emptyList(),
     val message: String? = null,
     val markdown: Boolean? = null,
     val mentionsJson: String? = null,

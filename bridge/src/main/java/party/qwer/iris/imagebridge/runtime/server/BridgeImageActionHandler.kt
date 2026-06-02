@@ -10,16 +10,19 @@ internal class BridgeImageActionHandler(
     private val serialExecutor: RoomThreadSerialExecutor,
     private val pathValidator: BridgeImagePathValidator,
     private val metrics: BridgeMetrics,
+    private val leaseVerifier: BridgeImageLeaseVerifier = BridgeImageLeaseVerifier(),
 ) {
     fun handle(
         request: ImageBridgeProtocol.ImageBridgeRequest,
         health: ImageBridgeHealthSnapshot,
     ): ImageBridgeProtocol.ImageBridgeResponse {
         check(health.specStatus.ready) { "bridge spec not ready" }
+        val validatedPaths = pathValidator.validate(request.imagePaths)
+        leaseVerifier.verify(request.imageLeases, validatedPaths)
         val imageRequest =
             ImageSendRequest(
                 roomId = checkNotNull(request.roomId) { "roomId missing" },
-                imagePaths = pathValidator.validate(request.imagePaths),
+                imagePaths = validatedPaths,
                 threadId = request.threadId,
                 threadScope = request.threadScope,
                 requestId = request.requestId,

@@ -5,6 +5,7 @@ package party.qwer.iris.imagebridge.runtime
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.send.ImageSendRequest
 import party.qwer.iris.imagebridge.runtime.send.TextSendRequest
+import party.qwer.iris.imagebridge.runtime.server.BridgeImageLeaseVerifier
 import party.qwer.iris.imagebridge.runtime.server.BridgeImagePathValidator
 import party.qwer.iris.imagebridge.runtime.server.BridgeMetrics
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
@@ -21,7 +22,7 @@ import kotlin.test.assertTrue
 
 class ImageBridgeRequestHandlerSendTest {
     @Test
-    fun `send image request delegates to runtime and returns sent response`() {
+    fun `send image request with valid lease delegates to runtime and returns sent response`() {
         var captured: ImageSendRequest? = null
         val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
         val rootDir = file.parentFile ?: error("temp file parent missing")
@@ -33,6 +34,7 @@ class ImageBridgeRequestHandlerSendTest {
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
                 metrics = metrics,
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token", acceptLegacyRawPath = false),
             )
 
         val response =
@@ -43,6 +45,15 @@ class ImageBridgeRequestHandlerSendTest {
                     threadId = 55L,
                     threadScope = 3,
                     requestId = "req-1",
+                    imageLeases =
+                        listOf(
+                            signedImageLease(
+                                secret = "bridge-token",
+                                requestId = "req-1",
+                                roomId = 123L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
                 ),
             )
 
@@ -56,6 +67,95 @@ class ImageBridgeRequestHandlerSendTest {
         assertEquals(1, health.metrics?.sendSuccess)
         assertEquals("req-1", health.metrics?.lastSendRequestId)
         assertNotNull(health.metrics?.lastSendDurationMs)
+        file.delete()
+    }
+
+    @Test
+    fun `send image request without lease is rejected when legacy raw path is disabled`() {
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called without a valid lease") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token", acceptLegacyRawPath = false),
+            )
+
+        val response =
+            handler.handle(
+                sendImageRequest(
+                    roomId = 123L,
+                    imagePaths = listOf(file.absolutePath),
+                    requestId = "req-no-lease",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        file.delete()
+    }
+
+    @Test
+    fun `send image request without lease is accepted when legacy raw path is enabled`() {
+        var captured: ImageSendRequest? = null
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { request -> captured = request },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token", acceptLegacyRawPath = true),
+            )
+
+        val response =
+            handler.handle(
+                sendImageRequest(
+                    roomId = 123L,
+                    imagePaths = listOf(file.absolutePath),
+                    requestId = "req-legacy",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_SENT, response.status)
+        assertEquals(listOf(file.canonicalPath), captured?.imagePaths?.map { it.canonicalPath })
+        file.delete()
+    }
+
+    @Test
+    fun `send image request with mismatched lease path is rejected`() {
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called for an unauthorized path") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token", acceptLegacyRawPath = false),
+            )
+
+        val response =
+            handler.handle(
+                sendImageRequest(
+                    roomId = 123L,
+                    imagePaths = listOf(file.absolutePath),
+                    requestId = "req-mismatch",
+                    imageLeases =
+                        listOf(
+                            signedImageLease(
+                                secret = "bridge-token",
+                                requestId = "req-mismatch",
+                                roomId = 123L,
+                                canonicalPath = "${file.canonicalPath}.other",
+                            ),
+                        ),
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
         file.delete()
     }
 
