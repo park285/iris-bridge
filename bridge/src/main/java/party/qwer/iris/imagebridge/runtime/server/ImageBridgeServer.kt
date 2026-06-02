@@ -34,7 +34,16 @@ internal class ImageBridgeServer(
     private val bridgeMetrics: BridgeMetrics = BridgeMetrics(),
     private val discoverySnapshotProvider: () -> BridgeDiscoverySnapshot = defaultBridgeDiscovery::snapshot,
 ) {
-    private val muxClientDispatcher = newBridgeMuxClientDispatcher({ clientExecutor }, { requestHandler }, { running.get() }, peerIdentityValidator, bridgeMetrics)
+    private val sessionAdmission: BridgeSessionAdmission = newBridgeSessionAdmission(bridgeMetrics)
+    private val muxClientDispatcher =
+        newBridgeMuxClientDispatcher(
+            { clientExecutor },
+            { requestHandler },
+            { running.get() },
+            peerIdentityValidator,
+            bridgeMetrics,
+            sessionAdmission,
+        )
 
     @Volatile
     private var requestHandler: ImageBridgeRequestHandler? = null

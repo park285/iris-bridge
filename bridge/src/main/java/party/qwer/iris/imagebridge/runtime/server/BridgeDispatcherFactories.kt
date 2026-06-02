@@ -8,6 +8,7 @@ internal fun newBridgeMuxClientDispatcher(
     isRunning: () -> Boolean,
     peerIdentityValidator: BridgePeerIdentityValidator,
     metrics: BridgeMetrics,
+    sessionAdmission: BridgeSessionAdmission = newBridgeSessionAdmission(metrics),
 ): BridgeMuxClientDispatcher =
     BridgeMuxClientDispatcher(
         executorProvider = executorProvider,
@@ -15,4 +16,5 @@ internal fun newBridgeMuxClientDispatcher(
         isRunning = isRunning,
         peerIdentityValidator = peerIdentityValidator,
         metrics = metrics,
+        sessionAdmission = sessionAdmission,
     )
