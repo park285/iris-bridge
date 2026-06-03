@@ -135,14 +135,21 @@ object ImageLease {
                 0x0C -> out.append("\\f")
                 else ->
                     if (ch.code < 0x20) {
-                        out.append("\\u")
-                        for (shift in intArrayOf(12, 8, 4, 0)) {
-                            out.append(HEX_DIGITS[(ch.code shr shift) and 0xF])
-                        }
+                        appendUnicodeEscape(out, ch.code)
                     } else {
                         out.append(ch)
                     }
             }
+        }
+    }
+
+    private fun appendUnicodeEscape(
+        out: StringBuilder,
+        code: Int,
+    ) {
+        out.append("\\u")
+        for (shift in intArrayOf(12, 8, 4, 0)) {
+            out.append(HEX_DIGITS[(code shr shift) and 0xF])
         }
     }
 
