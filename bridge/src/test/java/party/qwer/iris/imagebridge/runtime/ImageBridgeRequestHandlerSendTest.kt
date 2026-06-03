@@ -34,7 +34,7 @@ class ImageBridgeRequestHandlerSendTest {
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
                 metrics = metrics,
-                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token", acceptLegacyRawPath = false),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token"),
             )
 
         val response =
@@ -71,7 +71,7 @@ class ImageBridgeRequestHandlerSendTest {
     }
 
     @Test
-    fun `send image request without lease is rejected when legacy raw path is disabled`() {
+    fun `send image request without lease is rejected`() {
         val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
         val rootDir = file.parentFile ?: error("temp file parent missing")
         val handler =
@@ -80,7 +80,7 @@ class ImageBridgeRequestHandlerSendTest {
                 healthProvider = { readyHealthSnapshot() },
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
-                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token", acceptLegacyRawPath = false),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token"),
             )
 
         val response =
@@ -97,17 +97,17 @@ class ImageBridgeRequestHandlerSendTest {
     }
 
     @Test
-    fun `send image request without lease is accepted when legacy raw path is enabled`() {
-        var captured: ImageSendRequest? = null
+    fun `send image request without lease does not invoke sender`() {
+        val senderCalled = AtomicBoolean(false)
         val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
         val rootDir = file.parentFile ?: error("temp file parent missing")
         val handler =
             ImageBridgeRequestHandler(
-                imageSender = { request -> captured = request },
+                imageSender = { senderCalled.set(true) },
                 healthProvider = { readyHealthSnapshot() },
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
-                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token", acceptLegacyRawPath = true),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token"),
             )
 
         val response =
@@ -119,8 +119,8 @@ class ImageBridgeRequestHandlerSendTest {
                 ),
             )
 
-        assertEquals(ImageBridgeProtocol.STATUS_SENT, response.status)
-        assertEquals(listOf(file.canonicalPath), captured?.imagePaths?.map { it.canonicalPath })
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertFalse(senderCalled.get(), "sender must not run without a valid lease")
         file.delete()
     }
 
@@ -134,7 +134,7 @@ class ImageBridgeRequestHandlerSendTest {
                 healthProvider = { readyHealthSnapshot() },
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
-                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token", acceptLegacyRawPath = false),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token"),
             )
 
         val response =

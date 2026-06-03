@@ -13,11 +13,14 @@ import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_SINGLE
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_ENTRY
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_INJECT
 import party.qwer.iris.imagebridge.runtime.server.BridgeHandshakeValidator
+import party.qwer.iris.imagebridge.runtime.server.BridgeImageLeaseVerifier
 import party.qwer.iris.imagebridge.runtime.server.BridgeSecurityMode
 import party.qwer.iris.imagebridge.runtime.server.BridgeSpecStatus
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitiesSnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitySnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeHealthSnapshot
+
+private const val TEST_BRIDGE_TOKEN = "bridge-token"
 
 internal fun sendImageRequest(
     roomId: Long,
@@ -61,6 +64,22 @@ internal fun signedImageLease(
             expiresAtEpochMs = expiresAtEpochMs,
             nonce = "$requestId:$imageIndex",
         ),
+    )
+
+internal fun testImageLeaseVerifier(): BridgeImageLeaseVerifier = BridgeImageLeaseVerifier(expectedToken = TEST_BRIDGE_TOKEN)
+
+internal fun signedTestImageLease(
+    requestId: String,
+    roomId: Long,
+    canonicalPath: String,
+    imageIndex: Int = 0,
+): SignedImageLease =
+    signedImageLease(
+        secret = TEST_BRIDGE_TOKEN,
+        requestId = requestId,
+        roomId = roomId,
+        canonicalPath = canonicalPath,
+        imageIndex = imageIndex,
     )
 
 internal fun sendTextRequest(

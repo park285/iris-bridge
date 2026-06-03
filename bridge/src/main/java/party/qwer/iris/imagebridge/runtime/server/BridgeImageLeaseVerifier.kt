@@ -6,8 +6,6 @@ import party.qwer.iris.SignedImageLease
 
 internal class BridgeImageLeaseVerifier(
     private val expectedToken: String = party.qwer.iris.resolveBridgeToken(),
-    private val acceptLegacyRawPath: Boolean =
-        System.getenv("IRIS_BRIDGE_ACCEPT_LEGACY_IMAGE_PATH") == "1",
     private val nowEpochMs: () -> Long = { System.currentTimeMillis() },
 ) {
     fun verify(
@@ -15,10 +13,7 @@ internal class BridgeImageLeaseVerifier(
         validatedPaths: List<ValidatedBridgeImagePath>,
     ) {
         if (leases.isEmpty()) {
-            require(acceptLegacyRawPath) {
-                "image lease required: set IRIS_BRIDGE_ACCEPT_LEGACY_IMAGE_PATH=1 to accept legacy raw path during migration"
-            }
-            return
+            error("image lease required")
         }
         require(expectedToken.isNotBlank()) { "bridge token must be configured to verify image leases" }
         val now = nowEpochMs()

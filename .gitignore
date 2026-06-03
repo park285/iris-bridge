@@ -69,7 +69,9 @@ docs/closeout-*.tar.gz
 !/.github/workflows/
 !/.github/workflows/closeout-replay.yml
 !/.github/actionlint.yaml
-/artifacts/
+/artifacts/*
+!/artifacts/design-10/
+!/artifacts/design-10/**
 /AGENTS.md
 /CLAUDE.md
 /review.txt

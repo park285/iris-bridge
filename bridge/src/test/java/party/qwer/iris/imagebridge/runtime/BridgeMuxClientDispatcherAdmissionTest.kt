@@ -16,7 +16,7 @@ import party.qwer.iris.imagebridge.runtime.server.BridgeSecurityMode
 import party.qwer.iris.imagebridge.runtime.server.BridgeSessionAdmission
 import party.qwer.iris.imagebridge.runtime.server.BridgeSocketHandshakeAuthenticator
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
-import party.qwer.iris.imagebridge.runtime.server.RawThreadBridgeSessionAdmission
+import party.qwer.iris.imagebridge.runtime.server.newBridgeSessionAdmission
 import party.qwer.iris.imagebridge.runtime.server.newBridgeSessionExecutor
 import java.io.ByteArrayInputStream
 import java.util.concurrent.CountDownLatch
@@ -117,11 +117,19 @@ class BridgeMuxClientDispatcherAdmissionTest {
     }
 
     @Test
-    fun `raw thread admission path runs session work`() {
-        val admission = RawThreadBridgeSessionAdmission()
-        val ran = CountDownLatch(1)
-        assertTrue(admission.tryExecute { ran.countDown() })
-        assertTrue(ran.await(2, TimeUnit.SECONDS), "raw-thread rollback path must run work")
+    fun `admission factory creates bounded sessions`() {
+        val executor = newBridgeSessionExecutor(1)
+        try {
+            val admission =
+                newBridgeSessionAdmission(
+                    metrics = BridgeMetrics(),
+                    executorProvider = { executor },
+                )
+
+            assertTrue(admission is BoundedBridgeSessionAdmission, "bridge sessions must stay bounded")
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     private fun dispatcher(

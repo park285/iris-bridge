@@ -92,8 +92,22 @@ class ImageBridgeRequestHandlerDedupeTest {
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
                 metrics = metrics,
+                leaseVerifier = testImageLeaseVerifier(),
             )
-        val request = sendImageRequest(roomId = 123L, imagePaths = listOf(file.absolutePath), requestId = "dedupe-image-1")
+        val request =
+            sendImageRequest(
+                roomId = 123L,
+                imagePaths = listOf(file.absolutePath),
+                requestId = "dedupe-image-1",
+                imageLeases =
+                    listOf(
+                        signedTestImageLease(
+                            requestId = "dedupe-image-1",
+                            roomId = 123L,
+                            canonicalPath = file.canonicalPath,
+                        ),
+                    ),
+            )
 
         val first = handler.handle(request)
         val second = handler.handle(request)

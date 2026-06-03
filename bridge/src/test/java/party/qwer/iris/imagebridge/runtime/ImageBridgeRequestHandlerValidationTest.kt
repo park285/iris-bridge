@@ -148,12 +148,24 @@ class ImageBridgeRequestHandlerValidationTest {
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
                 metrics = metrics,
+                leaseVerifier = testImageLeaseVerifier(),
                 logError = { _, _, _ -> },
             )
 
         val response =
             handler.handle(
-                sendImageRequest(roomId = 1L, imagePaths = listOf(file.absolutePath)),
+                sendImageRequest(
+                    roomId = 1L,
+                    imagePaths = listOf(file.absolutePath),
+                    imageLeases =
+                        listOf(
+                            signedTestImageLease(
+                                requestId = "image-request",
+                                roomId = 1L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
+                ),
             )
 
         assertEquals("failed", response.status)

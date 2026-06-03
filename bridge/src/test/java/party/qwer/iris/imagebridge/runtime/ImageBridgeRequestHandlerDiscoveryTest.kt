@@ -44,12 +44,24 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                 },
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = testImageLeaseVerifier(),
                 logError = { _, _, _ -> },
             )
 
         val response =
             handler.handle(
-                sendImageRequest(roomId = 1L, imagePaths = listOf(file.absolutePath)),
+                sendImageRequest(
+                    roomId = 1L,
+                    imagePaths = listOf(file.absolutePath),
+                    imageLeases =
+                        listOf(
+                            signedTestImageLease(
+                                requestId = "image-request",
+                                roomId = 1L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
+                ),
             )
 
         assertEquals("sent", response.status)
@@ -79,12 +91,24 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                 },
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = testImageLeaseVerifier(),
                 logError = { _, _, _ -> },
             )
 
         val response =
             handler.handle(
-                sendImageRequest(roomId = 1L, imagePaths = listOf(file.absolutePath)),
+                sendImageRequest(
+                    roomId = 1L,
+                    imagePaths = listOf(file.absolutePath),
+                    imageLeases =
+                        listOf(
+                            signedTestImageLease(
+                                requestId = "image-request",
+                                roomId = 1L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
+                ),
             )
 
         assertEquals("failed", response.status)
@@ -110,12 +134,24 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                 },
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = testImageLeaseVerifier(),
                 logError = { _, _, _ -> },
             )
 
         val response =
             handler.handle(
-                sendImageRequest(roomId = 1L, imagePaths = listOf(file.absolutePath)),
+                sendImageRequest(
+                    roomId = 1L,
+                    imagePaths = listOf(file.absolutePath),
+                    imageLeases =
+                        listOf(
+                            signedTestImageLease(
+                                requestId = "image-request",
+                                roomId = 1L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
+                ),
             )
 
         assertEquals("failed", response.status)
@@ -149,6 +185,7 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                 },
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = testImageLeaseVerifier(),
                 logError = { _, _, _ -> },
             )
 
@@ -159,6 +196,14 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                     imagePaths = listOf(file.absolutePath),
                     threadId = 55L,
                     threadScope = 2,
+                    imageLeases =
+                        listOf(
+                            signedTestImageLease(
+                                requestId = "image-request",
+                                roomId = 1L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
                 ),
             )
 
@@ -193,6 +238,7 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                 },
                 handshakeValidator = developmentHandshakeValidator(),
                 pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = testImageLeaseVerifier(),
                 logError = { _, _, _ -> },
             )
 
@@ -203,6 +249,14 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                     imagePaths = listOf(file.absolutePath),
                     threadId = 55L,
                     threadScope = 2,
+                    imageLeases =
+                        listOf(
+                            signedTestImageLease(
+                                requestId = "image-request",
+                                roomId = 1L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
                 ),
             )
 
