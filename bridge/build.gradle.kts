@@ -137,7 +137,7 @@ tasks.register<JacocoReport>("jacocoDebugUnitTestReport") {
     sourceDirectories.setFrom(files("src/main/java", "src/main/kotlin"))
     classDirectories.setFrom(
         files(
-            fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) {
+            fileTree(layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")) {
                 exclude(jacocoDebugExcludes)
             },
             fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes")) {
@@ -154,7 +154,7 @@ tasks.register<JacocoCoverageVerification>("jacocoDebugUnitTestCoverageVerificat
     sourceDirectories.setFrom(files("src/main/java", "src/main/kotlin"))
     classDirectories.setFrom(
         files(
-            fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) {
+            fileTree(layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")) {
                 exclude(jacocoDebugExcludes)
             },
             fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes")) {
