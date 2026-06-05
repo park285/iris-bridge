@@ -160,6 +160,130 @@ class ImageBridgeRequestHandlerSendTest {
     }
 
     @Test
+    fun `send image request with lease for another room is rejected`() {
+        val senderCalled = AtomicBoolean(false)
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { senderCalled.set(true) },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token"),
+            )
+
+        val response =
+            handler.handle(
+                sendImageRequest(
+                    roomId = 123L,
+                    imagePaths = listOf(file.absolutePath),
+                    requestId = "req-room-mismatch",
+                    imageLeases =
+                        listOf(
+                            signedImageLease(
+                                secret = "bridge-token",
+                                requestId = "req-room-mismatch",
+                                roomId = 999L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertFalse(senderCalled.get(), "sender must not run for a lease signed for another room")
+        file.delete()
+    }
+
+    @Test
+    fun `send image request with mismatched lease digest is rejected`() {
+        val senderCalled = AtomicBoolean(false)
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { senderCalled.set(true) },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token"),
+            )
+
+        val response =
+            handler.handle(
+                sendImageRequest(
+                    roomId = 123L,
+                    imagePaths = listOf(file.absolutePath),
+                    requestId = "req-digest-mismatch",
+                    imageLeases =
+                        listOf(
+                            signedImageLease(
+                                secret = "bridge-token",
+                                requestId = "req-digest-mismatch",
+                                roomId = 123L,
+                                canonicalPath = file.canonicalPath,
+                                sha256Hex = "0".repeat(64),
+                            ),
+                        ),
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertFalse(senderCalled.get(), "sender must not run for a lease signed for different bytes")
+        file.delete()
+    }
+
+    @Test
+    fun `replayed image lease is rejected within verifier ttl`() {
+        var firstSendCount = 0
+        val secondSenderCalled = AtomicBoolean(false)
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val verifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token")
+        val firstHandler =
+            ImageBridgeRequestHandler(
+                imageSender = { firstSendCount += 1 },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = verifier,
+            )
+        val secondHandler =
+            ImageBridgeRequestHandler(
+                imageSender = { secondSenderCalled.set(true) },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = verifier,
+            )
+        val request =
+            sendImageRequest(
+                roomId = 123L,
+                imagePaths = listOf(file.absolutePath),
+                requestId = "req-replay",
+                imageLeases =
+                    listOf(
+                        signedImageLease(
+                            secret = "bridge-token",
+                            requestId = "req-replay",
+                            roomId = 123L,
+                            canonicalPath = file.canonicalPath,
+                        ),
+                    ),
+            )
+
+        val first = firstHandler.handle(request)
+        val second = secondHandler.handle(request)
+
+        assertEquals(ImageBridgeProtocol.STATUS_SENT, first.status)
+        assertEquals(1, firstSendCount)
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, second.status)
+        assertFalse(secondSenderCalled.get(), "sender must not run for a consumed image lease nonce")
+        file.delete()
+    }
+
+    @Test
     fun `send text request delegates to text sender and returns sent response`() {
         var captured: TextSendRequest? = null
         val handler =

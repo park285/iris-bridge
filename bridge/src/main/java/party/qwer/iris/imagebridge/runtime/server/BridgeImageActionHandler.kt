@@ -18,14 +18,16 @@ internal class BridgeImageActionHandler(
     ): ImageBridgeProtocol.ImageBridgeResponse {
         check(health.specStatus.ready) { "bridge spec not ready" }
         val validatedPaths = pathValidator.validate(request.imagePaths)
-        leaseVerifier.verify(request.imageLeases, validatedPaths)
+        val roomId = checkNotNull(request.roomId) { "roomId missing" }
+        val requestId = checkNotNull(request.requestId) { "requestId missing" }
+        leaseVerifier.verify(roomId, requestId, request.imageLeases, validatedPaths)
         val imageRequest =
             ImageSendRequest(
-                roomId = checkNotNull(request.roomId) { "roomId missing" },
+                roomId = roomId,
                 imagePaths = validatedPaths,
                 threadId = request.threadId,
                 threadScope = request.threadScope,
-                requestId = request.requestId,
+                requestId = requestId,
             )
         health.discoverySnapshot
             .sendBlockReason(
@@ -40,6 +42,6 @@ internal class BridgeImageActionHandler(
         }
         val completedAtEpochMs = System.currentTimeMillis()
         metrics.recordSendSuccess(completedAtEpochMs, completedAtEpochMs - startedAtEpochMs)
-        return ImageBridgeProtocol.buildSuccessResponse(request.requestId)
+        return ImageBridgeProtocol.buildSuccessResponse(requestId)
     }
 }

@@ -19,6 +19,8 @@ import party.qwer.iris.imagebridge.runtime.server.BridgeSpecStatus
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitiesSnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitySnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeHealthSnapshot
+import java.io.File
+import java.security.MessageDigest
 
 private const val TEST_BRIDGE_TOKEN = "bridge-token"
 
@@ -48,6 +50,10 @@ internal fun signedImageLease(
     canonicalPath: String,
     imageIndex: Int = 0,
     expiresAtEpochMs: Long = Long.MAX_VALUE,
+    sha256Hex: String = fileSha256HexOrFixture(canonicalPath),
+    byteLength: Long = fileLengthOrFixture(canonicalPath),
+    lastModifiedEpochMs: Long = fileLastModifiedOrFixture(canonicalPath),
+    nonce: String = "$requestId:$imageIndex",
 ): SignedImageLease =
     ImageLease.issue(
         secret,
@@ -57,14 +63,43 @@ internal fun signedImageLease(
             roomId = roomId,
             imageIndex = imageIndex,
             canonicalPath = canonicalPath,
-            sha256Hex = "deadbeef",
-            byteLength = 1L,
+            sha256Hex = sha256Hex,
+            byteLength = byteLength,
             contentType = "image/png",
-            lastModifiedEpochMs = 1L,
+            lastModifiedEpochMs = lastModifiedEpochMs,
             expiresAtEpochMs = expiresAtEpochMs,
-            nonce = "$requestId:$imageIndex",
+            nonce = nonce,
         ),
     )
+
+private fun fileSha256HexOrFixture(canonicalPath: String): String {
+    val file = File(canonicalPath)
+    if (!file.isFile) return "deadbeef"
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().toHex()
+}
+
+private fun fileLengthOrFixture(canonicalPath: String): Long =
+    File(canonicalPath)
+        .takeIf { it.isFile }
+        ?.length()
+        ?: 1L
+
+private fun fileLastModifiedOrFixture(canonicalPath: String): Long =
+    File(canonicalPath)
+        .takeIf { it.isFile }
+        ?.lastModified()
+        ?: 1L
+
+private fun ByteArray.toHex(): String = joinToString(separator = "") { byte -> "%02x".format(byte) }
 
 internal fun testImageLeaseVerifier(): BridgeImageLeaseVerifier = BridgeImageLeaseVerifier(expectedToken = TEST_BRIDGE_TOKEN)
 
