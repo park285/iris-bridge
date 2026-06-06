@@ -235,6 +235,50 @@ class ImageBridgeRequestHandlerSendTest {
     }
 
     @Test
+    fun `send image request with mismatched lease mtime is rejected with expected and actual values`() {
+        val senderCalled = AtomicBoolean(false)
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val actualLastModified = file.lastModified()
+        val expectedLastModified = actualLastModified - 1000
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { senderCalled.set(true) },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token"),
+            )
+
+        val response =
+            handler.handle(
+                sendImageRequest(
+                    roomId = 123L,
+                    imagePaths = listOf(file.absolutePath),
+                    requestId = "req-mtime-mismatch",
+                    imageLeases =
+                        listOf(
+                            signedImageLease(
+                                secret = "bridge-token",
+                                requestId = "req-mtime-mismatch",
+                                roomId = 123L,
+                                canonicalPath = file.canonicalPath,
+                                lastModifiedEpochMs = expectedLastModified,
+                            ),
+                        ),
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals(
+            "image lease last modified mismatch: ${file.canonicalPath} expected=$expectedLastModified actual=$actualLastModified",
+            response.error,
+        )
+        assertFalse(senderCalled.get(), "sender must not run for a lease signed for a different mtime")
+        file.delete()
+    }
+
+    @Test
     fun `replayed image lease is rejected within verifier ttl`() {
         var firstSendCount = 0
         val secondSenderCalled = AtomicBoolean(false)

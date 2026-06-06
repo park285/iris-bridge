@@ -80,7 +80,7 @@ internal class BridgeImageLeaseVerifier(
             "image lease byte length mismatch: ${payload.canonicalPath}"
         }
         require(payload.lastModifiedEpochMs == facts.lastModifiedEpochMs) {
-            "image lease last modified mismatch: ${payload.canonicalPath}"
+            "image lease last modified mismatch: ${payload.canonicalPath} expected=${payload.lastModifiedEpochMs} actual=${facts.lastModifiedEpochMs}"
         }
         require(payload.sha256Hex.equals(facts.sha256Hex, ignoreCase = true)) {
             "image lease digest mismatch: ${payload.canonicalPath}"
