@@ -5,6 +5,7 @@ import android.util.Log
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
@@ -49,6 +50,10 @@ class IrisBridgeModule : XposedModule() {
         classLoader: ClassLoader,
     ) {
         Log.i(TAG, "Application.onCreate — starting image bridge server")
+        runCatching {
+            System.loadLibrary("iris_bridge_core")
+            Log.i(TAG, "bridge-core abi=${BridgeCore.nativeAbiVersion()} loaded")
+        }.onFailure { Log.e(TAG, "bridge-core load failed", it) }
         val discovery = discoverKakaoClassRegistryForBridge { KakaoClassRegistry.discover(classLoader) }
         discovery.registry?.let { defaultBridgeDiscovery.install(it, hookInstaller) }
         markdownHooks.install(classLoader, discovery.registry, hookInstaller)
