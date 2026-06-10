@@ -28,7 +28,7 @@ internal class BridgeSocketHandshakeAuthenticator private constructor(
         if (!core.requireHandshake) return
         try {
             val helloPayload = LengthPrefixedFrameCodec.readPayload(input)
-            val helloEnvelope = core.handshakeOnHello(helloPayload, System.currentTimeMillis())
+            val helloEnvelope = core.handshakeOnHello(helloPayload, System.currentTimeMillis(), socketName)
             val serverFrameJson =
                 helloEnvelope.string("frameJson")?.takeIf { helloEnvelope.isOk }
                     ?: throw IllegalArgumentException(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED)

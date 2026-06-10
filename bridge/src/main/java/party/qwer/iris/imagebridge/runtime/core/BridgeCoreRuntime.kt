@@ -26,7 +26,8 @@ class BridgeCoreRuntime internal constructor(
     fun handshakeOnHello(
         frameJson: String,
         nowMs: Long,
-    ): BridgeCoreEnvelope = dispatch { BridgeCore.nativeHandshakeOnHello(handle, frameJson, nowMs) }
+        socketName: String,
+    ): BridgeCoreEnvelope = dispatch { BridgeCore.nativeHandshakeOnHello(handle, frameJson, nowMs, socketName) }
 
     fun handshakeOnClientProof(frameJson: String): BridgeCoreEnvelope = dispatch { BridgeCore.nativeHandshakeOnClientProof(handle, frameJson) }
 

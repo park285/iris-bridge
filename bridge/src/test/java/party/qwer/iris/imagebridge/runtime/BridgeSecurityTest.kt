@@ -145,6 +145,38 @@ class BridgeSecurityTest {
     }
 
     @Test
+    fun `socket authenticator binds the server proof to the caller socket name`() {
+        val runtime = productionHandshakeRuntime()
+        try {
+            val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
+            val outcome =
+                driveHandshake(authenticator, clientNonce = "client-nonce") { serverNonce ->
+                    ImageBridgeHandshakeProtocol.buildClientProof(
+                        bridgeToken = "bridge-token",
+                        clientNonce = "client-nonce",
+                        serverNonce = serverNonce,
+                    )
+                }
+
+            assertNull(outcome.failure, "authenticator must accept the production handshake")
+            val serverProofFrame = assertNotNull(outcome.serverProofFrame)
+            val serverNonce = assertNotNull(serverProofFrame.serverNonce)
+            assertEquals(
+                ImageBridgeHandshakeProtocol.serverProof(
+                    bridgeToken = "bridge-token",
+                    clientNonce = "client-nonce",
+                    serverNonce = serverNonce,
+                    socketName = "iris-image-bridge-mux",
+                ),
+                serverProofFrame.proof,
+                "server proof must bind the socket name the caller passed to authenticate()",
+            )
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
     fun `socket authenticator rejects client proof built with a wrong token`() {
         val runtime = productionHandshakeRuntime()
         try {

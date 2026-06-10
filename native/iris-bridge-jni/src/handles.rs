@@ -7,8 +7,6 @@ use iris_bridge_core::server::{
     DedupeLedger, HandshakeServer, LeaseLedger, Rejection, SecurityMode,
 };
 
-const BRIDGE_MUX_SOCKET_NAME: &str = "@iris-image-bridge-mux";
-
 pub const ERROR_INVALID_HANDLE: &str = "INVALID_HANDLE";
 
 pub const MAX_HANDSHAKE_SESSIONS: usize = 64;
@@ -71,12 +69,10 @@ impl BridgeCoreContext {
         &self,
         frame_json: &str,
         now_ms: i64,
+        socket_name: &str,
     ) -> Result<String, Rejection> {
-        let mut session = HandshakeServer::new(
-            self.bridge_token.clone(),
-            BRIDGE_MUX_SOCKET_NAME,
-            self.nonce_provider,
-        );
+        let mut session =
+            HandshakeServer::new(self.bridge_token.clone(), socket_name, self.nonce_provider);
         let frame = session.on_hello(frame_json, now_ms)?;
         {
             let mut sessions = self.lock_sessions();

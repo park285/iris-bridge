@@ -108,7 +108,7 @@ class BridgeCoreRuntimeTest {
         assertFalse(token.isOk, "token validation must fail closed after close")
         assertEquals("BRIDGE_CORE_CLOSED", token.errorCode)
 
-        val hello = runtime.handshakeOnHello("""{"type":"hello","protocolVersion":1,"clientNonce":"aa","socketName":"@iris-image-bridge-mux","timestampMs":1}""", 1L)
+        val hello = runtime.handshakeOnHello("""{"type":"hello","protocolVersion":1,"clientNonce":"aa","socketName":"@iris-image-bridge-mux","timestampMs":1}""", 1L, "@iris-image-bridge-mux")
         assertFalse(hello.isOk)
         assertEquals("BRIDGE_CORE_CLOSED", hello.errorCode)
 
@@ -163,7 +163,7 @@ class BridgeCoreRuntimeTest {
         try {
             val helloFrame =
                 """{"type":"hello","protocolVersion":1,"clientNonce":"client-nonce","socketName":"@iris-image-bridge-mux","timestampMs":1}"""
-            val helloEnvelope = BridgeCoreEnvelope.parse(BridgeCore.nativeHandshakeOnHello(runtime.handle, helloFrame, 1_000L))
+            val helloEnvelope = BridgeCoreEnvelope.parse(BridgeCore.nativeHandshakeOnHello(runtime.handle, helloFrame, 1_000L, "@iris-image-bridge-mux"))
             assertTrue(helloEnvelope.isOk, "hello must be accepted: ${helloEnvelope.errorMessage}")
 
             val serverFrameJson = assertNotNull(helloEnvelope.string("frameJson"))

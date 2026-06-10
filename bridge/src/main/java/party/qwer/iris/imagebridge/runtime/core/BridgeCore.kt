@@ -15,6 +15,7 @@ object BridgeCore {
         handle: Long,
         frameJson: String,
         nowMs: Long,
+        socketName: String,
     ): String
 
     external fun nativeHandshakeOnClientProof(

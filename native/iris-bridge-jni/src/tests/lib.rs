@@ -1,6 +1,6 @@
 use super::*;
 use crate::handles::MAX_HANDSHAKE_SESSIONS;
-use iris_bridge_core::handshake::{HandshakeFrame, client_proof};
+use iris_bridge_core::handshake::{HandshakeFrame, client_proof, server_proof};
 use iris_bridge_core::lease::{ImageLease, ImageLeasePayload};
 use serde_json::{Value, json};
 
@@ -163,16 +163,38 @@ fn dedupe_admit_reports_fresh_in_flight_and_cached_states() {
 }
 
 #[test]
+fn handshake_server_proof_binds_caller_socket_name() {
+    let ctx = context();
+    let hello = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-1","socketName":"iris-image-bridge-mux","timestampMs":1}"#;
+    let response = assert_ok(&dispatch_handshake_on_hello(
+        &ctx,
+        hello,
+        1,
+        "iris-image-bridge-mux",
+    ));
+    let frame: HandshakeFrame =
+        serde_json::from_str(response["frameJson"].as_str().expect("frame json"))
+            .expect("server frame");
+    let expected = server_proof(
+        TOKEN,
+        "client-1",
+        frame.server_nonce.as_deref().expect("server nonce"),
+        "iris-image-bridge-mux",
+    );
+    assert_eq!(frame.proof.as_deref(), Some(expected.as_str()));
+}
+
+#[test]
 fn handshake_registry_keeps_concurrent_sessions_independent() {
     let ctx = context();
     let hello_1 = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-1","socketName":"@mux","timestampMs":1}"#;
     let hello_2 = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-2","socketName":"@mux","timestampMs":2}"#;
 
-    let response_1 = assert_ok(&dispatch_handshake_on_hello(&ctx, hello_1, 1));
+    let response_1 = assert_ok(&dispatch_handshake_on_hello(&ctx, hello_1, 1, "@mux"));
     let frame_1: HandshakeFrame =
         serde_json::from_str(response_1["frameJson"].as_str().expect("frame json"))
             .expect("server frame 1");
-    let response_2 = assert_ok(&dispatch_handshake_on_hello(&ctx, hello_2, 2));
+    let response_2 = assert_ok(&dispatch_handshake_on_hello(&ctx, hello_2, 2, "@mux"));
     let frame_2: HandshakeFrame =
         serde_json::from_str(response_2["frameJson"].as_str().expect("frame json"))
             .expect("server frame 2");
@@ -250,7 +272,7 @@ fn require_handshake_reflects_resolved_policy() {
 fn handshake_registry_evicts_oldest_session_beyond_capacity() {
     let ctx = context();
     let oldest_hello = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-oldest","socketName":"@mux","timestampMs":1}"#;
-    let oldest = assert_ok(&dispatch_handshake_on_hello(&ctx, oldest_hello, 1));
+    let oldest = assert_ok(&dispatch_handshake_on_hello(&ctx, oldest_hello, 1, "@mux"));
     let oldest_frame: HandshakeFrame =
         serde_json::from_str(oldest["frameJson"].as_str().expect("frame json"))
             .expect("oldest server frame");
@@ -259,7 +281,7 @@ fn handshake_registry_evicts_oldest_session_beyond_capacity() {
         let hello = format!(
             r#"{{"type":"hello","protocolVersion":1,"clientNonce":"client-{index}","socketName":"@mux","timestampMs":2}}"#
         );
-        assert_ok(&dispatch_handshake_on_hello(&ctx, &hello, 2));
+        assert_ok(&dispatch_handshake_on_hello(&ctx, &hello, 2, "@mux"));
     }
 
     let oldest_proof = client_proof(

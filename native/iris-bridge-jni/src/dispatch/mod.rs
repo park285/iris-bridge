@@ -87,9 +87,10 @@ pub fn dispatch_handshake_on_hello(
     context: &BridgeCoreContext,
     frame_json: &str,
     now_ms: i64,
+    socket_name: &str,
 ) -> String {
     json_catch_unwind(|| {
-        let frame = context.open_handshake_session(frame_json, now_ms)?;
+        let frame = context.open_handshake_session(frame_json, now_ms, socket_name)?;
         Ok(json!({ "frameJson": frame }))
     })
 }

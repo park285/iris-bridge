@@ -17,11 +17,13 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
     handle: jlong,
     frame_json: JString<'local>,
     now_ms: jlong,
+    socket_name: JString<'local>,
 ) -> jni::sys::jstring {
     catch_jstring(&mut env, |env| {
         let frame = read_string(env, &frame_json);
+        let socket = read_string(env, &socket_name);
         let envelope = match with_context(handle, |context| {
-            dispatch_handshake_on_hello(context, &frame, now_ms)
+            dispatch_handshake_on_hello(context, &frame, now_ms, &socket)
         }) {
             Ok(envelope) => envelope,
             Err(rejection) => invalid_handle_envelope(&rejection),
