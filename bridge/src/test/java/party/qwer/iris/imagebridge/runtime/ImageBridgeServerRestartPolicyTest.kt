@@ -23,6 +23,8 @@ class ImageBridgeServerRestartPolicyTest {
 
     @Test
     fun `restart delay grows exponentially and caps`() {
+        assertEquals(1_000L, defaultImageBridgeServer.nextBridgeRestartDelayMs(0))
+        assertEquals(1_000L, defaultImageBridgeServer.nextBridgeRestartDelayMs(-3))
         assertEquals(1_000L, defaultImageBridgeServer.nextBridgeRestartDelayMs(1))
         assertEquals(2_000L, defaultImageBridgeServer.nextBridgeRestartDelayMs(2))
         assertEquals(4_000L, defaultImageBridgeServer.nextBridgeRestartDelayMs(3))

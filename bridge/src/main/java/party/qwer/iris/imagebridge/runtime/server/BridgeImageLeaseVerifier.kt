@@ -6,9 +6,8 @@ import party.qwer.iris.ImageLeasePayload
 import party.qwer.iris.SignedImageLease
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.imageLeaseRejectionIsStateError
 import party.qwer.iris.imagebridge.runtime.core.loadOrNull
-import java.io.File
-import java.security.MessageDigest
 
 internal class BridgeImageLeaseVerifier private constructor(
     private val bridgeCoreProvider: () -> BridgeCoreRuntime?,
@@ -31,7 +30,7 @@ internal class BridgeImageLeaseVerifier private constructor(
         validatedPaths: List<ValidatedBridgeImagePath>,
     ) {
         val core = bridgeCoreProvider() ?: error("bridge core unavailable to verify image leases")
-        val factsJson = factsJsonFor(validatedPaths)
+        val factsJson = factsJsonFor(core, validatedPaths)
         val leasesJson = leasesJsonFor(leases)
         val envelope = core.verifyLeases(requestRoomId, requestId, leasesJson, factsJson, nowEpochMs())
         if (!envelope.isOk) {
@@ -65,43 +64,23 @@ internal class BridgeImageLeaseVerifier private constructor(
             .put("expiresAtEpochMs", payload.expiresAtEpochMs)
             .put("nonce", payload.nonce)
 
-    private fun factsJsonFor(validatedPaths: List<ValidatedBridgeImagePath>): String {
-        val facts = JSONArray()
-        validatedPaths.forEach { path ->
-            val file = File(path.canonicalPath)
-            require(file.isFile) { "image file not found: ${path.canonicalPath}" }
-            facts.put(
-                JSONObject()
-                    .put("canonical_path", path.canonicalPath)
-                    .put("sha256_hex", sha256Hex(file))
-                    .put("byte_length", file.length())
-                    .put("last_modified_epoch_ms", file.lastModified()),
-            )
+    private fun factsJsonFor(
+        core: BridgeCoreRuntime,
+        validatedPaths: List<ValidatedBridgeImagePath>,
+    ): String {
+        val envelope = core.imageLeaseFactsJson(validatedPaths.map { path -> path.canonicalPath })
+        if (!envelope.isOk) {
+            throw leaseRejection(envelope.errorMessage ?: "image lease facts generation failed")
         }
-        return facts.toString()
-    }
-
-    private fun sha256Hex(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().toHex()
+        return envelope.string("factsJson") ?: throw leaseRejection("image lease facts missing")
     }
 
     private fun leaseRejection(message: String): RuntimeException =
-        if (message == "image lease required" || message.startsWith("image lease verification failed:")) {
+        if (BridgeCore.imageLeaseRejectionIsStateError(message)) {
             IllegalStateException(message)
         } else {
             IllegalArgumentException(message)
         }
-
-    private fun ByteArray.toHex(): String = joinToString(separator = "") { byte -> "%02x".format(byte) }
 }
 
 private fun bridgeCoreProviderFor(expectedToken: String): () -> BridgeCoreRuntime? {

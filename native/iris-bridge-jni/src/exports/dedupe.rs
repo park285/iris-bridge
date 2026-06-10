@@ -9,7 +9,7 @@ use crate::handles::with_context;
 use crate::marshal::{catch_jstring, read_string, return_string};
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeDedupeAdmit<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniLease_nativeDedupeAdmit<
     'local,
 >(
     mut env: JNIEnv<'local>,
@@ -31,7 +31,7 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeDedupeComplete<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniLease_nativeDedupeComplete<
     'local,
 >(
     mut env: JNIEnv<'local>,

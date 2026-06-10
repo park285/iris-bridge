@@ -3,6 +3,9 @@ use crate::handles::MAX_HANDSHAKE_SESSIONS;
 use iris_bridge_core::handshake::{HandshakeFrame, client_proof, server_proof};
 use iris_bridge_core::lease::{ImageLease, ImageLeasePayload};
 use serde_json::{Value, json};
+use std::fs;
+use std::path::PathBuf;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const TOKEN: &str = "bridge-token";
 const SHA256_EMPTY: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -11,6 +14,16 @@ const GOLDEN_MENTIONS_HASH: &str =
     "cbdee567897480fbbfc4dc21159c79d8b2488d5e4152e8525aa469f35f55f3fc";
 const GOLDEN_SIGNATURE: &str = "79d5a2a35924c010f1984eb53ad492aea6421150afa648e015ca841f2f82431a";
 const CREATED_AT: i64 = 1_700_000_000_000;
+
+fn temp_dir(name: &str) -> PathBuf {
+    let id = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock after epoch")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("{name}-{}-{id}", std::process::id()));
+    fs::create_dir(&dir).expect("create temp dir");
+    dir
+}
 
 fn context() -> BridgeCoreContext {
     BridgeCoreContext::new(Some("production"), TOKEN, Some("true"))
@@ -148,6 +161,79 @@ fn verify_leases_reports_malformed_facts_json() {
 }
 
 #[test]
+fn image_lease_rejection_kind_matches_core_exception_policy() {
+    assert!(dispatch_image_lease_rejection_is_state_error(
+        "image lease required"
+    ));
+    assert!(dispatch_image_lease_rejection_is_state_error(
+        "image lease verification failed: EXPIRED"
+    ));
+    assert!(!dispatch_image_lease_rejection_is_state_error(
+        "image lease last modified mismatch: /tmp/a expected=1 actual=2"
+    ));
+    assert!(!dispatch_image_lease_rejection_is_state_error(
+        "image file not found: /tmp/a"
+    ));
+}
+
+#[test]
+fn send_block_reason_matches_core_discovery_policy() {
+    let hooks = r#"[
+        {"name":"ChatMediaSender#sendMultiple","installed":true},
+        {"name":"ChatMediaSender#threadedEntry","installed":true},
+        {"name":"ChatMediaSender#threadedInject","installed":false}
+    ]"#;
+
+    assert_eq!(
+        dispatch_send_block_reason(false, "[]", 1, None, None),
+        Some("bridge discovery hooks not installed".to_owned())
+    );
+    assert_eq!(
+        dispatch_send_block_reason(false, "not-json", 1, None, None),
+        Some("bridge discovery hooks not installed".to_owned())
+    );
+    assert_eq!(dispatch_send_block_reason(true, hooks, 1, None, None), None);
+    assert_eq!(
+        dispatch_send_block_reason(true, hooks, 1, Some(55), Some(2)),
+        Some("bridge discovery hook not ready: ChatMediaSender#threadedInject".to_owned())
+    );
+    assert_eq!(
+        dispatch_send_block_reason(true, "not-json", 1, None, None),
+        Some("bridge discovery hook snapshot invalid".to_owned())
+    );
+}
+
+#[test]
+fn current_bridge_capabilities_dispatch_reports_rollout_and_readiness_reasons() {
+    let envelope = assert_ok(&dispatch_current_bridge_capabilities(
+        true, None, true, true, true, None, false, true,
+    ));
+
+    assert_eq!(envelope["inspectChatRoomSupported"], true);
+    assert_eq!(envelope["inspectChatRoomReady"], true);
+    assert_eq!(envelope["sendTextSupported"], true);
+    assert_eq!(envelope["sendTextReady"], false);
+    assert_eq!(envelope["sendTextReason"], "text bridge send_text disabled");
+    assert_eq!(envelope["sendMarkdownReady"], true);
+    assert_eq!(envelope.get("sendMarkdownReason"), None);
+
+    let unavailable = assert_ok(&dispatch_current_bridge_capabilities(
+        false,
+        Some("registry unavailable"),
+        true,
+        true,
+        true,
+        None,
+        true,
+        true,
+    ));
+
+    assert_eq!(unavailable["inspectChatRoomSupported"], false);
+    assert_eq!(unavailable["inspectChatRoomReason"], "registry unavailable");
+    assert_eq!(unavailable["sendTextReason"], "registry unavailable");
+}
+
+#[test]
 fn dedupe_admit_reports_fresh_in_flight_and_cached_states() {
     let ctx = context();
     let fresh = assert_ok(&dispatch_dedupe_admit(&ctx, "send_text:req-1", 0));
@@ -184,6 +270,21 @@ fn request_requires_request_id_matches_core_action_set() {
     assert!(!dispatch_request_requires_request_id(
         "snapshot_chatroom_members"
     ));
+}
+
+#[test]
+fn request_dedupe_key_matches_core_admission_policy() {
+    assert_eq!(
+        dispatch_request_dedupe_key("send_text", Some("req-1")).as_deref(),
+        Some("send_text:req-1")
+    );
+    assert_eq!(
+        dispatch_request_dedupe_key("send_text", Some(" req-1 ")).as_deref(),
+        Some("send_text: req-1 ")
+    );
+    assert_eq!(dispatch_request_dedupe_key("send_text", Some("  ")), None);
+    assert_eq!(dispatch_request_dedupe_key("send_text", None), None);
+    assert_eq!(dispatch_request_dedupe_key("health", Some("req-1")), None);
 }
 
 #[test]
@@ -240,6 +341,101 @@ fn validate_image_paths_reports_static_path_policy() {
 }
 
 #[test]
+fn materialize_image_path_dispatch_returns_snapshot_and_revalidates_changes() {
+    let root = temp_dir("iris-jni-image-path-root");
+    let file = root.join("image.png");
+    fs::write(&file, b"x").expect("write image");
+    let root = root.canonicalize().expect("canonical root");
+    let allowed_roots_json = json!([root.to_string_lossy()]).to_string();
+    let path = file.to_string_lossy();
+
+    let envelope = assert_ok(&dispatch_materialize_image_path(&path, &allowed_roots_json));
+    let canonical = file
+        .canonicalize()
+        .expect("canonical file")
+        .to_string_lossy()
+        .into_owned();
+    assert_eq!(envelope["canonicalPath"], canonical);
+    assert_eq!(envelope["sizeBytes"], 1);
+    let last_modified = envelope["lastModifiedEpochMs"]
+        .as_i64()
+        .expect("lastModifiedEpochMs");
+
+    std::thread::sleep(Duration::from_millis(10));
+    fs::write(&file, b"changed").expect("change image");
+
+    assert_error(
+        &dispatch_revalidate_image_path_snapshot(&canonical, &allowed_roots_json, 1, last_modified),
+        "PATH_VALIDATION_FAILED",
+        &format!("image file changed before send: {canonical}"),
+    );
+
+    fs::remove_dir_all(&root).expect("cleanup temp dir");
+}
+
+#[test]
+fn image_lease_facts_dispatch_hashes_file_bytes_and_reports_missing_files() {
+    let root = temp_dir("iris-jni-lease-facts-root");
+    let file = root.join("image.png");
+    fs::write(&file, b"abc").expect("write image");
+    let path = file.to_string_lossy().into_owned();
+    let paths_json = json!([path]).to_string();
+
+    let envelope = assert_ok(&dispatch_image_lease_facts_json(&paths_json));
+    let facts_json = envelope["factsJson"].as_str().expect("factsJson");
+    let facts: Value = serde_json::from_str(facts_json).expect("facts JSON");
+
+    assert_eq!(
+        facts[0]["canonical_path"].as_str().expect("canonical_path"),
+        file.to_string_lossy()
+    );
+    assert_eq!(
+        facts[0]["sha256_hex"],
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+    assert_eq!(facts[0]["byte_length"], 3);
+    assert!(facts[0]["last_modified_epoch_ms"].as_i64().expect("mtime") > 0);
+
+    let missing = root.join("missing.png").to_string_lossy().into_owned();
+    assert_error(
+        &dispatch_image_lease_facts_json(&json!([missing]).to_string()),
+        "PATH_VALIDATION_FAILED",
+        &format!(
+            "image file not found: {}",
+            root.join("missing.png").to_string_lossy()
+        ),
+    );
+    assert_error(
+        &dispatch_image_lease_facts_json("not-json"),
+        "BAD_REQUEST",
+        "image lease paths JSON invalid",
+    );
+    fs::remove_dir_all(&root).expect("cleanup temp dir");
+}
+
+#[test]
+fn image_path_under_allowed_root_matches_core_separator_boundary() {
+    let roots = r#"["/data/iris-tmp/reply-images"]"#;
+
+    assert!(dispatch_image_path_under_allowed_root(
+        "/data/iris-tmp/reply-images/req-1/image-0.png",
+        roots,
+    ));
+    assert!(!dispatch_image_path_under_allowed_root(
+        "/data/iris-tmp/reply-images-sibling/req-1/image-0.png",
+        roots,
+    ));
+    assert!(!dispatch_image_path_under_allowed_root(
+        "/data/iris-tmp/reply-images/req-1/image-0.png",
+        "not-json",
+    ));
+    assert!(!dispatch_image_path_under_allowed_root(
+        "/data/iris-tmp/reply-images/req-1/image-0.png",
+        r#"[""]"#,
+    ));
+}
+
+#[test]
 fn classify_error_code_reports_native_bridge_failure_classification() {
     let path = assert_ok(&dispatch_classify_error_code(
         "image path validation timed out",
@@ -267,6 +463,67 @@ fn classify_error_code_reports_native_bridge_failure_classification() {
 
     let send_failed = assert_ok(&dispatch_classify_error_code("send failed", false));
     assert_eq!(send_failed["classifiedErrorCode"], "SEND_FAILED");
+}
+
+#[test]
+fn bridge_flag_truthiness_matches_core_policy() {
+    for raw in ["true", "TRUE", " True ", "1", "on", "yes"] {
+        assert!(dispatch_is_truthy_flag(raw), "{raw:?} must be truthy");
+    }
+    for raw in ["", "false", "0", "off", "no", "enabled", "yes please"] {
+        assert!(!dispatch_is_truthy_flag(raw), "{raw:?} must be false");
+    }
+}
+
+#[test]
+fn restart_delay_dispatch_matches_bridge_server_backoff_policy() {
+    assert_eq!(dispatch_restart_delay_ms(0), 1_000);
+    assert_eq!(dispatch_restart_delay_ms(-3), 1_000);
+    assert_eq!(dispatch_restart_delay_ms(1), 1_000);
+    assert_eq!(dispatch_restart_delay_ms(2), 2_000);
+    assert_eq!(dispatch_restart_delay_ms(3), 4_000);
+    assert_eq!(dispatch_restart_delay_ms(6), 30_000);
+    assert_eq!(dispatch_restart_delay_ms(99), 30_000);
+}
+
+#[test]
+fn normalize_security_mode_raw_matches_core_policy() {
+    assert_eq!(
+        dispatch_normalize_security_mode(None),
+        "production",
+        "missing env defaults to production",
+    );
+    assert_eq!(
+        dispatch_normalize_security_mode(Some("unknown")),
+        "production",
+        "unknown env defaults to production",
+    );
+    assert_eq!(
+        dispatch_normalize_security_mode(Some(" Development ")),
+        "development",
+        "development env is trimmed and case-insensitive",
+    );
+    assert_eq!(
+        dispatch_normalize_security_mode(Some("dev")),
+        "development",
+        "dev alias remains supported",
+    );
+}
+
+#[test]
+fn allowed_peer_uids_match_core_security_mode_policy() {
+    assert_eq!(
+        dispatch_allowed_peer_uids(Some("production"), None),
+        vec![0],
+    );
+    assert_eq!(
+        dispatch_allowed_peer_uids(Some("development"), None),
+        vec![0, 2000],
+    );
+    assert_eq!(
+        dispatch_allowed_peer_uids(Some("dev"), Some("2000, 3000,invalid, 0")),
+        vec![0, 2000, 3000],
+    );
 }
 
 #[test]

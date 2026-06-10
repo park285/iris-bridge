@@ -13,9 +13,9 @@ use crate::marshal::{catch_jstring, read_optional_string, read_string, return_op
 #[unsafe(no_mangle)]
 #[allow(
     clippy::too_many_arguments,
-    reason = "Kotlin BridgeCore.nativeReplyHookSign external fun과 동결된 인자 계약"
+    reason = "Kotlin BridgeCoreJniReply.nativeReplyHookSign external fun과 동결된 인자 계약"
 )]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeReplyHookSign<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniReply_nativeReplyHookSign<
     'local,
 >(
     mut env: JNIEnv<'local>,
@@ -47,9 +47,9 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
 #[unsafe(no_mangle)]
 #[allow(
     clippy::too_many_arguments,
-    reason = "Kotlin BridgeCore.nativeReplyHookVerify external fun과 동결된 인자 계약"
+    reason = "Kotlin BridgeCoreJniReply.nativeReplyHookVerify external fun과 동결된 인자 계약"
 )]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeReplyHookVerify<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniReply_nativeReplyHookVerify<
     'local,
 >(
     mut env: JNIEnv<'local>,
@@ -84,7 +84,7 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeMentionsHashFromJson<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniReply_nativeMentionsHashFromJson<
     'local,
 >(
     mut env: JNIEnv<'local>,
@@ -98,7 +98,7 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeMentionsHashFromAttachment<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniReply_nativeMentionsHashFromAttachment<
     'local,
 >(
     mut env: JNIEnv<'local>,

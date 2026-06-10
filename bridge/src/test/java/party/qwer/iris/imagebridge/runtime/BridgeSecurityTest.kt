@@ -6,7 +6,9 @@ import party.qwer.iris.ImageBridgeHandshakeFrame
 import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreImagePathSnapshot
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.imagePathUnderAllowedRoot
 import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import party.qwer.iris.imagebridge.runtime.send.ImageSendRequest
 import party.qwer.iris.imagebridge.runtime.send.KakaoImageSender
@@ -18,6 +20,7 @@ import party.qwer.iris.imagebridge.runtime.server.BridgeSecurityMode
 import party.qwer.iris.imagebridge.runtime.server.BridgeSocketHandshakeAuthenticator
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import java.nio.file.Files
@@ -322,6 +325,36 @@ class BridgeSecurityTest {
     }
 
     @Test
+    fun `path validator fails closed when native materializer is unavailable`() {
+        val allowedDir = Files.createTempDirectory("iris-allowed").toFile()
+        val image = Files.createTempFile(allowedDir.toPath(), "iris-image", ".png").toFile().apply { writeText("x") }
+        val validator =
+            BridgeImagePathValidator(
+                rootPaths = listOf(allowedDir.absolutePath),
+                materializeImagePath = { _, _ -> null },
+            )
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                validator.validate(listOf(image.absolutePath))
+            }
+
+        assertEquals("bridge core unavailable to materialize image path", error.message)
+        allowedDir.deleteRecursively()
+    }
+
+    @Test
+    fun `native root check preserves child path boundary`() {
+        val allowedDir = Files.createTempDirectory("iris-allowed").toFile().canonicalFile
+        val insidePath = File(allowedDir, "iris-inside.png").path
+        val siblingPrefixPath = "${allowedDir.path}-sibling/iris-outside.png"
+
+        assertTrue(BridgeCore.imagePathUnderAllowedRoot(insidePath, listOf(allowedDir.path)))
+        assertFalse(BridgeCore.imagePathUnderAllowedRoot(siblingPrefixPath, listOf(allowedDir.path)))
+        allowedDir.deleteRecursively()
+    }
+
+    @Test
     fun `default path validator allows native runtime reply image root`() {
         assertTrue(BridgeImagePathValidator.DEFAULT_ALLOWED_IMAGE_ROOTS.contains("/data/iris-tmp/reply-images"))
         assertFalse(BridgeImagePathValidator.DEFAULT_ALLOWED_IMAGE_ROOTS.contains(BridgeImagePathValidator.LEGACY_OUTBOX_IMAGE_ROOT))
@@ -412,6 +445,33 @@ class BridgeSecurityTest {
             }
 
         assertTrue(error.message?.contains("changed before send") == true)
+        allowedDir.deleteRecursively()
+    }
+
+    @Test
+    fun `validated path fails closed when native revalidator is unavailable`() {
+        val allowedDir = Files.createTempDirectory("iris-allowed").toFile()
+        val image = Files.createTempFile(allowedDir.toPath(), "iris-image", ".png").toFile().apply { writeText("x") }
+        val validator =
+            BridgeImagePathValidator(
+                rootPaths = listOf(allowedDir.absolutePath),
+                materializeImagePath = { _, _ ->
+                    BridgeCoreImagePathSnapshot(
+                        canonicalPath = image.canonicalPath,
+                        sizeBytes = image.length(),
+                        lastModifiedEpochMs = image.lastModified(),
+                    )
+                },
+                revalidateImagePathSnapshot = { _, _, _, _ -> null },
+            )
+        val validated = validator.validate(listOf(image.absolutePath)).single()
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                validated.revalidate()
+            }
+
+        assertEquals("bridge core unavailable to revalidate image path", error.message)
         allowedDir.deleteRecursively()
     }
 

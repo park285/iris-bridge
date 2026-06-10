@@ -1,38 +1,5 @@
 package party.qwer.iris.imagebridge.runtime.core
 
-import android.util.Log
-import party.qwer.iris.ImageBridgeProtocol
-
-private const val TAG = "IrisBridge"
-private const val LIBRARY_NAME = "iris_bridge_core"
-
-internal fun bridgeCoreLogInfo(message: String) {
-    runCatching { Log.i(TAG, message) }
-}
-
-internal fun bridgeCoreLogWarn(
-    message: String,
-    error: Throwable,
-) {
-    runCatching { Log.w(TAG, message, error) }
-}
-
-internal fun bridgeCoreLogError(message: String) {
-    runCatching { Log.e(TAG, message) }
-}
-
-internal fun bridgeCoreLogError(
-    message: String,
-    error: Throwable,
-) {
-    runCatching { Log.e(TAG, message, error) }
-}
-
-internal fun bridgeCoreLoadLibraryOnce(): Boolean =
-    runCatching { System.loadLibrary(LIBRARY_NAME) }
-        .onFailure { bridgeCoreLogError("bridge-core load failed", it) }
-        .isSuccess
-
 fun BridgeCore.replyHookSign(
     bridgeToken: String,
     roomId: Long,
@@ -43,7 +10,7 @@ fun BridgeCore.replyHookSign(
 ): String? {
     if (!bridgeCoreLoadLibraryOnce()) return null
     return runCatching {
-        nativeReplyHookSign(
+        BridgeCoreJniReply.nativeReplyHookSign(
             bridgeToken,
             roomId,
             messageText,
@@ -54,42 +21,6 @@ fun BridgeCore.replyHookSign(
     }.getOrElse { error ->
         bridgeCoreLogError("bridge-core reply-hook sign threw", error)
         null
-    }
-}
-
-fun BridgeCore.mentionsHashFromJson(mentionsJson: String?): String? {
-    if (!bridgeCoreLoadLibraryOnce()) return null
-    return runCatching { nativeMentionsHashFromJson(mentionsJson) }
-        .getOrElse { error ->
-            bridgeCoreLogError("bridge-core mentions hash threw", error)
-            null
-        }
-}
-
-fun BridgeCore.requestRequiresRequestId(action: String): Boolean {
-    if (!bridgeCoreLoadLibraryOnce()) return true
-    return runCatching { nativeRequestRequiresRequestId(action) }
-        .getOrElse { error ->
-            bridgeCoreLogError("bridge-core request admission threw", error)
-            true
-        }
-}
-
-fun BridgeCore.classifyErrorCode(
-    message: String,
-    isIllegalArgument: Boolean,
-): String {
-    if (!bridgeCoreLoadLibraryOnce()) return ImageBridgeProtocol.ERROR_INTERNAL
-    return runCatching {
-        val envelope = BridgeCoreEnvelope.parse(nativeClassifyErrorCode(message, isIllegalArgument))
-        if (envelope.isOk) {
-            envelope.string("classifiedErrorCode") ?: ImageBridgeProtocol.ERROR_INTERNAL
-        } else {
-            ImageBridgeProtocol.ERROR_INTERNAL
-        }
-    }.getOrElse { error ->
-        bridgeCoreLogError("bridge-core error classification threw", error)
-        ImageBridgeProtocol.ERROR_INTERNAL
     }
 }
 
@@ -106,7 +37,7 @@ fun BridgeCore.replyHookVerify(
     if (createdAtEpochMs == null) return false
     if (!bridgeCoreLoadLibraryOnce()) return false
     return runCatching {
-        nativeReplyHookVerify(
+        BridgeCoreJniReply.nativeReplyHookVerify(
             bridgeToken,
             roomId,
             messageText,
@@ -122,28 +53,19 @@ fun BridgeCore.replyHookVerify(
     }
 }
 
-fun BridgeCore.mentionsHashFromAttachment(attachmentText: String?): String? {
-    if (!bridgeCoreLoadLibraryOnce()) return null
-    return runCatching { nativeMentionsHashFromAttachment(attachmentText) }
-        .getOrElse { error ->
-            bridgeCoreLogError("bridge-core mentions hash threw", error)
-            null
-        }
-}
-
 fun BridgeCore.loadOrNull(
     securityMode: String?,
     bridgeToken: String,
     requireHandshakeRaw: String?,
 ): BridgeCoreRuntime? {
     if (!bridgeCoreLoadLibraryOnce()) return null
-    val abiVersion = runCatching { nativeAbiVersion() }.getOrNull()
+    val abiVersion = runCatching { BridgeCoreJniContext.nativeAbiVersion() }.getOrNull()
     if (abiVersion != EXPECTED_ABI_VERSION) {
         bridgeCoreLogError("bridge-core ABI mismatch: expected $EXPECTED_ABI_VERSION, got $abiVersion")
         return null
     }
     val handle =
-        runCatching { nativeCreateContext(securityMode, bridgeToken, requireHandshakeRaw) }
+        runCatching { BridgeCoreJniContext.nativeCreateContext(securityMode, bridgeToken, requireHandshakeRaw) }
             .getOrElse { error ->
                 bridgeCoreLogError("bridge-core context creation threw", error)
                 return null
@@ -152,7 +74,7 @@ fun BridgeCore.loadOrNull(
         bridgeCoreLogError("bridge-core context creation returned null handle")
         return null
     }
-    val requireHandshake = runCatching { nativeRequireHandshake(handle) }.getOrDefault(true)
+    val requireHandshake = runCatching { BridgeCoreJniContext.nativeRequireHandshake(handle) }.getOrDefault(true)
     bridgeCoreLogInfo("bridge-core abi=$abiVersion loaded")
     return BridgeCoreRuntime(handle = handle, requireHandshake = requireHandshake)
 }

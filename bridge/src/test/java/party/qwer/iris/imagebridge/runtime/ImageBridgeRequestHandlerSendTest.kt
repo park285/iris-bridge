@@ -9,6 +9,7 @@ import party.qwer.iris.imagebridge.runtime.server.BridgeImageLeaseVerifier
 import party.qwer.iris.imagebridge.runtime.server.BridgeImagePathValidator
 import party.qwer.iris.imagebridge.runtime.server.BridgeMetrics
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
+import party.qwer.iris.imagebridge.runtime.server.ValidatedBridgeImagePath
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -16,6 +17,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -93,6 +95,7 @@ class ImageBridgeRequestHandlerSendTest {
             )
 
         assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals(ImageBridgeProtocol.ERROR_SEND_FAILED, response.errorCode)
         file.delete()
     }
 
@@ -156,6 +159,7 @@ class ImageBridgeRequestHandlerSendTest {
             )
 
         assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals(ImageBridgeProtocol.ERROR_PATH_VALIDATION, response.errorCode)
         file.delete()
     }
 
@@ -192,6 +196,7 @@ class ImageBridgeRequestHandlerSendTest {
             )
 
         assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, response.errorCode)
         assertFalse(senderCalled.get(), "sender must not run for a lease signed for another room")
         file.delete()
     }
@@ -230,6 +235,7 @@ class ImageBridgeRequestHandlerSendTest {
             )
 
         assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, response.errorCode)
         assertFalse(senderCalled.get(), "sender must not run for a lease signed for different bytes")
         file.delete()
     }
@@ -270,6 +276,7 @@ class ImageBridgeRequestHandlerSendTest {
             )
 
         assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, response.errorCode)
         assertEquals(
             "image lease last modified mismatch: ${file.canonicalPath} expected=$expectedLastModified actual=$actualLastModified",
             response.error,
@@ -323,8 +330,41 @@ class ImageBridgeRequestHandlerSendTest {
         assertEquals(ImageBridgeProtocol.STATUS_SENT, first.status)
         assertEquals(1, firstSendCount)
         assertEquals(ImageBridgeProtocol.STATUS_FAILED, second.status)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, second.errorCode)
         assertFalse(secondSenderCalled.get(), "sender must not run for a consumed image lease nonce")
         file.delete()
+    }
+
+    @Test
+    fun `image lease verifier rejects file deleted after path validation`() {
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val canonicalPath = file.canonicalPath
+        val validatedPath: ValidatedBridgeImagePath =
+            BridgeImagePathValidator(rootDir.absolutePath)
+                .validate(listOf(file.absolutePath))
+                .single()
+        val lease =
+            signedImageLease(
+                secret = "bridge-token",
+                requestId = "req-deleted-before-facts",
+                roomId = 123L,
+                canonicalPath = canonicalPath,
+            )
+        file.delete()
+
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                BridgeImageLeaseVerifier(expectedToken = "bridge-token")
+                    .verify(
+                        requestRoomId = 123L,
+                        requestId = "req-deleted-before-facts",
+                        leases = listOf(lease),
+                        validatedPaths = listOf(validatedPath),
+                    )
+            }
+
+        assertEquals("image file not found: $canonicalPath", error.message)
     }
 
     @Test

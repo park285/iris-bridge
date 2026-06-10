@@ -2,12 +2,16 @@
 
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONArray
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import java.io.File
+import java.nio.file.Files
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -16,8 +20,8 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 class BridgeCoreRuntimeTest {
     @Test
-    fun `ABI version includes error classification JNI surface`() {
-        assertEquals(5, BridgeCore.EXPECTED_ABI_VERSION)
+    fun `ABI version includes request dedupe key JNI surface`() {
+        assertEquals(16, BridgeCore.EXPECTED_ABI_VERSION)
     }
 
     @Test
@@ -26,7 +30,7 @@ class BridgeCoreRuntimeTest {
 
         assertNotNull(runtime, "host .so must load via java.library.path in unit tests")
         try {
-            assertEquals(BridgeCore.EXPECTED_ABI_VERSION, BridgeCore.nativeAbiVersion())
+            assertEquals(BridgeCore.EXPECTED_ABI_VERSION, BridgeCoreJniContext.nativeAbiVersion())
             assertTrue(runtime.requireHandshake, "production+true must require handshake")
         } finally {
             runtime.close()
@@ -201,6 +205,15 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
+    fun `request dedupe key dispatch preserves side effect key policy`() {
+        assertEquals("send_text:req-1", BridgeCore.requestDedupeKey("send_text", "req-1"))
+        assertEquals("send_text: req-1 ", BridgeCore.requestDedupeKey("send_text", " req-1 "))
+        assertNull(BridgeCore.requestDedupeKey("send_text", "  "))
+        assertNull(BridgeCore.requestDedupeKey("send_text", null))
+        assertNull(BridgeCore.requestDedupeKey("health", "req-1"))
+    }
+
+    @Test
     fun `text request validation dispatch normalizes attachment and rejects invalid combinations`() {
         val runtime =
             assertNotNull(
@@ -299,6 +312,183 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
+    fun `bridge flag truthiness dispatch matches server rollout parsing`() {
+        for (raw in listOf("true", "TRUE", " True ", "1", "on", "yes")) {
+            assertTrue(BridgeCore.isTruthyFlag(raw), "$raw must be truthy")
+        }
+        for (raw in listOf("", "false", "0", "off", "no", "enabled", "yes please")) {
+            assertFalse(BridgeCore.isTruthyFlag(raw), "$raw must be false")
+        }
+    }
+
+    @Test
+    fun `security mode normalization dispatch returns canonical core raw values`() {
+        assertEquals("production", BridgeCore.normalizeSecurityMode(null))
+        assertEquals("production", BridgeCore.normalizeSecurityMode("unknown"))
+        assertEquals("development", BridgeCore.normalizeSecurityMode(" Development "))
+        assertEquals("development", BridgeCore.normalizeSecurityMode("dev"))
+    }
+
+    @Test
+    fun `allowed peer uid dispatch returns core security mode defaults and configured values`() {
+        assertEquals(listOf(0), BridgeCore.allowedPeerUids("production", null).toList())
+        assertEquals(listOf(0, 2000), BridgeCore.allowedPeerUids("development", null).toList())
+        assertEquals(
+            listOf(0, 2000, 3000),
+            BridgeCore.allowedPeerUids("dev", "2000, 3000,invalid, 0").toList(),
+        )
+    }
+
+    @Test
+    fun `image path root containment dispatch preserves separator boundary`() {
+        val roots = listOf("/data/iris-tmp/reply-images")
+
+        assertTrue(
+            BridgeCore.imagePathUnderAllowedRoot(
+                "/data/iris-tmp/reply-images/req-1/image-0.png",
+                roots,
+            ),
+        )
+        assertFalse(
+            BridgeCore.imagePathUnderAllowedRoot(
+                "/data/iris-tmp/reply-images-sibling/req-1/image-0.png",
+                roots,
+            ),
+        )
+        assertFalse(
+            BridgeCore.imagePathUnderAllowedRoot(
+                "/data/iris-tmp/reply-images/req-1/image-0.png",
+                listOf(""),
+            ),
+        )
+    }
+
+    @Test
+    fun `image path materialization dispatch returns canonical snapshot and revalidates changes`() {
+        val root = Files.createTempDirectory("iris-core-path-root").toFile()
+        val image = Files.createTempFile(root.toPath(), "image", ".png").toFile().apply { writeText("x") }
+        val roots = listOf(root.canonicalPath)
+
+        val snapshot = assertNotNull(BridgeCore.materializeImagePath(image.absolutePath, roots))
+        assertEquals(image.canonicalPath, snapshot.canonicalPath)
+        assertEquals(1L, snapshot.sizeBytes)
+        assertTrue(snapshot.lastModifiedEpochMs > 0)
+
+        Thread.sleep(10)
+        image.writeText("changed")
+
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                BridgeCore.revalidateImagePathSnapshot(
+                    snapshot.canonicalPath,
+                    roots,
+                    snapshot.sizeBytes,
+                    snapshot.lastModifiedEpochMs,
+                )
+            }
+        assertEquals("image file changed before send: ${snapshot.canonicalPath}", error.message)
+
+        root.deleteRecursively()
+    }
+
+    @Test
+    fun `image lease rejection kind dispatch preserves bridge exception policy`() {
+        assertTrue(BridgeCore.imageLeaseRejectionIsStateError("image lease required"))
+        assertTrue(BridgeCore.imageLeaseRejectionIsStateError("image lease verification failed: EXPIRED"))
+        assertFalse(
+            BridgeCore.imageLeaseRejectionIsStateError(
+                "image lease last modified mismatch: /tmp/a expected=1 actual=2",
+            ),
+        )
+        assertFalse(BridgeCore.imageLeaseRejectionIsStateError("image file not found: /tmp/a"))
+    }
+
+    @Test
+    fun `image lease rejection fallback preserves bridge exception policy`() {
+        assertTrue(imageLeaseRejectionIsStateErrorFallback("image lease required"))
+        assertTrue(imageLeaseRejectionIsStateErrorFallback("image lease verification failed: EXPIRED"))
+        assertFalse(
+            imageLeaseRejectionIsStateErrorFallback(
+                "image lease last modified mismatch: /tmp/a expected=1 actual=2",
+            ),
+        )
+        assertFalse(imageLeaseRejectionIsStateErrorFallback("image file not found: /tmp/a"))
+    }
+
+    @Test
+    fun `image lease facts dispatch returns facts json for canonical paths`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "development", bridgeToken = "bridge-token", requireHandshakeRaw = null),
+            )
+        val root = Files.createTempDirectory("iris-core-lease-facts").toFile()
+        val image = Files.createTempFile(root.toPath(), "image", ".png").toFile().apply { writeText("abc") }
+        try {
+            val envelope = runtime.imageLeaseFactsJson(listOf(image.canonicalPath))
+            assertTrue(envelope.isOk, "lease facts must be generated: ${envelope.errorMessage}")
+            val facts = JSONArray(assertNotNull(envelope.string("factsJson")))
+            val fact = facts.getJSONObject(0)
+
+            assertEquals(image.canonicalPath, fact.getString("canonical_path"))
+            assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", fact.getString("sha256_hex"))
+            assertEquals(3L, fact.getLong("byte_length"))
+            assertTrue(fact.getLong("last_modified_epoch_ms") > 0L)
+
+            val missing = File(root, "missing.png").path
+            val missingEnvelope = runtime.imageLeaseFactsJson(listOf(missing))
+            assertFalse(missingEnvelope.isOk)
+            assertEquals("PATH_VALIDATION_FAILED", missingEnvelope.errorCode)
+            assertEquals("image file not found: $missing", missingEnvelope.errorMessage)
+        } finally {
+            root.deleteRecursively()
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `send block reason dispatch preserves discovery hook policy`() {
+        val hooks =
+            """
+            [
+              {"name":"ChatMediaSender#sendMultiple","installed":true},
+              {"name":"ChatMediaSender#threadedEntry","installed":true},
+              {"name":"ChatMediaSender#threadedInject","installed":false}
+            ]
+            """.trimIndent()
+
+        assertEquals("bridge discovery hooks not installed", BridgeCore.sendBlockReason(false, "[]", 1, null, null))
+        assertNull(BridgeCore.sendBlockReason(true, hooks, 1, null, null))
+        assertEquals(
+            "bridge discovery hook not ready: ChatMediaSender#threadedInject",
+            BridgeCore.sendBlockReason(true, hooks, 1, 55L, 2),
+        )
+    }
+
+    @Test
+    fun `current bridge capabilities dispatch preserves rollout and readiness policy`() {
+        val envelope =
+            assertNotNull(
+                BridgeCore.currentBridgeCapabilities(
+                    registryAvailable = true,
+                    registryError = null,
+                    specReady = true,
+                    textSupported = true,
+                    textReady = true,
+                    textReason = null,
+                    sendTextEnabled = false,
+                    sendMarkdownEnabled = true,
+                ),
+            )
+
+        assertTrue(envelope.isOk, "capabilities must be generated: ${envelope.errorMessage}")
+        assertTrue(assertNotNull(envelope.bool("inspectChatRoomReady")))
+        assertFalse(assertNotNull(envelope.bool("sendTextReady")))
+        assertEquals("text bridge send_text disabled", envelope.string("sendTextReason"))
+        assertTrue(assertNotNull(envelope.bool("sendMarkdownReady")))
+        assertEquals(null, envelope.string("sendMarkdownReason"))
+    }
+
+    @Test
     fun `handshake hello then client proof round-trips through the native library`() {
         val runtime =
             assertNotNull(
@@ -307,7 +497,15 @@ class BridgeCoreRuntimeTest {
         try {
             val helloFrame =
                 """{"type":"hello","protocolVersion":1,"clientNonce":"client-nonce","socketName":"@iris-image-bridge-mux","timestampMs":1}"""
-            val helloEnvelope = BridgeCoreEnvelope.parse(BridgeCore.nativeHandshakeOnHello(runtime.handle, helloFrame, 1_000L, "@iris-image-bridge-mux"))
+            val helloEnvelope =
+                BridgeCoreEnvelope.parse(
+                    BridgeCoreJniContext.nativeHandshakeOnHello(
+                        runtime.handle,
+                        helloFrame,
+                        1_000L,
+                        "@iris-image-bridge-mux",
+                    ),
+                )
             assertTrue(helloEnvelope.isOk, "hello must be accepted: ${helloEnvelope.errorMessage}")
 
             val serverFrameJson = assertNotNull(helloEnvelope.string("frameJson"))
@@ -319,7 +517,10 @@ class BridgeCoreRuntimeTest {
                     serverNonce = serverNonce,
                 )
             val proofFrame = """{"type":"client_proof","protocolVersion":1,"proof":"$proof"}"""
-            val proofEnvelope = BridgeCoreEnvelope.parse(BridgeCore.nativeHandshakeOnClientProof(runtime.handle, proofFrame))
+            val proofEnvelope =
+                BridgeCoreEnvelope.parse(
+                    BridgeCoreJniContext.nativeHandshakeOnClientProof(runtime.handle, proofFrame),
+                )
             assertTrue(proofEnvelope.isOk, "client proof must authenticate: ${proofEnvelope.errorMessage}")
         } finally {
             runtime.close()

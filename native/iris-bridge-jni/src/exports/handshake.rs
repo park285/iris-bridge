@@ -9,7 +9,7 @@ use crate::handles::with_context;
 use crate::marshal::{catch_jstring, read_string, return_string};
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeHandshakeOnHello<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniContext_nativeHandshakeOnHello<
     'local,
 >(
     mut env: JNIEnv<'local>,
@@ -33,7 +33,7 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeHandshakeOnClientProof<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniContext_nativeHandshakeOnClientProof<
     'local,
 >(
     mut env: JNIEnv<'local>,

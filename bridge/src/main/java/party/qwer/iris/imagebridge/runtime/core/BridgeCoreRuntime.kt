@@ -22,12 +22,12 @@ class BridgeCoreRuntime internal constructor(
     private val destroyed = AtomicBoolean(false)
     private val lifecycle = ReentrantReadWriteLock()
 
-    fun validateRequestToken(requestJson: String): BridgeCoreEnvelope = dispatch { BridgeCore.nativeValidateRequestToken(handle, requestJson) }
+    fun validateRequestToken(requestJson: String): BridgeCoreEnvelope = dispatch { BridgeCoreJniRequest.nativeValidateRequestToken(handle, requestJson) }
 
     fun validateRequestAdmission(
         action: String,
         requestId: String?,
-    ): BridgeCoreEnvelope = dispatch { BridgeCore.nativeValidateRequestAdmission(handle, action, requestId) }
+    ): BridgeCoreEnvelope = dispatch { BridgeCoreJniRequest.nativeValidateRequestAdmission(handle, action, requestId) }
 
     fun validateTextRequest(
         roomId: Long?,
@@ -37,7 +37,7 @@ class BridgeCoreRuntime internal constructor(
         mentionsJson: String?,
     ): BridgeCoreEnvelope =
         dispatch {
-            BridgeCore.nativeValidateTextRequest(
+            BridgeCoreJniRequest.nativeValidateTextRequest(
                 handle,
                 roomId != null,
                 roomId ?: 0L,
@@ -54,7 +54,7 @@ class BridgeCoreRuntime internal constructor(
         maxPathLength: Int,
     ): BridgeCoreEnvelope =
         dispatch {
-            BridgeCore.nativeValidateImagePaths(
+            BridgeCoreJniRequest.nativeValidateImagePaths(
                 handle,
                 imagePathsJson(imagePaths),
                 maxPathCount,
@@ -66,9 +66,9 @@ class BridgeCoreRuntime internal constructor(
         frameJson: String,
         nowMs: Long,
         socketName: String,
-    ): BridgeCoreEnvelope = dispatch { BridgeCore.nativeHandshakeOnHello(handle, frameJson, nowMs, socketName) }
+    ): BridgeCoreEnvelope = dispatch { BridgeCoreJniContext.nativeHandshakeOnHello(handle, frameJson, nowMs, socketName) }
 
-    fun handshakeOnClientProof(frameJson: String): BridgeCoreEnvelope = dispatch { BridgeCore.nativeHandshakeOnClientProof(handle, frameJson) }
+    fun handshakeOnClientProof(frameJson: String): BridgeCoreEnvelope = dispatch { BridgeCoreJniContext.nativeHandshakeOnClientProof(handle, frameJson) }
 
     fun verifyLeases(
         roomId: Long,
@@ -76,12 +76,17 @@ class BridgeCoreRuntime internal constructor(
         leasesJson: String,
         factsJson: String,
         nowMs: Long,
-    ): BridgeCoreEnvelope = dispatch { BridgeCore.nativeVerifyLeases(handle, roomId, requestId, leasesJson, factsJson, nowMs) }
+    ): BridgeCoreEnvelope = dispatch { BridgeCoreJniLease.nativeVerifyLeases(handle, roomId, requestId, leasesJson, factsJson, nowMs) }
+
+    fun imageLeaseFactsJson(canonicalPaths: List<String>): BridgeCoreEnvelope =
+        dispatch {
+            BridgeCoreJniLease.nativeBuildImageLeaseFacts(imagePathsJson(canonicalPaths))
+        }
 
     fun dedupeAdmit(
         key: String,
         nowMs: Long,
-    ): BridgeCoreEnvelope = dispatch { BridgeCore.nativeDedupeAdmit(handle, key, nowMs) }
+    ): BridgeCoreEnvelope = dispatch { BridgeCoreJniLease.nativeDedupeAdmit(handle, key, nowMs) }
 
     fun dedupeComplete(
         key: String,
@@ -90,7 +95,7 @@ class BridgeCoreRuntime internal constructor(
     ) {
         lifecycle.read {
             if (destroyed.get()) return
-            runCatching { BridgeCore.nativeDedupeComplete(handle, key, responseJson, nowMs) }
+            runCatching { BridgeCoreJniLease.nativeDedupeComplete(handle, key, responseJson, nowMs) }
                 .onFailure { bridgeCoreLogWarn("bridge-core dedupe complete threw", it) }
         }
     }
@@ -112,7 +117,7 @@ class BridgeCoreRuntime internal constructor(
     override fun close() {
         lifecycle.write {
             if (destroyed.compareAndSet(false, true)) {
-                runCatching { BridgeCore.nativeDestroyContext(handle) }
+                runCatching { BridgeCoreJniContext.nativeDestroyContext(handle) }
                     .onFailure { bridgeCoreLogWarn("bridge-core context destroy threw", it) }
             }
         }

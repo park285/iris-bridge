@@ -8,10 +8,10 @@ use crate::marshal::{catch_jstring, read_optional_string, return_string};
 
 #[allow(
     clippy::too_many_arguments,
-    reason = "Kotlin BridgeCore.nativeValidateTextRequest external fun과 동결된 인자 계약"
+    reason = "Kotlin BridgeCoreJniRequest.nativeValidateTextRequest external fun과 동결된 인자 계약"
 )]
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeValidateTextRequest<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniRequest_nativeValidateTextRequest<
     'local,
 >(
     mut env: JNIEnv<'local>,

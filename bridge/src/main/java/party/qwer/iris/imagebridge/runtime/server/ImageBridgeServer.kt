@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.serverRestartDelayMs
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscoverySnapshot
 import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
@@ -18,8 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 private const val TAG = "IrisBridge"
-private const val INITIAL_RESTART_DELAY_MS = 1_000L
-private const val MAX_RESTART_DELAY_MS = 30_000L
 
 internal class ImageBridgeServer(
     internal val running: AtomicBoolean = AtomicBoolean(false),
@@ -122,7 +122,7 @@ internal class ImageBridgeServer(
         sleepBeforeBridgeRestart(delayMs, running)
     }
 
-    internal fun nextBridgeRestartDelayMs(failureCount: Int): Long = (INITIAL_RESTART_DELAY_MS shl (failureCount - 1).coerceAtLeast(0).coerceAtMost(5)).coerceAtMost(MAX_RESTART_DELAY_MS)
+    internal fun nextBridgeRestartDelayMs(failureCount: Int): Long = BridgeCore.serverRestartDelayMs(failureCount)
 
     internal fun newClientExecutorForTest(): ThreadPoolExecutor = newClientExecutor()
 

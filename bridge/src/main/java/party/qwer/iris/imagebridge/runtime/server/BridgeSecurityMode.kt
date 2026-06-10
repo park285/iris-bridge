@@ -1,5 +1,8 @@
 package party.qwer.iris.imagebridge.runtime.server
 
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.normalizeSecurityMode
+
 internal enum class BridgeSecurityMode {
     DEVELOPMENT,
     PRODUCTION,
@@ -7,8 +10,8 @@ internal enum class BridgeSecurityMode {
 
     companion object {
         fun fromEnv(raw: String? = System.getenv("IRIS_BRIDGE_SECURITY_MODE")): BridgeSecurityMode =
-            when (raw?.trim()?.lowercase()) {
-                "development", "dev" -> DEVELOPMENT
+            when (BridgeCore.normalizeSecurityMode(raw)) {
+                "development" -> DEVELOPMENT
                 else -> PRODUCTION
             }
     }

@@ -2,6 +2,7 @@ package party.qwer.iris.imagebridge.runtime.server
 
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.requestDedupeKey
 import party.qwer.iris.imagebridge.runtime.core.requestRequiresRequestId
 
 internal inline fun executeWithBridgeAdmission(
@@ -22,6 +23,8 @@ internal inline fun executeWithBridgeAdmission(
             requestId = request.requestId,
         )
     }
-    val requestId = request.requestId?.takeIf { it.isNotBlank() } ?: return block()
-    return deduper.execute("${request.action}:$requestId") { block() }
+    val dedupeKey =
+        BridgeCore.requestDedupeKey(request.action, request.requestId)
+            ?: error("bridge core unavailable to build request dedupe key")
+    return deduper.execute(dedupeKey) { block() }
 }

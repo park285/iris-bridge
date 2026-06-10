@@ -1,8 +1,24 @@
 package party.qwer.iris.imagebridge.runtime.discovery
 
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreEnvelope
 import party.qwer.iris.imagebridge.runtime.send.KakaoTextSendCapability
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitiesSnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitySnapshot
+import party.qwer.iris.imagebridge.runtime.core.currentBridgeCapabilities as nativeCurrentBridgeCapabilities
+
+private const val CAPABILITIES_POLICY_UNAVAILABLE_REASON = "bridge core unavailable to evaluate bridge capabilities"
+
+internal typealias BridgeCapabilitiesNativePolicy = (
+    registryAvailable: Boolean,
+    registryError: String?,
+    specReady: Boolean,
+    textSupported: Boolean,
+    textReady: Boolean,
+    textReason: String?,
+    sendTextEnabled: Boolean,
+    sendMarkdownEnabled: Boolean,
+) -> BridgeCoreEnvelope?
 
 internal fun currentBridgeCapabilities(
     registryAvailable: Boolean,
@@ -11,68 +27,77 @@ internal fun currentBridgeCapabilities(
     textSendCapability: KakaoTextSendCapability? = null,
     sendTextEnabled: Boolean = true,
     sendMarkdownEnabled: Boolean = true,
+    nativeCapabilities: BridgeCapabilitiesNativePolicy = ::nativeBridgeCapabilities,
 ): ImageBridgeCapabilitiesSnapshot {
-    val readinessReason =
-        when {
-            !registryAvailable -> registryError ?: "chatroom resolver unavailable"
-            !specReady -> "bridge spec not ready"
-            else -> "capability ready"
-        }
+    nativeCapabilities(
+        registryAvailable,
+        registryError,
+        specReady,
+        textSendCapability?.supported == true,
+        textSendCapability?.ready == true,
+        textSendCapability?.reason,
+        sendTextEnabled,
+        sendMarkdownEnabled,
+    )?.takeIf { envelope -> envelope.isOk }
+        ?.capabilitiesSnapshot()
+        ?.let { capabilities -> return capabilities }
+
+    return unavailableCapabilities()
+}
+
+private fun nativeBridgeCapabilities(
+    registryAvailable: Boolean,
+    registryError: String?,
+    specReady: Boolean,
+    textSupported: Boolean,
+    textReady: Boolean,
+    textReason: String?,
+    sendTextEnabled: Boolean,
+    sendMarkdownEnabled: Boolean,
+): BridgeCoreEnvelope? =
+    with(BridgeCore) {
+        nativeCurrentBridgeCapabilities(
+            registryAvailable = registryAvailable,
+            registryError = registryError,
+            specReady = specReady,
+            textSupported = textSupported,
+            textReady = textReady,
+            textReason = textReason,
+            sendTextEnabled = sendTextEnabled,
+            sendMarkdownEnabled = sendMarkdownEnabled,
+        )
+    }
+
+private fun BridgeCoreEnvelope.capabilitiesSnapshot(): ImageBridgeCapabilitiesSnapshot? =
+    ImageBridgeCapabilitiesSnapshot(
+        inspectChatRoom = capabilitySnapshot("inspectChatRoom") ?: return null,
+        openChatRoom = capabilitySnapshot("openChatRoom") ?: return null,
+        snapshotChatRoomMembers = capabilitySnapshot("snapshotChatRoomMembers") ?: return null,
+        sendText = capabilitySnapshot("sendText") ?: return null,
+        sendMarkdown = capabilitySnapshot("sendMarkdown") ?: return null,
+    )
+
+private fun BridgeCoreEnvelope.capabilitySnapshot(prefix: String): ImageBridgeCapabilitySnapshot? =
+    ImageBridgeCapabilitySnapshot(
+        supported = strictBool("${prefix}Supported") ?: return null,
+        ready = strictBool("${prefix}Ready") ?: return null,
+        reason = string("${prefix}Reason"),
+    )
+
+private fun unavailableCapabilities(): ImageBridgeCapabilitiesSnapshot {
+    val unavailable = unavailableCapability()
     return ImageBridgeCapabilitiesSnapshot(
-        inspectChatRoom =
-            ImageBridgeCapabilitySnapshot(
-                supported = registryAvailable,
-                ready = registryAvailable && specReady,
-                reason = if (registryAvailable && specReady) null else readinessReason,
-            ),
-        openChatRoom =
-            ImageBridgeCapabilitySnapshot(
-                supported = true,
-                ready = true,
-            ),
-        snapshotChatRoomMembers =
-            ImageBridgeCapabilitySnapshot(
-                supported = registryAvailable,
-                ready = registryAvailable && specReady,
-                reason = if (registryAvailable && specReady) null else readinessReason,
-            ),
-        sendText =
-            textCapabilitySnapshot(
-                registryAvailable = registryAvailable,
-                specReady = specReady,
-                readinessReason = readinessReason,
-                textSendCapability = textSendCapability,
-                enabled = sendTextEnabled,
-                disabledReason = "text bridge send_text disabled",
-            ),
-        sendMarkdown =
-            textCapabilitySnapshot(
-                registryAvailable = registryAvailable,
-                specReady = specReady,
-                readinessReason = readinessReason,
-                textSendCapability = textSendCapability,
-                enabled = sendMarkdownEnabled,
-                disabledReason = "text bridge send_markdown disabled",
-            ),
+        inspectChatRoom = unavailable,
+        openChatRoom = unavailable,
+        snapshotChatRoomMembers = unavailable,
+        sendText = unavailable,
+        sendMarkdown = unavailable,
     )
 }
 
-private fun textCapabilitySnapshot(
-    registryAvailable: Boolean,
-    specReady: Boolean,
-    readinessReason: String,
-    textSendCapability: KakaoTextSendCapability?,
-    enabled: Boolean,
-    disabledReason: String,
-): ImageBridgeCapabilitySnapshot =
+private fun unavailableCapability(): ImageBridgeCapabilitySnapshot =
     ImageBridgeCapabilitySnapshot(
-        supported = textSendCapability?.supported == true,
-        ready = registryAvailable && specReady && enabled && textSendCapability?.ready == true,
-        reason =
-            when {
-                !registryAvailable || !specReady -> readinessReason
-                !enabled -> disabledReason
-                textSendCapability?.ready == true -> null
-                else -> textSendCapability?.reason ?: "text sender unavailable"
-            },
+        supported = false,
+        ready = false,
+        reason = CAPABILITIES_POLICY_UNAVAILABLE_REASON,
     )

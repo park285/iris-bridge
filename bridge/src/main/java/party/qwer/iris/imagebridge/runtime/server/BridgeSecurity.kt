@@ -1,27 +1,35 @@
 package party.qwer.iris.imagebridge.runtime.server
 
-import android.os.Process
 import party.qwer.iris.resolveBridgeReplyImageDir
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreImagePathSnapshot
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.allowedPeerUids
+import party.qwer.iris.imagebridge.runtime.core.materializeImagePath
+import party.qwer.iris.imagebridge.runtime.core.revalidateImagePathSnapshot
 import java.io.File
-import java.nio.file.Files
+
+private typealias ImagePathMaterializer = (String, Collection<String>) -> BridgeCoreImagePathSnapshot?
+private typealias ImagePathRevalidator = (String, Collection<String>, Long, Long) -> BridgeCoreImagePathSnapshot?
 
 internal data class ValidatedBridgeImagePath(
     val canonicalPath: String,
-    private val allowedRoots: List<File>,
+    private val allowedRootPaths: List<String>,
     private val sizeBytes: Long,
     private val lastModifiedEpochMs: Long,
+    private val revalidateImagePathSnapshot: ImagePathRevalidator = { path, roots, size, lastModified ->
+        BridgeCore.revalidateImagePathSnapshot(path, roots, size, lastModified)
+    },
 ) {
     fun revalidate(): String {
-        val file = File(canonicalPath)
-        require(!Files.isSymbolicLink(file.toPath())) { "image path must not be a symbolic link: $canonicalPath" }
-        val current = file.canonicalFile
-        require(current.isFile) { "image file not found: $canonicalPath" }
-        require(current.isUnderAllowedRoot(allowedRoots)) { "image path is outside allowed root: $canonicalPath" }
-        require(current.length() == sizeBytes && current.lastModified() == lastModifiedEpochMs) {
-            "image file changed before send: $canonicalPath"
-        }
-        return current.path
+        val snapshot =
+            revalidateImagePathSnapshot(
+                canonicalPath,
+                allowedRootPaths,
+                sizeBytes,
+                lastModifiedEpochMs,
+            ) ?: error("bridge core unavailable to revalidate image path")
+        return snapshot.canonicalPath
     }
 }
 
@@ -43,24 +51,7 @@ internal class BridgePeerIdentityValidator(
         private fun buildAllowedUids(
             securityMode: BridgeSecurityMode,
             extraUidsRaw: String?,
-        ): Set<Int> {
-            val defaults =
-                when (securityMode) {
-                    BridgeSecurityMode.PRODUCTION -> linkedSetOf(Process.ROOT_UID)
-                    BridgeSecurityMode.DEVELOPMENT ->
-                        linkedSetOf(
-                            Process.ROOT_UID,
-                            Process.SHELL_UID,
-                        )
-                }
-            val configured =
-                extraUidsRaw
-                    ?.split(',')
-                    ?.mapNotNull { token -> token.trim().toIntOrNull() }
-                    ?.toSet()
-                    .orEmpty()
-            return defaults + configured
-        }
+        ): Set<Int> = BridgeCore.allowedPeerUids(securityMode.coreRawValue(), extraUidsRaw).toSet()
 
         internal fun defaultAllowedUids(raw: String?): Set<Int> = buildAllowedUids(BridgeSecurityMode.PRODUCTION, raw)
     }
@@ -71,6 +62,12 @@ internal class BridgeImagePathValidator(
     private val maxPathCount: Int = MAX_IMAGE_PATH_COUNT,
     private val maxPathLength: Int = MAX_IMAGE_PATH_LENGTH,
     private val staticValidator: BridgeImagePathStaticValidator = BridgeImagePathStaticValidator(),
+    private val materializeImagePath: ImagePathMaterializer = { path, roots ->
+        BridgeCore.materializeImagePath(path, roots)
+    },
+    private val revalidateImagePathSnapshot: ImagePathRevalidator = { path, roots, size, lastModified ->
+        BridgeCore.revalidateImagePathSnapshot(path, roots, size, lastModified)
+    },
 ) {
     constructor(rootPath: String) : this(listOf(rootPath), MAX_IMAGE_PATH_COUNT, MAX_IMAGE_PATH_LENGTH)
 
@@ -79,23 +76,17 @@ internal class BridgeImagePathValidator(
         rootPaths: Collection<String> = DEFAULT_ALLOWED_IMAGE_ROOTS,
     ) : this(rootPaths, MAX_IMAGE_PATH_COUNT, MAX_IMAGE_PATH_LENGTH, BridgeImagePathStaticValidator(bridgeCore))
 
-    private val allowedRoots = rootPaths.map { rootPath -> File(rootPath).canonicalFile }
+    private val allowedRootPaths = rootPaths.map { rootPath -> File(rootPath).canonicalFile.path }
 
     fun validate(imagePaths: List<String>): List<ValidatedBridgeImagePath> {
         staticValidator.validate(imagePaths, maxPathCount, maxPathLength)
         return imagePaths.map { path ->
-            val rawFile = File(path)
-            require(!Files.isSymbolicLink(rawFile.toPath())) { "image path must not be a symbolic link: $path" }
-            val imageFile = rawFile.canonicalFile
-            require(imageFile.isFile) { "image file not found: $path" }
-            require(imageFile.isUnderAllowedRoot(allowedRoots)) {
-                "image path is outside allowed root: $path"
-            }
-            ValidatedBridgeImagePath(
-                canonicalPath = imageFile.path,
-                allowedRoots = allowedRoots,
-                sizeBytes = imageFile.length(),
-                lastModifiedEpochMs = imageFile.lastModified(),
+            val snapshot =
+                materializeImagePath(path, allowedRootPaths)
+                    ?: error("bridge core unavailable to materialize image path")
+            snapshot.toValidatedPath(
+                allowedRootPaths = allowedRootPaths,
+                revalidateImagePathSnapshot = revalidateImagePathSnapshot,
             )
         }
     }
@@ -123,7 +114,14 @@ internal class BridgeImagePathValidator(
     }
 }
 
-private fun File.isUnderAllowedRoot(allowedRoots: List<File>): Boolean =
-    allowedRoots.any { allowedRoot ->
-        path.startsWith("${allowedRoot.path}${File.separator}")
-    }
+private fun BridgeCoreImagePathSnapshot.toValidatedPath(
+    allowedRootPaths: List<String>,
+    revalidateImagePathSnapshot: ImagePathRevalidator,
+): ValidatedBridgeImagePath =
+    ValidatedBridgeImagePath(
+        canonicalPath = canonicalPath,
+        allowedRootPaths = allowedRootPaths,
+        sizeBytes = sizeBytes,
+        lastModifiedEpochMs = lastModifiedEpochMs,
+        revalidateImagePathSnapshot = revalidateImagePathSnapshot,
+    )

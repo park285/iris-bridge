@@ -9,7 +9,7 @@ use crate::handles::{BridgeCoreContext, drop_handle, into_handle, with_context};
 use crate::marshal::{read_optional_string, read_string};
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeCreateContext<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniContext_nativeCreateContext<
     'local,
 >(
     mut env: JNIEnv<'local>,
@@ -32,7 +32,7 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeDestroyContext(
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniContext_nativeDestroyContext(
     _env: JNIEnv<'_>,
     _class: JClass<'_>,
     handle: jlong,
@@ -41,7 +41,7 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeRequireHandshake(
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniContext_nativeRequireHandshake(
     _env: JNIEnv<'_>,
     _class: JClass<'_>,
     handle: jlong,
@@ -53,7 +53,7 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_
 }
 
 #[unsafe(no_mangle)]
-pub const extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeAbiVersion(
+pub const extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniContext_nativeAbiVersion(
     _env: JNIEnv<'_>,
     _class: JClass<'_>,
 ) -> jint {

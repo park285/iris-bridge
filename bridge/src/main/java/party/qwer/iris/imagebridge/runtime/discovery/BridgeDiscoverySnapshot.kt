@@ -1,5 +1,13 @@
 package party.qwer.iris.imagebridge.runtime.discovery
 
+import org.json.JSONArray
+import org.json.JSONObject
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.sendBlockReasonRaw
+
+private const val SEND_BLOCK_POLICY_UNAVAILABLE_REASON = "bridge core unavailable to evaluate bridge discovery hooks"
+private typealias NativeSendBlockReason = (Boolean, String, Int, Long?, Int?) -> String?
+
 internal data class DiscoveryHookStatus(
     val name: String,
     val installed: Boolean,
@@ -14,31 +22,34 @@ internal data class BridgeDiscoverySnapshot(
     val hooks: List<DiscoveryHookStatus>,
 )
 
-@Suppress("UNUSED_PARAMETER")
-internal fun BridgeDiscoverySnapshot.requiredSendHookName(imageCount: Int): String = HOOK_SEND_MULTIPLE
-
 internal fun BridgeDiscoverySnapshot.sendBlockReason(imageCount: Int): String? = sendBlockReason(imageCount, threadId = null, threadScope = null)
 
 internal fun BridgeDiscoverySnapshot.sendBlockReason(
     imageCount: Int,
     threadId: Long?,
     threadScope: Int?,
+    nativeSendBlockReason: NativeSendBlockReason = BridgeCore::sendBlockReasonRaw,
 ): String? {
-    if (!installAttempted) return "bridge discovery hooks not installed"
-    val requiredHookNames =
-        buildList {
-            if (threadId != null && (threadScope ?: 0) >= 2) {
-                add(HOOK_SEND_THREADED_ENTRY)
-                add(HOOK_SEND_THREADED_INJECT)
-            } else {
-                add(requiredSendHookName(imageCount))
-            }
-        }
-    requiredHookNames.forEach { requiredHookName ->
-        val hook =
-            hooks.firstOrNull { it.name == requiredHookName }
-                ?: return "bridge discovery hook missing from snapshot: $requiredHookName"
-        if (!hook.installed) return "bridge discovery hook not ready: $requiredHookName"
+    val nativeReason =
+        nativeSendBlockReason(
+            installAttempted,
+            hooksJson(),
+            imageCount,
+            threadId,
+            threadScope,
+        )
+    if (nativeReason != null) return nativeReason.ifEmpty { null }
+    return SEND_BLOCK_POLICY_UNAVAILABLE_REASON
+}
+
+private fun BridgeDiscoverySnapshot.hooksJson(): String {
+    val array = JSONArray()
+    hooks.forEach { hook ->
+        array.put(
+            JSONObject()
+                .put("name", hook.name)
+                .put("installed", hook.installed),
+        )
     }
-    return null
+    return array.toString()
 }

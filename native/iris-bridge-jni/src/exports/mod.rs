@@ -1,9 +1,15 @@
 mod admission;
+mod bridge_flags;
+mod capabilities;
 mod context;
 mod dedupe;
+mod discovery_hooks;
 mod error_classification;
 mod handshake;
 mod image_path;
+mod peer_identity;
 mod reply_hook;
+mod restart_policy;
+mod security_mode;
 mod text_request;
 mod token_lease;

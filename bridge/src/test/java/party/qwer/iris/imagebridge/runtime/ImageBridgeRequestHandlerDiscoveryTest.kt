@@ -8,6 +8,7 @@ import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_MULTIPLE
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_SINGLE
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_ENTRY
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_INJECT
+import party.qwer.iris.imagebridge.runtime.discovery.sendBlockReason
 import party.qwer.iris.imagebridge.runtime.server.BridgeImagePathValidator
 import party.qwer.iris.imagebridge.runtime.server.BridgeSpecStatus
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeHealthSnapshot
@@ -17,6 +18,25 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ImageBridgeRequestHandlerDiscoveryTest {
+    @Test
+    fun `discovery send block reason fails closed when native policy is unavailable`() {
+        val snapshot =
+            BridgeDiscoverySnapshot(
+                installAttempted = true,
+                hooks = listOf(DiscoveryHookStatus(name = HOOK_SEND_MULTIPLE, installed = true, invocationCount = 0)),
+            )
+
+        val reason =
+            snapshot.sendBlockReason(
+                imageCount = 1,
+                threadId = null,
+                threadScope = null,
+                nativeSendBlockReason = { _, _, _, _, _ -> null },
+            )
+
+        assertEquals("bridge core unavailable to evaluate bridge discovery hooks", reason)
+    }
+
     @Test
     fun `single image request only requires multi send discovery hook`() {
         var sendCalls = 0

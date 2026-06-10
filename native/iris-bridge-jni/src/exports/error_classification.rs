@@ -6,7 +6,7 @@ use crate::dispatch::dispatch_classify_error_code;
 use crate::marshal::{catch_jstring, read_string, return_string};
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCore_nativeClassifyErrorCode<
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniRequest_nativeClassifyErrorCode<
     'local,
 >(
     mut env: JNIEnv<'local>,

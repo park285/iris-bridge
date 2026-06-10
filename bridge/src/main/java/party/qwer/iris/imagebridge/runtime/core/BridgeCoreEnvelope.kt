@@ -26,6 +26,12 @@ class BridgeCoreEnvelope private constructor(
 
     fun string(key: String): String? = if (json.has(key) && !json.isNull(key)) json.optString(key) else null
 
+    fun bool(key: String): Boolean? = if (json.has(key) && !json.isNull(key)) json.optBoolean(key) else null
+
+    fun strictBool(key: String): Boolean? = if (json.has(key) && !json.isNull(key)) json.opt(key) as? Boolean else null
+
+    fun long(key: String): Long? = if (json.has(key) && !json.isNull(key)) json.optLong(key) else null
+
     fun dedupeState(): DedupeState? =
         when (string("state")) {
             "fresh" -> DedupeState.Fresh
