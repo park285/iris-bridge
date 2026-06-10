@@ -56,12 +56,12 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                 threadId = 55L,
                 threadScope = 2,
                 nativeSendBlockReason = {
-                        installAttempted,
-                        hookNames,
-                        hookInstalled,
-                        imageCount,
-                        threadId,
-                        threadScope,
+                    installAttempted,
+                    hookNames,
+                    hookInstalled,
+                    imageCount,
+                    threadId,
+                    threadScope,
                     ->
                     assertEquals(true, installAttempted)
                     assertEquals(listOf(HOOK_SEND_MULTIPLE, HOOK_SEND_THREADED_INJECT), hookNames.toList())

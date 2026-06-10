@@ -4,10 +4,16 @@ mod dedupe;
 mod discovery_hooks;
 mod envelope;
 mod handshake;
+mod kakao_link_attachment;
+mod kakao_link_template;
 mod kakao_target;
 mod lease;
+mod member_field_checks;
 mod mentions_hash;
+mod reply_attachment_text;
 mod reply_hook;
+mod reply_leverage_attachment;
+mod reply_mention_attachment;
 mod request_validation;
 mod restart_policy;
 
@@ -22,12 +28,32 @@ pub use discovery_hooks::{
     DISCOVERY_HOOK_SNAPSHOT_INVALID_REASON, dispatch_send_block_reason_from_snapshot,
 };
 pub use handshake::{dispatch_handshake_on_client_proof, dispatch_handshake_on_hello};
+pub use kakao_link_attachment::{
+    dispatch_kakao_link_attachments_match, dispatch_kakao_link_leverage_encryption_type,
+    dispatch_kakao_link_pending_cleanup_attachments_match,
+};
+pub use kakao_link_template::{
+    dispatch_kakao_link_build_spec_send_attachment, dispatch_kakao_link_build_v4_encoded_query,
+    dispatch_kakao_link_extract_app_key, dispatch_kakao_link_has_explicit_template_args,
+    dispatch_kakao_link_has_resolved_iris_template, dispatch_kakao_link_patch_display_attachment,
+};
 pub use kakao_target::dispatch_resolve_kakao_target;
 pub use lease::{
     dispatch_image_lease_facts_json, dispatch_image_lease_rejection_is_state_error,
     dispatch_verify_leases,
 };
+pub use member_field_checks::{
+    dispatch_member_generic_label_penalty, dispatch_member_looks_like_mention_user_id_value,
+    dispatch_member_looks_like_nickname, dispatch_member_looks_like_profile_url,
+    dispatch_member_nickname_quality_score, dispatch_member_parse_role_code_from_long,
+    dispatch_member_parse_role_code_from_string, dispatch_member_path_hint_score,
+    dispatch_member_primitive_long_value_from_string,
+};
+pub use reply_attachment_text::{
+    dispatch_reply_attachment_session_id, dispatch_reply_attachment_text_looks_like,
+};
 pub use reply_hook::{dispatch_reply_hook_sign, dispatch_reply_hook_verify};
+pub use reply_leverage_attachment::dispatch_merge_reply_leverage_attachment;
 pub use request_validation::{
     dispatch_allowed_peer_uids, dispatch_classify_error_code, dispatch_failure_metric_bucket,
     dispatch_image_path_under_allowed_root, dispatch_is_truthy_flag,
@@ -46,6 +72,9 @@ pub use envelope::DispatchResult;
 use envelope::bad_request;
 pub use envelope::{invalid_handle_envelope, json_catch_unwind};
 pub use mentions_hash::{dispatch_mentions_hash_from_attachment, dispatch_mentions_hash_from_json};
+pub use reply_mention_attachment::{
+    dispatch_merge_reply_mention_attachment, dispatch_reply_mention_attachment_or_null,
+};
 
 pub fn dispatch_validate_request_token(context: &BridgeCoreContext, request_json: &str) -> String {
     json_catch_unwind(|| {

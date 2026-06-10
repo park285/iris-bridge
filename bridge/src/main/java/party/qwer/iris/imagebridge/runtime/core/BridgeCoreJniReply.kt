@@ -24,4 +24,20 @@ internal object BridgeCoreJniReply {
     external fun nativeMentionsHashFromJson(mentionsJson: String?): String?
 
     external fun nativeMentionsHashFromAttachment(attachmentText: String?): String?
+
+    external fun nativeReplyMentionAttachmentOrNull(attachmentText: String): String?
+
+    external fun nativeMergeReplyMentionAttachment(
+        targetAttachmentText: String,
+        mentionAttachmentText: String,
+    ): String?
+
+    external fun nativeMergeReplyLeverageAttachment(
+        generatedAttachment: String?,
+        rawAttachment: String,
+    ): String?
+
+    external fun nativeReplyAttachmentTextLooksLike(value: String): Boolean
+
+    external fun nativeReplyAttachmentSessionId(attachmentText: String): String?
 }

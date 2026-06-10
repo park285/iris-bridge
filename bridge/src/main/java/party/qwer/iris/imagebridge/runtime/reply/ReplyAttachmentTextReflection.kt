@@ -1,6 +1,9 @@
 package party.qwer.iris.imagebridge.runtime.reply
 
 import org.json.JSONObject
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.looksLikeReplyAttachmentText
+import party.qwer.iris.imagebridge.runtime.core.replyAttachmentSessionId
 import java.lang.reflect.Field
 import java.lang.reflect.Modifier
 
@@ -86,13 +89,6 @@ private fun writeStringFieldCandidate(
             }.getOrDefault(false)
         }
 
-private fun isAttachmentText(value: String): Boolean =
-    value.contains("irisSessionId") ||
-        value.contains("callingPkg") ||
-        value.contains("\"mentions\"") ||
-        (value.contains("\"P\"") && value.contains("\"C\""))
+private fun isAttachmentText(value: String): Boolean = BridgeCore.looksLikeReplyAttachmentText(value)
 
-internal fun extractAttachmentSessionId(attachmentText: String): String? =
-    runCatching {
-        JSONObject(attachmentText).optString("irisSessionId").ifBlank { null }
-    }.getOrNull()
+internal fun extractAttachmentSessionId(attachmentText: String): String? = BridgeCore.replyAttachmentSessionId(attachmentText)

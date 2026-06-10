@@ -11,6 +11,9 @@ import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.send.KakaoChatLogAttachmentCrypto
 import party.qwer.iris.imagebridge.runtime.send.ReflectiveKakaoLinkSpecSender
 import party.qwer.iris.imagebridge.runtime.send.buildKakaoLinkV4EncodedQuery
+import party.qwer.iris.imagebridge.runtime.send.extractKakaoLinkAppKey
+import party.qwer.iris.imagebridge.runtime.send.hasExplicitKakaoLinkTemplateArgs
+import party.qwer.iris.imagebridge.runtime.send.hasResolvedIrisKakaoLinkTemplate
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkAttachmentsMatch
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkDisplayPatchAttachment
 import party.qwer.iris.imagebridge.runtime.send.kakaoLinkPendingCleanupAttachmentsMatch
@@ -223,6 +226,49 @@ class KakaoLinkSpecSenderTest {
             """.trimIndent()
 
         assertTrue(kakaoLinkPendingCleanupAttachmentsMatch(expected, pending))
+    }
+
+    @Test
+    fun `kakaolink template route helpers use bridge core policy`() {
+        assertTrue(
+            hasExplicitKakaoLinkTemplateArgs(
+                """
+                {"templateArgs": {"item1_title": "첫 번째"}}
+                """.trimIndent(),
+            ),
+        )
+        assertFalse(hasExplicitKakaoLinkTemplateArgs("not-json"))
+        assertTrue(
+            hasResolvedIrisKakaoLinkTemplate(
+                """
+                {"P": {"SID": "iris_133218"}, "C": {"ITL": [{"TD": {"T": "첫 번째"}}]}}
+                """.trimIndent(),
+            ),
+        )
+        assertFalse(
+            hasResolvedIrisKakaoLinkTemplate(
+                """
+                {"P": {"SNM": "hololive-bot"}, "C": {"ITL": []}}
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `kakaolink app key extraction uses bridge core policy`() {
+        assertEquals(
+            "bfbfe8b641716d3f45e01a3b7a03f13d",
+            extractKakaoLinkAppKey(
+                """
+                {"P": {"SL": {"LCA": "kakaobfbfe8b641716d3f45e01a3b7a03f13d://kakaolink"}}}
+                """.trimIndent(),
+            ),
+        )
+        assertEquals(
+            "46e8bda79095ab1dea785ef1adad5117",
+            extractKakaoLinkAppKey("https://example.test/path?app_key=46e8bda79095ab1dea785ef1adad5117"),
+        )
+        assertEquals(null, extractKakaoLinkAppKey("app_key=46e8bda79095ab1dea785ef1adad5117"))
     }
 
     @Test

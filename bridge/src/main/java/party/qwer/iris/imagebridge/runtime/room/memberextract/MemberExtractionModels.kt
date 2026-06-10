@@ -80,8 +80,6 @@ internal data class RankedContainerCandidate(
 internal const val MAX_GRAPH_DEPTH = 4
 internal const val MAX_CONTAINER_ELEMENTS = 80
 internal const val MAX_MEMBER_FIELD_DEPTH = 4
-internal const val MAX_NICKNAME_LENGTH = 80
-internal const val MAX_MENTION_USER_ID_LENGTH = 128
 internal const val CONTAINER_TYPE_COLLECTION = "collection"
 internal const val CONTAINER_TYPE_MAP = "map"
 internal const val MAX_DEBUG_CONTAINER_SUMMARY = 8
@@ -92,17 +90,3 @@ internal const val MAX_DEBUG_VALUE_LENGTH = 48
 internal const val MAX_DEBUG_MEMBER_IDS = 8
 internal const val MAX_DEBUG_NICKNAMES = 8
 internal const val TAG = "IrisBridge"
-internal val KNOWN_ROLE_CODES = setOf(0, 1, 2, 4, 8)
-internal val GENERIC_LABEL_VALUES = setOf("notice", "system", "default", "unknown", "profile", "member")
-internal val INTERNAL_ARTIFACT_TOKENS =
-    setOf(
-        "backup",
-        "openlink",
-        "chatmember",
-        "display",
-        "memberid",
-        "userid",
-        "user_ids",
-        "nickname",
-        "profile",
-    )

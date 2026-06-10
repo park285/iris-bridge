@@ -2,6 +2,8 @@ package party.qwer.iris.imagebridge.runtime.send
 
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.kakaoLinkLeverageEncryptionType
 
 internal data class KakaoLeveragePatchTarget(
     val rowId: Long,
@@ -115,13 +117,4 @@ private fun decryptedLeverageMessage(
     }.getOrNull()
 }
 
-private fun leverageEncryptionType(value: String): Int =
-    ENCRYPTION_TYPE_REGEX
-        .find(value)
-        ?.groupValues
-        ?.getOrNull(1)
-        ?.toIntOrNull()
-        ?: DEFAULT_ENCRYPTION_TYPE
-
-private const val DEFAULT_ENCRYPTION_TYPE = 31
-private val ENCRYPTION_TYPE_REGEX = Regex(""""enc"\s*:\s*(\d+)""")
+private fun leverageEncryptionType(value: String): Int = BridgeCore.kakaoLinkLeverageEncryptionType(value)

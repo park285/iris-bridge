@@ -1,7 +1,8 @@
 package party.qwer.iris.imagebridge.runtime
 
 import android.util.Log
-import org.json.JSONObject
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.mergeReplyLeverageAttachment
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_REPLY_MARKDOWN_REQUEST
 import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContext
@@ -93,19 +94,7 @@ private fun injectLeverageAttachment(
 internal fun mergeLeverageAttachment(
     generatedAttachment: String?,
     rawAttachment: String,
-): String =
-    runCatching {
-        val raw = JSONObject(rawAttachment)
-        val generated = generatedAttachment?.let(::JSONObject) ?: return@runCatching raw.toString()
-        raw.optJSONObject("C")?.let { content -> generated.put("C", content) }
-        raw.optJSONObject("K")?.let { rawK ->
-            val generatedK = generated.optJSONObject("K") ?: JSONObject()
-            rawK.optString("ti").takeIf { value -> value.isNotBlank() }?.let { value -> generatedK.put("ti", value) }
-            rawK.optString("ai").takeIf { value -> value.isNotBlank() }?.let { value -> generatedK.put("ai", value) }
-            generated.put("K", generatedK)
-        }
-        generated.toString()
-    }.getOrElse { rawAttachment }
+): String = BridgeCore.mergeReplyLeverageAttachment(generatedAttachment, rawAttachment) ?: rawAttachment
 
 private fun injectMentionAttachment(
     tag: String,

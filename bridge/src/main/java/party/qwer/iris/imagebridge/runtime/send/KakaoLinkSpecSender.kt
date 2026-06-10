@@ -1,11 +1,11 @@
 package party.qwer.iris.imagebridge.runtime.send
 
 import android.util.Log
-import org.json.JSONObject
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectMethodBySignature
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Modifier
-import java.net.URLEncoder
+import party.qwer.iris.imagebridge.runtime.core.buildKakaoLinkV4EncodedQuery as coreBuildKakaoLinkV4EncodedQuery
 
 internal interface KakaoLinkSpecSender {
     fun send(
@@ -100,38 +100,9 @@ private fun resolveKakaoLinkParserMethod(helperClass: Class<*>): java.lang.refle
     )
 }
 
-internal fun buildKakaoLinkV4EncodedQuery(rawAttachment: String): String {
-    val attachment = JSONObject(rawAttachment)
-    val platform = attachment.getJSONObject("P")
-    val appVer = firstNonBlank(platform.optString("VA"), platform.optString("VI")) ?: "6.0.0"
-    val appKey =
-        firstNonBlank(attachment.optString("app_key"), attachment.optString("appKey"))
-            ?: extractKakaoLinkAppKey(rawAttachment)
-            ?: error("KakaoLink app key not found")
-    val templateId =
-        firstNonBlank(
-            attachment.optString("template_id"),
-            attachment.optString("templateId"),
-            attachment.optJSONObject("K")?.optString("ti"),
-            platform.optString("SDID"),
-        )
-            ?: error("KakaoLink template id not found")
-    val templateArgs = explicitTemplateArgs(attachment)
-    val queryParams =
-        mutableListOf(
-            "linkver" to "4.0",
-            "appver" to appVer,
-            "appkey" to appKey,
-            "template_id" to templateId,
-            "template_json" to attachment.toString(),
-        )
-    (templateArgs ?: inferTemplateArgs(attachment))?.let { resolvedArgs ->
-        queryParams += "template_args" to resolvedArgs.toString()
-    }
-    return queryParams.joinToString("&") { (key, value) -> "${urlEncode(key)}=${urlEncode(value)}" }
-}
-
-private fun urlEncode(value: String): String = URLEncoder.encode(value, "UTF-8")
+internal fun buildKakaoLinkV4EncodedQuery(rawAttachment: String): String =
+    BridgeCore.coreBuildKakaoLinkV4EncodedQuery(rawAttachment)
+        ?: error("KakaoLink V4 query build failed")
 
 private fun describeThrowable(error: Throwable): String {
     val root =

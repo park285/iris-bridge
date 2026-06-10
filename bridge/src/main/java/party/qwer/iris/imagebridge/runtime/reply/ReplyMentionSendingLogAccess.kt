@@ -1,6 +1,8 @@
 package party.qwer.iris.imagebridge.runtime.reply
 
-import org.json.JSONObject
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.mergeReplyMentionAttachment
+import party.qwer.iris.imagebridge.runtime.core.replyMentionAttachmentOrNull
 
 internal object ReplyMentionSendingLogAccess {
     fun injectMentionAttachment(
@@ -17,24 +19,10 @@ internal object ReplyMentionSendingLogAccess {
         return true
     }
 
-    fun mentionAttachmentOrNull(attachmentText: String): String? =
-        runCatching {
-            val attachment = JSONObject(attachmentText)
-            val mentions = attachment.optJSONArray("mentions") ?: return null
-            if (mentions.length() == 0) return null
-            attachment.toString()
-        }.getOrNull()
+    fun mentionAttachmentOrNull(attachmentText: String): String? = BridgeCore.replyMentionAttachmentOrNull(attachmentText)
 
     private fun mergeMentionAttachment(
         targetAttachmentText: String,
         mentionAttachmentText: String,
-    ): String? =
-        runCatching {
-            val target = JSONObject(targetAttachmentText)
-            val source = JSONObject(mentionAttachmentText)
-            val mentions = source.optJSONArray("mentions") ?: return null
-            if (mentions.length() == 0) return null
-            target.put("mentions", mentions)
-            target.toString()
-        }.getOrNull()
+    ): String? = BridgeCore.mergeReplyMentionAttachment(targetAttachmentText, mentionAttachmentText)
 }

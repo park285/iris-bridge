@@ -20,8 +20,7 @@ internal data class BridgeDiscoverySnapshot(
     val hooks: List<DiscoveryHookStatus>,
 )
 
-internal fun BridgeDiscoverySnapshot.sendBlockReason(imageCount: Int): String? =
-    sendBlockReason(imageCount, threadId = null, threadScope = null)
+internal fun BridgeDiscoverySnapshot.sendBlockReason(imageCount: Int): String? = sendBlockReason(imageCount, threadId = null, threadScope = null)
 
 internal fun BridgeDiscoverySnapshot.sendBlockReason(
     imageCount: Int,
@@ -42,8 +41,6 @@ internal fun BridgeDiscoverySnapshot.sendBlockReason(
     return SEND_BLOCK_POLICY_UNAVAILABLE_REASON
 }
 
-private fun BridgeDiscoverySnapshot.hookNames(): Array<String> =
-    hooks.map { hook -> hook.name }.toTypedArray()
+private fun BridgeDiscoverySnapshot.hookNames(): Array<String> = hooks.map { hook -> hook.name }.toTypedArray()
 
-private fun BridgeDiscoverySnapshot.hookInstalled(): BooleanArray =
-    BooleanArray(hooks.size) { index -> hooks[index].installed }
+private fun BridgeDiscoverySnapshot.hookInstalled(): BooleanArray = BooleanArray(hooks.size) { index -> hooks[index].installed }

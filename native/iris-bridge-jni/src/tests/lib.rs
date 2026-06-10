@@ -245,6 +245,128 @@ fn send_block_reason_snapshot_dispatch_matches_core_discovery_policy() {
 }
 
 #[test]
+fn member_field_dispatch_matches_core_member_extraction_policy() {
+    assert_eq!(dispatch_member_parse_role_code_from_long(4), Some(4));
+    assert_eq!(
+        dispatch_member_parse_role_code_from_string("manager"),
+        Some(4)
+    );
+    assert_eq!(dispatch_member_parse_role_code_from_string("guest"), None);
+
+    assert!(dispatch_member_looks_like_nickname("홍길동"));
+    assert!(!dispatch_member_looks_like_nickname(
+        "Welcome to '카푸치노'."
+    ));
+    assert!(dispatch_member_looks_like_profile_url(
+        "https://example.com/profile.webp"
+    ));
+    assert_eq!(
+        dispatch_member_primitive_long_value_from_string(" -42 "),
+        Some("-42".to_owned())
+    );
+    assert_eq!(
+        dispatch_member_path_hint_score(
+            "$.members.profile.nickname",
+            &["member".to_owned(), "nickname".to_owned()],
+            &["backup".to_owned()],
+        ),
+        50
+    );
+    assert!(dispatch_member_looks_like_mention_user_id_value(
+        "text-ping-7",
+        Some(7),
+        Some("Alice"),
+    ));
+    assert!(!dispatch_member_looks_like_mention_user_id_value(
+        "Alice",
+        Some(7),
+        Some("Alice"),
+    ));
+    assert_eq!(dispatch_member_nickname_quality_score("[홍길동]"), 42);
+    assert_eq!(dispatch_member_generic_label_penalty("notice"), 220);
+}
+
+#[test]
+fn reply_mention_attachment_dispatch_matches_core_merge_policy() {
+    let attachment = dispatch_reply_mention_attachment_or_null(
+        r#"{"callingPkg":"com.kakao.talk","mentions":[{"user_id":"text-user","at":[1],"len":3}]}"#,
+    )
+    .expect("valid mention attachment");
+    let value: Value = serde_json::from_str(&attachment).expect("attachment JSON");
+    assert_eq!(value["callingPkg"], "com.kakao.talk");
+    assert_eq!(value["mentions"][0]["user_id"], "text-user");
+
+    assert_eq!(
+        dispatch_reply_mention_attachment_or_null(r#"{"mentions":[]}"#),
+        None
+    );
+    assert_eq!(
+        dispatch_merge_reply_mention_attachment(
+            r#"{"a":1,"mentions":[{"user_id":"old"}],"b":2}"#,
+            r#"{"mentions":[{"user_id":"new"}]}"#,
+        ),
+        Some(r#"{"a":1,"mentions":[{"user_id":"new"}],"b":2}"#.to_owned())
+    );
+    assert_eq!(
+        dispatch_merge_reply_mention_attachment("not-json", r#"{"mentions":[1]}"#),
+        None
+    );
+}
+
+#[test]
+fn reply_leverage_attachment_dispatch_matches_core_merge_policy() {
+    let merged = dispatch_merge_reply_leverage_attachment(
+        Some(
+            r#"{"P":{"A":{"code":"signed"},"RF":"out-client"},"C":{"old":true},"K":{"ak":"app","av":"6.0.0","ti":"old","lv":"4.0"}}"#,
+        ),
+        r#"{"P":{"RF":"chat_ln"},"C":{"new":true},"K":{"ti":"121065","ai":"377386"}}"#,
+    );
+    let value: Value = serde_json::from_str(&merged).expect("merged JSON");
+    assert_eq!(value["P"]["A"]["code"], "signed");
+    assert_eq!(value["P"]["RF"], "out-client");
+    assert_eq!(value["C"]["new"], true);
+    assert_eq!(value["K"]["ak"], "app");
+    assert_eq!(value["K"]["ti"], "121065");
+    assert_eq!(value["K"]["ai"], "377386");
+    assert_eq!(value["K"]["lv"], "4.0");
+
+    assert_eq!(
+        dispatch_merge_reply_leverage_attachment(None, r#"{ "K": { "ti": "121065" } }"#),
+        r#"{"K":{"ti":"121065"}}"#
+    );
+    assert_eq!(
+        dispatch_merge_reply_leverage_attachment(Some("not-json"), r#"{"K":{"ti":"raw"}}"#),
+        r#"{"K":{"ti":"raw"}}"#
+    );
+}
+
+#[test]
+fn reply_attachment_text_dispatch_matches_core_policy() {
+    assert!(dispatch_reply_attachment_text_looks_like(
+        r#"{"callingPkg":"com.kakao.talk"}"#
+    ));
+    assert!(dispatch_reply_attachment_text_looks_like(
+        r#"{"P":{},"C":{}}"#
+    ));
+    assert!(!dispatch_reply_attachment_text_looks_like(
+        "mentions without JSON quotes"
+    ));
+    assert_eq!(
+        dispatch_reply_attachment_session_id(r#"{"irisSessionId":"session-1"}"#).as_deref(),
+        Some("session-1")
+    );
+    assert_eq!(
+        dispatch_reply_attachment_session_id(r#"{"irisSessionId":12345}"#).as_deref(),
+        Some("12345")
+    );
+    assert_eq!(
+        dispatch_reply_attachment_session_id(r#"{"irisSessionId":"   "}"#),
+        None
+    );
+    assert_eq!(dispatch_reply_attachment_session_id("not-json"), None);
+}
+
+#[test]
 fn current_bridge_capabilities_dispatch_reports_rollout_and_readiness_reasons() {
     let envelope = assert_ok(&dispatch_current_bridge_capabilities(
         true, None, true, true, true, None, false, true,
@@ -531,6 +653,166 @@ fn kakao_target_dispatch_matches_bridge_package_policy() {
         &dispatch_resolve_kakao_target("com.example.talk"),
         "BAD_REQUEST",
         "unsupported KakaoTalk package: com.example.talk",
+    );
+}
+
+#[test]
+fn kakao_link_attachment_dispatch_matches_titles_and_rejects_bad_json() {
+    let expected = r#"{
+        "template_id":"133218",
+        "C":{"ITL":[{"TD":{"T":"첫 번째"}},{"TD":{"T":"두 번째"}}]},
+        "K":{"ti":"133218"}
+    }"#;
+    let committed = r#"{
+        "ti":"133218",
+        "C":{"ITL":[{"TD":{"T":"첫 번째"}},{"TD":{"T":"두 번째"}}]}
+    }"#;
+    let stale = r#"{
+        "ti":"133218",
+        "C":{"ITL":[{"TD":{"T":"다른 방송"}}]}
+    }"#;
+
+    assert!(dispatch_kakao_link_attachments_match(expected, committed));
+    assert!(!dispatch_kakao_link_attachments_match(expected, stale));
+    assert!(!dispatch_kakao_link_attachments_match(
+        "not-json", committed
+    ));
+}
+
+#[test]
+fn kakao_link_leverage_encryption_type_dispatch_matches_bridge_policy() {
+    assert_eq!(
+        dispatch_kakao_link_leverage_encryption_type(r#"{"enc":31}"#),
+        31
+    );
+    assert_eq!(
+        dispatch_kakao_link_leverage_encryption_type(r#"{ "enc" : 42 }"#),
+        42
+    );
+    assert_eq!(
+        dispatch_kakao_link_leverage_encryption_type(r#"{"enc":"42"}"#),
+        31
+    );
+    assert_eq!(
+        dispatch_kakao_link_leverage_encryption_type(r#"{"enc":-1}"#),
+        31
+    );
+    assert_eq!(dispatch_kakao_link_leverage_encryption_type("not-json"), 31);
+}
+
+#[test]
+fn kakao_link_pending_cleanup_dispatch_checks_header_and_identity() {
+    let expected = r#"{
+        "template_id":"133266",
+        "C":{"HD":{"TD":{"T":"동일한 알림"}}},
+        "K":{"ti":"133266"},
+        "template_args":{"alarm_title":"동일한 알림","web_url":"watch?v=expected01"}
+    }"#;
+    let pending = r#"{
+        "ti":"133266",
+        "C":{"HD":{"TD":{"T":"동일한 알림"}}},
+        "ta":{"alarm_title":"동일한 알림","web_url":"watch?v=expected01"}
+    }"#;
+    let stale = r#"{
+        "ti":"133266",
+        "C":{"HD":{"TD":{"T":"동일한 알림"}}},
+        "ta":{"alarm_title":"동일한 알림","web_url":"watch?v=stale00002"}
+    }"#;
+
+    assert!(dispatch_kakao_link_pending_cleanup_attachments_match(
+        expected, pending,
+    ));
+    assert!(!dispatch_kakao_link_pending_cleanup_attachments_match(
+        expected, stale,
+    ));
+}
+
+#[test]
+fn kakao_link_template_dispatch_preserves_route_flags_and_app_key_extraction() {
+    assert!(dispatch_kakao_link_has_explicit_template_args(
+        r#"{"templateArgs":{"item1_title":"첫 번째"}}"#
+    ));
+    assert!(!dispatch_kakao_link_has_explicit_template_args("not-json"));
+
+    assert!(dispatch_kakao_link_has_resolved_iris_template(
+        r#"{"P":{"SNM":"hololive-bot"},"C":{"ITL":[{"TD":{"T":"첫 번째"}}]}}"#
+    ));
+    assert!(!dispatch_kakao_link_has_resolved_iris_template(
+        r#"{"P":{"SNM":"hololive-bot"},"C":{"ITL":[]}}"#
+    ));
+
+    assert_eq!(
+        dispatch_kakao_link_extract_app_key(
+            "https://example.test/path?app_key=46e8bda79095ab1dea785ef1adad5117",
+        )
+        .as_deref(),
+        Some("46e8bda79095ab1dea785ef1adad5117")
+    );
+
+    let query = dispatch_kakao_link_build_v4_encoded_query(
+        r#"{
+            "app_key":"bfbfe8b641716d3f45e01a3b7a03f13d",
+            "template_id":"133218",
+            "P":{"VA":"6.0.0","SDID":"133218"},
+            "C":{"HD":{"TD":{"T":"5분 전 알림"}}}
+        }"#,
+    )
+    .expect("query");
+    assert!(query.starts_with("linkver=4.0&appver=6.0.0&appkey=bfbfe8b641716d3f45e01a3b7a03f13d"));
+    assert!(query.contains("%EB%B6%84+%EC%A0%84"));
+    assert_eq!(dispatch_kakao_link_build_v4_encoded_query("not-json"), None);
+
+    let send_attachment = dispatch_kakao_link_build_spec_send_attachment(
+        r#"{
+            "app_key":"bfbfe8b641716d3f45e01a3b7a03f13d",
+            "template_id":"133220",
+            "P":{"VA":"6.0.0","SID":"iris_133220","SDID":"133220","SNM":"hololive-bot"},
+            "C":{"HD":{"TD":{"T":"5분 전 알림"}},"ITL":[{"TD":{"T":"단건 방송"}}]},
+            "K":{"ti":"133220"},
+            "template_args":{"visible_stream_count":"1"}
+        }"#,
+    );
+    let send_attachment = serde_json::from_str::<Value>(&send_attachment).expect("attachment");
+    assert_eq!(send_attachment["template_id"], "133220");
+    assert_eq!(send_attachment["P"]["SDID"], "133220");
+    assert_eq!(send_attachment["K"]["ti"], "133220");
+    assert_eq!(
+        send_attachment["template_args"]["visible_stream_count"],
+        "1"
+    );
+    assert_eq!(
+        dispatch_kakao_link_build_spec_send_attachment("not-json"),
+        "not-json",
+    );
+
+    let patched = dispatch_kakao_link_patch_display_attachment(
+        Some(
+            r#"{
+                "P":{"SDID":"133222","SST":{"L":{"LPC":"https://apps.kakao.com/talk/message/block?tid=133222"}}},
+                "C":{"ITL":[]},
+                "K":{"ti":"133222","lv":"4.0"}
+            }"#,
+        ),
+        r#"{
+            "template_id":"133218",
+            "P":{"ME":"5분 전 알림"},
+            "C":{"ITL":[{"TD":{"T":"첫 번째","D":"멤버 · LIVE"},"L":{"LPC":"https://youtu.be/one"}}],"BUL":[]},
+            "K":{"ti":"133218"}
+        }"#,
+    );
+    let patched = serde_json::from_str::<Value>(&patched).expect("patched");
+    assert_eq!(patched["P"]["SDID"], "133218");
+    assert_eq!(patched["P"]["ME"], "5분 전 알림");
+    assert_eq!(patched["P"]["DID"], "https://youtu.be/one");
+    assert_eq!(
+        patched["P"]["SST"]["L"]["LPC"],
+        "https://apps.kakao.com/talk/message/block?tid=133218"
+    );
+    assert_eq!(patched["K"]["ti"], "133218");
+    assert_eq!(patched["C"]["ITL"][0]["TD"]["D"], "멤버");
+    assert_eq!(
+        dispatch_kakao_link_patch_display_attachment(None, "raw"),
+        "raw",
     );
 }
 
