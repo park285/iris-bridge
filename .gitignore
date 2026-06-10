@@ -87,3 +87,6 @@ docs/closeout-*.tar.gz
 /scripts/replay_closeout.sh
 /scripts/verify-all.sh
 /scripts/verify_closeout_packet.py
+
+# Generated bridge jniLibs
+/bridge/src/main/jniLibs/

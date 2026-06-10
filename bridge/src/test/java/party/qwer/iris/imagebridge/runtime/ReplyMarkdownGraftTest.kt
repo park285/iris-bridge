@@ -2,6 +2,9 @@ package party.qwer.iris.imagebridge.runtime
 
 import org.json.JSONObject
 import party.qwer.iris.ReplyHookSignatureProtocol
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.mentionsHashFromJson
+import party.qwer.iris.imagebridge.runtime.core.replyHookSign
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownBridgeExtras
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContext
@@ -663,7 +666,7 @@ private fun markdownSignature(
     createdAtEpochMs: Long,
 ): String =
     requireNotNull(
-        ReplyHookSignatureProtocol.signPreparedOrNull(
+        BridgeCore.replyHookSign(
             bridgeToken = BRIDGE_TOKEN,
             roomId = roomId,
             messageText = messageText,
@@ -681,13 +684,13 @@ private fun mentionSignature(
     mentionsJson: String,
 ): String =
     requireNotNull(
-        ReplyHookSignatureProtocol.signOrNull(
+        BridgeCore.replyHookSign(
             bridgeToken = BRIDGE_TOKEN,
             roomId = roomId,
             messageText = messageText,
             sessionId = sessionId,
             createdAtEpochMs = createdAtEpochMs,
-            mentionsJson = mentionsJson,
+            mentionsHash = BridgeCore.mentionsHashFromJson(mentionsJson),
         ),
     )
 

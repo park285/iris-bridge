@@ -5,12 +5,16 @@ import android.util.Log
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.server.defaultImageBridgeServer
+import party.qwer.iris.resolveBridgeToken
 import java.lang.reflect.Method
 
 private const val IRIS_BRIDGE_TAG = "IrisBridge"
@@ -49,6 +53,7 @@ class IrisBridgeModule : XposedModule() {
         classLoader: ClassLoader,
     ) {
         Log.i(TAG, "Application.onCreate — starting image bridge server")
+        val bridgeCore = loadBridgeCore()
         val discovery = discoverKakaoClassRegistryForBridge { KakaoClassRegistry.discover(classLoader) }
         discovery.registry?.let { defaultBridgeDiscovery.install(it, hookInstaller) }
         markdownHooks.install(classLoader, discovery.registry, hookInstaller)
@@ -60,8 +65,16 @@ class IrisBridgeModule : XposedModule() {
             leveragePendingContexts,
             leverageCommitPendingContexts,
             hookInstaller,
+            bridgeCore,
         )
     }
+
+    private fun loadBridgeCore(): BridgeCoreRuntime? =
+        BridgeCore.loadOrNull(
+            securityMode = System.getenv("IRIS_BRIDGE_SECURITY_MODE"),
+            bridgeToken = resolveBridgeToken(),
+            requireHandshakeRaw = System.getenv("IRIS_BRIDGE_REQUIRE_HANDSHAKE"),
+        )
 }
 
 private data class KakaoClassRegistryDiscoveryResult(

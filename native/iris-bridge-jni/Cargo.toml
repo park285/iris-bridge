@@ -1,0 +1,34 @@
+[package]
+name = "iris-bridge-jni"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "iris_bridge_core"
+crate-type = ["cdylib"]
+doc = false
+
+[dependencies]
+getrandom.workspace = true
+hex.workspace = true
+iris-bridge-core = { path = "../iris-bridge-core" }
+jni = "0.21"
+serde.workspace = true
+serde_json.workspace = true
+
+[lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+elided_lifetimes_in_paths = "warn"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+allow_attributes_without_reason = "deny"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"

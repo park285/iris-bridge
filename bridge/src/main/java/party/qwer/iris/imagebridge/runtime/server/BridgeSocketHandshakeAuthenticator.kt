@@ -1,72 +1,60 @@
 package party.qwer.iris.imagebridge.runtime.server
 
 import party.qwer.iris.ImageBridgeHandshakeProtocol
-import party.qwer.iris.ImageBridgeProtocol
-import party.qwer.iris.resolveBridgeToken
+import party.qwer.iris.LengthPrefixedFrameCodec
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import java.io.InputStream
 import java.io.OutputStream
 
-internal class BridgeSocketHandshakeAuthenticator(
-    private val expectedToken: String = resolveBridgeToken(),
-    private val securityMode: BridgeSecurityMode = BridgeSecurityMode.fromEnv(),
-    private val requireHandshakeRaw: String? = System.getenv("IRIS_BRIDGE_REQUIRE_HANDSHAKE"),
-    private val nonceFactory: () -> String = ImageBridgeHandshakeProtocol::newNonce,
+internal class BridgeSocketHandshakeAuthenticator private constructor(
+    private val bridgeCoreProvider: () -> BridgeCoreRuntime?,
 ) {
+    constructor(
+        expectedToken: String = party.qwer.iris.resolveBridgeToken(),
+        securityMode: BridgeSecurityMode = BridgeSecurityMode.fromEnv(),
+        requireHandshakeRaw: String? = System.getenv("IRIS_BRIDGE_REQUIRE_HANDSHAKE"),
+    ) : this(bridgeCoreProviderFor(expectedToken, securityMode, requireHandshakeRaw))
+
+    constructor(bridgeCore: BridgeCoreRuntime) : this({ bridgeCore })
+
     fun authenticate(
         input: InputStream,
         output: OutputStream,
         socketName: String,
     ) {
-        if (!isRequired()) return
+        val core = bridgeCoreProvider() ?: throw IllegalArgumentException(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED)
+        if (!core.requireHandshake) return
         try {
-            require(expectedToken.isNotBlank()) { ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED }
-            val hello = ImageBridgeHandshakeProtocol.readFrame(input)
-            val clientNonce = hello.clientNonce.orEmpty()
-            if (
-                hello.type != ImageBridgeHandshakeProtocol.TYPE_HELLO ||
-                hello.protocolVersion != ImageBridgeProtocol.PROTOCOL_VERSION ||
-                clientNonce.isBlank()
-            ) {
-                throw IllegalArgumentException(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED)
-            }
-            val serverNonce = nonceFactory()
-            ImageBridgeHandshakeProtocol.writeFrame(
-                output,
-                ImageBridgeHandshakeProtocol.buildServerProof(
-                    bridgeToken = expectedToken,
-                    clientNonce = clientNonce,
-                    serverNonce = serverNonce,
-                    socketName = socketName,
-                ),
-            )
-            val clientProof = ImageBridgeHandshakeProtocol.readFrame(input)
-            val expectedProof =
-                ImageBridgeHandshakeProtocol.clientProof(
-                    bridgeToken = expectedToken,
-                    clientNonce = clientNonce,
-                    serverNonce = serverNonce,
-                )
-            if (
-                clientProof.type != ImageBridgeHandshakeProtocol.TYPE_CLIENT_PROOF ||
-                clientProof.protocolVersion != ImageBridgeProtocol.PROTOCOL_VERSION ||
-                !ImageBridgeHandshakeProtocol.proofMatches(clientProof.proof, expectedProof)
-            ) {
+            val helloPayload = LengthPrefixedFrameCodec.readPayload(input)
+            val helloEnvelope = core.handshakeOnHello(helloPayload, System.currentTimeMillis(), socketName)
+            val serverFrameJson =
+                helloEnvelope.string("frameJson")?.takeIf { helloEnvelope.isOk }
+                    ?: throw IllegalArgumentException(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED)
+            LengthPrefixedFrameCodec.writePayload(output, serverFrameJson)
+            val clientProofPayload = LengthPrefixedFrameCodec.readPayload(input)
+            val proofEnvelope = core.handshakeOnClientProof(clientProofPayload)
+            if (!proofEnvelope.isOk) {
                 throw IllegalArgumentException(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED)
             }
         } catch (error: Exception) {
             throw IllegalArgumentException(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED, error)
         }
     }
+}
 
-    private fun isRequired(): Boolean {
-        val explicitlyRequired =
-            when (requireHandshakeRaw?.trim()?.lowercase()) {
-                "1", "true", "yes", "y", "on" -> true
-                "0", "false", "no", "n", "off" -> false
-                else -> null
-            }
-        if (explicitlyRequired == true) return true
-        if (securityMode == BridgeSecurityMode.DEVELOPMENT) return false
-        return true
+private fun bridgeCoreProviderFor(
+    expectedToken: String,
+    securityMode: BridgeSecurityMode,
+    requireHandshakeRaw: String?,
+): () -> BridgeCoreRuntime? {
+    val runtime by lazy {
+        BridgeCore.loadOrNull(
+            securityMode = securityMode.coreRawValue(),
+            bridgeToken = expectedToken,
+            requireHandshakeRaw = requireHandshakeRaw,
+        )
     }
+    return { runtime }
 }

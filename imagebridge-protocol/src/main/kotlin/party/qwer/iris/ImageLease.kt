@@ -1,7 +1,6 @@
 package party.qwer.iris
 
 import kotlinx.serialization.Serializable
-import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -26,15 +25,10 @@ data class SignedImageLease(
     val signature: String,
 )
 
-enum class ImageLeaseVerification {
-    VALID,
-    SIGNATURE_MISMATCH,
-    EXPIRED,
-    ;
-
-    val valid: Boolean get() = this == VALID
-}
-
+// Lease verification/expiry는 iris-bridge-core(server/lease_verdict.rs)가 단일 소스다.
+// 여기 남은 sign/issue/canonicalJson은 bridge 테스트가 verifier 입력으로 쓸 유효 서명
+// lease를 만들기 위한 fixture 경로 — bridge에는 lease 서명용 native 진입점이 없고
+// (JNI export는 verify만), 알고리즘 parity는 native/iris-bridge-core/src/lease.rs가 보증한다.
 object ImageLease {
     const val VERSION = 1
 
@@ -72,22 +66,6 @@ object ImageLease {
         secret: String,
         payload: ImageLeasePayload,
     ): SignedImageLease = SignedImageLease(payload, sign(secret, payload))
-
-    fun verify(
-        secret: String,
-        lease: SignedImageLease,
-        nowEpochMs: Long,
-    ): ImageLeaseVerification {
-        val expected = sign(secret, lease.payload)
-        val signatureOk =
-            MessageDigest.isEqual(
-                expected.toByteArray(Charsets.UTF_8),
-                lease.signature.toByteArray(Charsets.UTF_8),
-            )
-        if (!signatureOk) return ImageLeaseVerification.SIGNATURE_MISMATCH
-        if (nowEpochMs > lease.payload.expiresAtEpochMs) return ImageLeaseVerification.EXPIRED
-        return ImageLeaseVerification.VALID
-    }
 
     private fun appendNumber(
         out: StringBuilder,

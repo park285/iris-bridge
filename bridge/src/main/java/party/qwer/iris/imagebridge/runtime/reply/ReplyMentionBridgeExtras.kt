@@ -1,7 +1,9 @@
 package party.qwer.iris.imagebridge.runtime.reply
 
 import android.content.Intent
-import party.qwer.iris.ReplyHookSignatureProtocol
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.mentionsHashFromAttachment
+import party.qwer.iris.imagebridge.runtime.core.replyHookVerify
 import party.qwer.iris.resolveBridgeToken
 
 internal object ReplyMentionBridgeExtras {
@@ -55,9 +57,9 @@ internal object ReplyMentionBridgeExtras {
             listOfNotNull(snapshot.attachmentText, snapshot.nestedAttachmentText)
                 .firstNotNullOfOrNull(ReplyMentionSendingLogAccess::mentionAttachmentOrNull)
                 ?: return null
-        val mentionsHash = ReplyHookSignatureProtocol.mentionsHashFromAttachment(attachmentText) ?: return null
+        val mentionsHash = BridgeCore.mentionsHashFromAttachment(attachmentText) ?: return null
         if (
-            !ReplyHookSignatureProtocol.verify(
+            !BridgeCore.replyHookVerify(
                 bridgeToken = bridgeToken,
                 roomId = roomId,
                 messageText = messageText,

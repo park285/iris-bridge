@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscoverySnapshot
 import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
@@ -21,18 +22,19 @@ private const val INITIAL_RESTART_DELAY_MS = 1_000L
 private const val MAX_RESTART_DELAY_MS = 30_000L
 
 internal class ImageBridgeServer(
-    private val running: AtomicBoolean = AtomicBoolean(false),
-    private val restartCount: AtomicInteger = AtomicInteger(0),
-    private val lastCrashMessage: AtomicReference<String?> = AtomicReference(null),
-    private val specStatus: AtomicReference<BridgeSpecStatus?> = AtomicReference(null),
-    private val registryAvailable: AtomicBoolean = AtomicBoolean(false),
-    private val lastRegistryError: AtomicReference<String?> = AtomicReference(null),
-    private val textSendCapability: AtomicReference<KakaoTextSendCapability?> = AtomicReference(null),
-    private val textBridgeSendTextEnabled: AtomicBoolean = AtomicBoolean(false),
-    private val textBridgeSendMarkdownEnabled: AtomicBoolean = AtomicBoolean(false),
+    internal val running: AtomicBoolean = AtomicBoolean(false),
+    internal val restartCount: AtomicInteger = AtomicInteger(0),
+    internal val lastCrashMessage: AtomicReference<String?> = AtomicReference(null),
+    internal val specStatus: AtomicReference<BridgeSpecStatus?> = AtomicReference(null),
+    internal val registryAvailable: AtomicBoolean = AtomicBoolean(false),
+    internal val lastRegistryError: AtomicReference<String?> = AtomicReference(null),
+    internal val textSendCapability: AtomicReference<KakaoTextSendCapability?> = AtomicReference(null),
+    internal val textBridgeSendTextEnabled: AtomicBoolean = AtomicBoolean(false),
+    internal val textBridgeSendMarkdownEnabled: AtomicBoolean = AtomicBoolean(false),
     private val peerIdentityValidator: BridgePeerIdentityValidator = BridgePeerIdentityValidator(),
-    private val bridgeMetrics: BridgeMetrics = BridgeMetrics(),
-    private val discoverySnapshotProvider: () -> BridgeDiscoverySnapshot = defaultBridgeDiscovery::snapshot,
+    internal val bridgeMetrics: BridgeMetrics = BridgeMetrics(),
+    internal val bridgeCoreUnavailable: AtomicBoolean = AtomicBoolean(false),
+    internal val discoverySnapshotProvider: () -> BridgeDiscoverySnapshot = defaultBridgeDiscovery::snapshot,
 ) {
     private val sessionAdmission: BridgeSessionAdmission = newBridgeSessionAdmission(bridgeMetrics)
     private val muxClientDispatcher =
@@ -51,6 +53,9 @@ internal class ImageBridgeServer(
     @Volatile
     private var clientExecutor: ExecutorService? = null
 
+    @Volatile
+    private var bridgeCore: BridgeCoreRuntime? = null
+
     fun start(
         context: Context,
         registry: KakaoClassRegistry?,
@@ -59,11 +64,19 @@ internal class ImageBridgeServer(
         leveragePendingContexts: ReplyLeveragePendingContextStore? = null,
         leverageCommitPendingContexts: ReplyLeveragePendingContextStore? = null,
         hookInstaller: BridgeHookInstaller = NoopBridgeHookInstaller,
+        bridgeCore: BridgeCoreRuntime?,
     ) {
+        if (bridgeCore == null) {
+            bridgeCoreUnavailable.set(true)
+            Log.e(TAG, "bridge-core unavailable — refusing to start mux server (fail-closed)")
+            return
+        }
         if (!running.compareAndSet(false, true)) {
             Log.w(TAG, "bridge server already running")
             return
         }
+        this.bridgeCore = bridgeCore
+        bridgeCoreUnavailable.set(false)
         restartCount.set(0)
         lastCrashMessage.set(null)
         registryAvailable.set(registry != null)
@@ -79,7 +92,7 @@ internal class ImageBridgeServer(
                 leveragePendingContexts,
                 leverageCommitPendingContexts,
                 hookInstaller,
-                ::healthSnapshot,
+                this::healthSnapshot,
                 bridgeMetrics,
             )
         textSendCapability.set(components.textSendCapability)
@@ -100,21 +113,6 @@ internal class ImageBridgeServer(
         )
     }
 
-    private fun healthSnapshot(): ImageBridgeHealthSnapshot =
-        buildImageBridgeHealthSnapshot(
-            running = running.get(),
-            specStatus = specStatus.get(),
-            registryAvailable = registryAvailable.get(),
-            lastRegistryError = lastRegistryError.get(),
-            textSendCapability = textSendCapability.get(),
-            textBridgeSendTextEnabled = textBridgeSendTextEnabled.get(),
-            textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled.get(),
-            metrics = bridgeMetrics.snapshot(),
-            restartCount = restartCount.get(),
-            lastCrashMessage = lastCrashMessage.get(),
-            discoverySnapshot = discoverySnapshotProvider(),
-        )
-
     private fun recordServerFailure(message: String) {
         recordBridgeServerFailure(restartCount, lastCrashMessage, message)
     }
@@ -132,6 +130,12 @@ internal class ImageBridgeServer(
     }
 
     internal fun healthSnapshotForTest(): ImageBridgeHealthSnapshot = healthSnapshot()
+
+    internal fun stopForTest() {
+        running.set(false)
+        bridgeCore?.close()
+        bridgeCore = null
+    }
 
     internal fun isTextBridgeSendTextEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_TEXT_ENABLED")): Boolean = textBridgeSendTextEnabled(raw)
 
