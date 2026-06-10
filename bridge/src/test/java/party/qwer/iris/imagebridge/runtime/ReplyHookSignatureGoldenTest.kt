@@ -3,6 +3,8 @@
 package party.qwer.iris.imagebridge.runtime
 
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.mentionsHashFromJson
+import party.qwer.iris.imagebridge.runtime.core.replyHookSign
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

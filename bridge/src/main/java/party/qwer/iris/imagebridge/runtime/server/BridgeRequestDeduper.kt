@@ -4,6 +4,7 @@ import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.core.DedupeState
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit

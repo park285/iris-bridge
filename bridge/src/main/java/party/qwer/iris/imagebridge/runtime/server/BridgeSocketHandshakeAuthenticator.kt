@@ -4,6 +4,7 @@ import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.LengthPrefixedFrameCodec
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import java.io.InputStream
 import java.io.OutputStream
 

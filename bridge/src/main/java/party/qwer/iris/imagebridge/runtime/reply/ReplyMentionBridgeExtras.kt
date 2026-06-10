@@ -2,6 +2,8 @@ package party.qwer.iris.imagebridge.runtime.reply
 
 import android.content.Intent
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.mentionsHashFromAttachment
+import party.qwer.iris.imagebridge.runtime.core.replyHookVerify
 import party.qwer.iris.resolveBridgeToken
 
 internal object ReplyMentionBridgeExtras {

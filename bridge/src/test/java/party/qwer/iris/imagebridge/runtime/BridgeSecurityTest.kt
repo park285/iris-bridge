@@ -7,6 +7,7 @@ import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import party.qwer.iris.imagebridge.runtime.send.ImageSendRequest
 import party.qwer.iris.imagebridge.runtime.send.KakaoImageSender
 import party.qwer.iris.imagebridge.runtime.send.KakaoSendInvoker

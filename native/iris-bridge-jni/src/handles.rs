@@ -65,7 +65,11 @@ impl BridgeCoreContext {
         }
     }
 
-    pub fn open_handshake_session(&self, frame_json: &str, now_ms: i64) -> Result<String, Rejection> {
+    pub fn open_handshake_session(
+        &self,
+        frame_json: &str,
+        now_ms: i64,
+    ) -> Result<String, Rejection> {
         let mut session = HandshakeServer::new(
             self.bridge_token.clone(),
             BRIDGE_MUX_SOCKET_NAME,

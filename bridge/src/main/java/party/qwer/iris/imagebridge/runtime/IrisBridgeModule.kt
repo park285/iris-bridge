@@ -7,6 +7,7 @@ import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore

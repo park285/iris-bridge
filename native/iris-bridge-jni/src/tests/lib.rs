@@ -200,8 +200,9 @@ fn handshake_registry_keeps_concurrent_sessions_independent() {
 
 #[test]
 fn reply_hook_sign_and_verify_match_core_golden() {
-    let signature = dispatch_reply_hook_sign(TOKEN, 42, "hello **world**", "req-7", CREATED_AT, None)
-        .expect("signable");
+    let signature =
+        dispatch_reply_hook_sign(TOKEN, 42, "hello **world**", "req-7", CREATED_AT, None)
+            .expect("signable");
     assert_eq!(signature, GOLDEN_SIGNATURE);
     assert!(dispatch_reply_hook_verify(
         TOKEN,

@@ -22,19 +22,19 @@ private const val INITIAL_RESTART_DELAY_MS = 1_000L
 private const val MAX_RESTART_DELAY_MS = 30_000L
 
 internal class ImageBridgeServer(
-    private val running: AtomicBoolean = AtomicBoolean(false),
-    private val restartCount: AtomicInteger = AtomicInteger(0),
-    private val lastCrashMessage: AtomicReference<String?> = AtomicReference(null),
-    private val specStatus: AtomicReference<BridgeSpecStatus?> = AtomicReference(null),
-    private val registryAvailable: AtomicBoolean = AtomicBoolean(false),
-    private val lastRegistryError: AtomicReference<String?> = AtomicReference(null),
-    private val textSendCapability: AtomicReference<KakaoTextSendCapability?> = AtomicReference(null),
-    private val textBridgeSendTextEnabled: AtomicBoolean = AtomicBoolean(false),
-    private val textBridgeSendMarkdownEnabled: AtomicBoolean = AtomicBoolean(false),
+    internal val running: AtomicBoolean = AtomicBoolean(false),
+    internal val restartCount: AtomicInteger = AtomicInteger(0),
+    internal val lastCrashMessage: AtomicReference<String?> = AtomicReference(null),
+    internal val specStatus: AtomicReference<BridgeSpecStatus?> = AtomicReference(null),
+    internal val registryAvailable: AtomicBoolean = AtomicBoolean(false),
+    internal val lastRegistryError: AtomicReference<String?> = AtomicReference(null),
+    internal val textSendCapability: AtomicReference<KakaoTextSendCapability?> = AtomicReference(null),
+    internal val textBridgeSendTextEnabled: AtomicBoolean = AtomicBoolean(false),
+    internal val textBridgeSendMarkdownEnabled: AtomicBoolean = AtomicBoolean(false),
     private val peerIdentityValidator: BridgePeerIdentityValidator = BridgePeerIdentityValidator(),
-    private val bridgeMetrics: BridgeMetrics = BridgeMetrics(),
-    private val bridgeCoreUnavailable: AtomicBoolean = AtomicBoolean(false),
-    private val discoverySnapshotProvider: () -> BridgeDiscoverySnapshot = defaultBridgeDiscovery::snapshot,
+    internal val bridgeMetrics: BridgeMetrics = BridgeMetrics(),
+    internal val bridgeCoreUnavailable: AtomicBoolean = AtomicBoolean(false),
+    internal val discoverySnapshotProvider: () -> BridgeDiscoverySnapshot = defaultBridgeDiscovery::snapshot,
 ) {
     private val sessionAdmission: BridgeSessionAdmission = newBridgeSessionAdmission(bridgeMetrics)
     private val muxClientDispatcher =
@@ -92,7 +92,7 @@ internal class ImageBridgeServer(
                 leveragePendingContexts,
                 leverageCommitPendingContexts,
                 hookInstaller,
-                ::healthSnapshot,
+                this::healthSnapshot,
                 bridgeMetrics,
             )
         textSendCapability.set(components.textSendCapability)
@@ -112,22 +112,6 @@ internal class ImageBridgeServer(
             sleepBeforeRestart = ::sleepBeforeRestart,
         )
     }
-
-    private fun healthSnapshot(): ImageBridgeHealthSnapshot =
-        buildImageBridgeHealthSnapshot(
-            running = running.get(),
-            specStatus = specStatus.get(),
-            registryAvailable = registryAvailable.get(),
-            lastRegistryError = lastRegistryError.get(),
-            textSendCapability = textSendCapability.get(),
-            textBridgeSendTextEnabled = textBridgeSendTextEnabled.get(),
-            textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled.get(),
-            metrics = bridgeMetrics.snapshot(),
-            restartCount = restartCount.get(),
-            lastCrashMessage = lastCrashMessage.get(),
-            bridgeCoreUnavailable = bridgeCoreUnavailable.get(),
-            discoverySnapshot = discoverySnapshotProvider(),
-        )
 
     private fun recordServerFailure(message: String) {
         recordBridgeServerFailure(restartCount, lastCrashMessage, message)

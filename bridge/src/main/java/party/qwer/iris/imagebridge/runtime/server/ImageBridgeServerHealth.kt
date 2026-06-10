@@ -37,3 +37,19 @@ internal fun buildImageBridgeHealthSnapshot(
         lastCrashMessage = lastCrashMessage,
         bridgeCoreUnavailable = bridgeCoreUnavailable,
     )
+
+internal fun ImageBridgeServer.healthSnapshot(): ImageBridgeHealthSnapshot =
+    buildImageBridgeHealthSnapshot(
+        running = running.get(),
+        specStatus = specStatus.get(),
+        registryAvailable = registryAvailable.get(),
+        lastRegistryError = lastRegistryError.get(),
+        textSendCapability = textSendCapability.get(),
+        textBridgeSendTextEnabled = textBridgeSendTextEnabled.get(),
+        textBridgeSendMarkdownEnabled = textBridgeSendMarkdownEnabled.get(),
+        metrics = bridgeMetrics.snapshot(),
+        restartCount = restartCount.get(),
+        lastCrashMessage = lastCrashMessage.get(),
+        bridgeCoreUnavailable = bridgeCoreUnavailable.get(),
+        discoverySnapshot = discoverySnapshotProvider(),
+    )

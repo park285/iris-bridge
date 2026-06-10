@@ -4,6 +4,7 @@ import org.json.JSONObject
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 
 internal class BridgeHandshakeValidator private constructor(
     private val bridgeCoreProvider: () -> BridgeCoreRuntime?,

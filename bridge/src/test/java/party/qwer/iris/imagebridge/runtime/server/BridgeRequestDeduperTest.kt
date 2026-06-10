@@ -7,6 +7,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.DedupeState
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail

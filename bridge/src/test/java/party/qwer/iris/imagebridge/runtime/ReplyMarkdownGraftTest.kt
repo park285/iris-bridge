@@ -3,6 +3,8 @@ package party.qwer.iris.imagebridge.runtime
 import org.json.JSONObject
 import party.qwer.iris.ReplyHookSignatureProtocol
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.mentionsHashFromJson
+import party.qwer.iris.imagebridge.runtime.core.replyHookSign
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownBridgeExtras
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownIngressCapture
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContext

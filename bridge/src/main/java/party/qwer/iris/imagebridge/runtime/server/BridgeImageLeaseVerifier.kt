@@ -6,6 +6,7 @@ import party.qwer.iris.ImageLeasePayload
 import party.qwer.iris.SignedImageLease
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import java.io.File
 import java.security.MessageDigest
 

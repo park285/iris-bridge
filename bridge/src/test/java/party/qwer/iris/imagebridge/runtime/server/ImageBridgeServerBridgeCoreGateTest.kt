@@ -6,6 +6,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
