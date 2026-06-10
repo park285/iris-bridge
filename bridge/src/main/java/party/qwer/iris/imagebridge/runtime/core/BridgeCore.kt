@@ -117,6 +117,39 @@ object BridgeCore {
 
     external fun nativeAbiVersion(): Int
 
+    fun replyHookSign(
+        bridgeToken: String,
+        roomId: Long,
+        messageText: String,
+        sessionId: String,
+        createdAtEpochMs: Long,
+        mentionsHash: String?,
+    ): String? {
+        if (!loadLibraryOnce()) return null
+        return runCatching {
+            nativeReplyHookSign(
+                bridgeToken,
+                roomId,
+                messageText,
+                sessionId,
+                createdAtEpochMs,
+                mentionsHash,
+            )
+        }.getOrElse { error ->
+            logError("bridge-core reply-hook sign threw", error)
+            null
+        }
+    }
+
+    fun mentionsHashFromJson(mentionsJson: String?): String? {
+        if (!loadLibraryOnce()) return null
+        return runCatching { nativeMentionsHashFromJson(mentionsJson) }
+            .getOrElse { error ->
+                logError("bridge-core mentions hash threw", error)
+                null
+            }
+    }
+
     fun replyHookVerify(
         bridgeToken: String,
         roomId: Long,

@@ -5,6 +5,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+// sign/canonicalJson은 iris-bridge-core(native/iris-bridge-core/src/lease.rs)와 동결된
+// cross-language 고정값으로, bridge 테스트 fixture(signedImageLease)가 쓰는 서명 경로를
+// 보증한다. verify/만료/replay 판정 테스트는 native로 이전됨
+// (native/iris-runtime/tests/image_lease_contract_test.rs,
+//  native/iris-bridge-core/src/server/tests/lease_verdict.rs).
 class ImageLeaseTest {
     private val secret = "image-lease-signing-secret"
 
@@ -63,44 +68,10 @@ class ImageLeaseTest {
     }
 
     @Test
-    fun `issued lease verifies before and at expiry`() {
+    fun `issued lease binds the canonical signature`() {
         val lease = ImageLease.issue(secret, goldenPayload())
+        assertEquals(goldenPayload(), lease.payload)
         assertEquals(goldenSignature, lease.signature)
-        assertTrue(ImageLease.verify(secret, lease, lease.payload.expiresAtEpochMs - 1).valid)
-        assertTrue(ImageLease.verify(secret, lease, lease.payload.expiresAtEpochMs).valid)
-    }
-
-    @Test
-    fun `expired lease is rejected`() {
-        val lease = ImageLease.issue(secret, goldenPayload())
-        val result = ImageLease.verify(secret, lease, lease.payload.expiresAtEpochMs + 1)
-        assertFalse(result.valid)
-        assertEquals(ImageLeaseVerification.EXPIRED, result)
-    }
-
-    @Test
-    fun `tampered payload is rejected`() {
-        val lease = ImageLease.issue(secret, goldenPayload())
-        val tampered =
-            lease.copy(
-                payload = lease.payload.copy(canonicalPath = "/data/iris-tmp/reply-images/req-7/evil"),
-            )
-        val result = ImageLease.verify(secret, tampered, tampered.payload.expiresAtEpochMs - 1)
-        assertFalse(result.valid)
-        assertEquals(ImageLeaseVerification.SIGNATURE_MISMATCH, result)
-    }
-
-    @Test
-    fun `tampered signature is rejected`() {
-        val lease = ImageLease.issue(secret, goldenPayload())
-        val tampered = lease.copy(signature = "0".repeat(goldenSignature.length))
-        assertFalse(ImageLease.verify(secret, tampered, lease.payload.expiresAtEpochMs - 1).valid)
-    }
-
-    @Test
-    fun `wrong secret is rejected`() {
-        val lease = ImageLease.issue(secret, goldenPayload())
-        assertFalse(ImageLease.verify("other-secret", lease, lease.payload.expiresAtEpochMs - 1).valid)
     }
 
     @Test
