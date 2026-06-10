@@ -3,9 +3,12 @@ mod envelope;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
+use iris_bridge_core::server::error_classification::classify_error_code;
+use iris_bridge_core::server::image_path::validate_image_paths;
 use iris_bridge_core::server::reply_hook::{
     REPLY_HOOK_TTL_MS, sign_prepared, verify as reply_verify,
 };
+use iris_bridge_core::server::text_request::{TextRequestInput, validate_text_request};
 use iris_bridge_core::server::token::validate_request;
 use iris_bridge_core::server::{Admit, PathFacts};
 use serde_json::json;
@@ -81,6 +84,61 @@ pub fn dispatch_dedupe_complete(
     let _ = catch_unwind(AssertUnwindSafe(|| {
         context.dedupe_ledger.complete(key, response_json, now_ms);
     }));
+}
+
+pub fn dispatch_request_admission(action: &str, request_id: Option<&str>) -> String {
+    json_catch_unwind(|| {
+        iris_bridge_core::server::admission::validate_request_id(action, request_id)?;
+        Ok(json!({}))
+    })
+}
+
+pub fn dispatch_request_requires_request_id(action: &str) -> bool {
+    iris_bridge_core::server::admission::requires_request_id(action)
+}
+
+pub fn dispatch_validate_text_request(
+    room_id: Option<i64>,
+    message: Option<&str>,
+    markdown: bool,
+    attachment_json: Option<&str>,
+    mentions_json: Option<&str>,
+) -> String {
+    json_catch_unwind(|| {
+        let verdict = validate_text_request(TextRequestInput {
+            room_id,
+            message,
+            markdown,
+            attachment_json,
+            mentions_json,
+        })?;
+        let extra = verdict.attachment_json.map_or_else(
+            || json!({}),
+            |attachment_json| json!({ "attachmentJson": attachment_json }),
+        );
+        Ok(extra)
+    })
+}
+
+pub fn dispatch_validate_image_paths(
+    image_paths_json: &str,
+    max_path_count: usize,
+    max_path_length: usize,
+) -> String {
+    json_catch_unwind(|| {
+        let image_paths: Vec<String> = serde_json::from_str(image_paths_json)
+            .map_err(|_| bad_request("image paths JSON invalid"))?;
+        validate_image_paths(&image_paths, max_path_count, max_path_length)?;
+        Ok(json!({}))
+    })
+}
+
+pub fn dispatch_classify_error_code(message: &str, is_illegal_argument: bool) -> String {
+    json_catch_unwind(|| {
+        Ok(json!({
+            "classifiedErrorCode": classify_error_code(message, is_illegal_argument),
+        }))
+    })
 }
 
 pub fn dispatch_handshake_on_hello(

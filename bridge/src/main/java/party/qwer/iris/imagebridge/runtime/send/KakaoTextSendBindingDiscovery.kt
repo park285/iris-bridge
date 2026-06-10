@@ -48,8 +48,16 @@ internal fun discoverKakaoTextSendBinding(
                 listener = listener,
                 logInfo = logInfo,
             ),
-        leverageAttachmentPatcher = KakaoLeverageAttachmentDbPatcher(logInfo = logInfo),
-        kakaoLinkCommitVerifier = KakaoChatLogDbCommitVerifier(logInfo = logInfo),
+        leverageAttachmentPatcher =
+            KakaoLeverageAttachmentDbPatcher(
+                databasePath = kakaoTalkDatabasePath(registry.target.packageName),
+                logInfo = logInfo,
+            ),
+        kakaoLinkCommitVerifier =
+            KakaoChatLogDbCommitVerifier(
+                databasePath = kakaoTalkDatabasePath(registry.target.packageName),
+                logInfo = logInfo,
+            ),
     )
 }
 

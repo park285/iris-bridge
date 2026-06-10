@@ -1,6 +1,8 @@
 package party.qwer.iris.imagebridge.runtime.send
 
 import android.content.Context
+import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectMethodBySignature
+import party.qwer.iris.imagebridge.runtime.kakao.classregistry.resolveShareManagerSingleton
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
@@ -36,27 +38,25 @@ internal fun discoverShareManagerTextInvoker(
             Class.forName(SHARE_MANAGER_CLASS, false, chatRoomClass.classLoader)
         }.getOrNull() ?: return null
     val target =
-        shareManagerClass.declaredFields
-            .asSequence()
-            .filter { field -> Modifier.isStatic(field.modifiers) && shareManagerClass.isAssignableFrom(field.type) }
-            .mapNotNull { field ->
-                runCatching {
-                    field.isAccessible = true
-                    field.get(null)
-                }.getOrNull()
-            }.firstOrNull()
+        runCatching { resolveShareManagerSingleton(shareManagerClass) }.getOrNull()
             ?: return null
     val method =
-        shareManagerClass.methods
-            .filter { method ->
-                val types = method.parameterTypes
-                types.size == 5 &&
-                    types[0].isAssignableFrom(appContext.javaClass) &&
-                    types[1].isAssignableFrom(chatRoomClass) &&
-                    types[2] == String::class.java &&
-                    types[3] == Boolean::class.javaPrimitiveType &&
-                    types[4].isAssignableFrom(listenerClass)
-            }.minWithOrNull(compareBy<Method> { if (it.name == "g0") 0 else 1 }.thenBy { it.name })
+        runCatching {
+            selectMethodBySignature(
+                label = "ShareManager text send on ${shareManagerClass.name}",
+                candidates =
+                    shareManagerClass.methods.filter { method ->
+                        val types = method.parameterTypes
+                        types.size == 5 &&
+                            types[0].isAssignableFrom(appContext.javaClass) &&
+                            types[1].isAssignableFrom(chatRoomClass) &&
+                            types[2] == String::class.java &&
+                            types[3] == Boolean::class.javaPrimitiveType &&
+                            types[4].isAssignableFrom(listenerClass)
+                    },
+                preferredNames = setOf("g0"),
+            )
+        }.getOrNull()
             ?: return null
     logInfo(KAKAO_TEXT_SEND_TAG, "text send discovery shareManagerMethod=${method.toGenericString()}")
     return KakaoShareManagerTextInvoker(target, method, appContext)

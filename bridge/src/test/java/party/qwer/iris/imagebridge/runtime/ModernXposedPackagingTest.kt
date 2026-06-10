@@ -25,13 +25,16 @@ class ModernXposedPackagingTest {
                 "party.qwer.iris.imagebridge.runtime.IrisBridgeModule",
             ),
         )
-        assertTrue(
+        val scopePackages =
             xposedMetaDir
                 .resolve("scope.list")
                 .readText()
                 .lineSequence()
-                .any { it.trim() == "com.kakao.talk" },
-        )
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toSet()
+        assertTrue("com.kakao.talk" in scopePackages)
+        assertTrue("com.kakao.talk.revanced" in scopePackages)
 
         val moduleProp = xposedMetaDir.resolve("module.prop").readText()
         assertTrue(moduleProp.contains("minApiVersion=101"))

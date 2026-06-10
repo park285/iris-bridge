@@ -6,6 +6,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import party.qwer.iris.ImageBridgeHandshakeProtocol
+import party.qwer.iris.ImageBridgeProtocol
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -14,6 +15,11 @@ import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 class BridgeCoreRuntimeTest {
+    @Test
+    fun `ABI version includes error classification JNI surface`() {
+        assertEquals(5, BridgeCore.EXPECTED_ABI_VERSION)
+    }
+
     @Test
     fun `loadOrNull returns runtime whose abi matches and round-trips a context handle`() {
         val runtime = BridgeCore.loadOrNull(securityMode = "production", bridgeToken = "bridge-token", requireHandshakeRaw = "true")
@@ -125,6 +131,24 @@ class BridgeCoreRuntimeTest {
         assertEquals("BRIDGE_CORE_CLOSED", admit.errorCode)
         assertNull(admit.dedupeState(), "closed admit must not report a dedupe state")
 
+        val text = runtime.validateTextRequest(
+            roomId = 1L,
+            message = "hello",
+            markdown = false,
+            attachmentJson = null,
+            mentionsJson = null,
+        )
+        assertFalse(text.isOk)
+        assertEquals("BRIDGE_CORE_CLOSED", text.errorCode)
+
+        val paths = runtime.validateImagePaths(
+            imagePaths = listOf("/data/iris-tmp/reply-images/req-1/image-0.png"),
+            maxPathCount = 8,
+            maxPathLength = 4096,
+        )
+        assertFalse(paths.isOk)
+        assertEquals("BRIDGE_CORE_CLOSED", paths.errorCode)
+
         runtime.dedupeComplete("send_text:req-1", """{"status":"sent"}""", 1L)
     }
 
@@ -152,6 +176,126 @@ class BridgeCoreRuntimeTest {
         } finally {
             runtime.close()
         }
+    }
+
+    @Test
+    fun `request admission dispatch rejects missing request id for side effect actions`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "development", bridgeToken = "bridge-token", requireHandshakeRaw = null),
+            )
+        try {
+            val missing = runtime.validateRequestAdmission("send_text", null)
+            assertFalse(missing.isOk)
+            assertEquals("MISSING_REQUEST_ID", missing.errorCode)
+            assertEquals("requestId missing", missing.errorMessage)
+
+            val present = runtime.validateRequestAdmission("send_text", "req-1")
+            assertTrue(present.isOk, "nonblank requestId must pass: ${present.errorMessage}")
+
+            val health = runtime.validateRequestAdmission("health", null)
+            assertTrue(health.isOk, "health must not require requestId: ${health.errorMessage}")
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `text request validation dispatch normalizes attachment and rejects invalid combinations`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "development", bridgeToken = "bridge-token", requireHandshakeRaw = null),
+            )
+        try {
+            val valid = runtime.validateTextRequest(
+                roomId = 123L,
+                message = "hello",
+                markdown = false,
+                attachmentJson = """  {"P":{"TP":"List"}}  """,
+                mentionsJson = null,
+            )
+            assertTrue(valid.isOk, "valid text request must pass: ${valid.errorMessage}")
+            assertEquals("""{"P":{"TP":"List"}}""", valid.string("attachmentJson"))
+
+            val invalid = runtime.validateTextRequest(
+                roomId = 123L,
+                message = "hello",
+                markdown = true,
+                attachmentJson = """{"P":{"TP":"List"}}""",
+                mentionsJson = null,
+            )
+            assertFalse(invalid.isOk)
+            assertEquals("BAD_REQUEST", invalid.errorCode)
+            assertEquals("attachmentJson is only supported for send_text", invalid.errorMessage)
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `image path validation dispatch rejects static path policy violations`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "development", bridgeToken = "bridge-token", requireHandshakeRaw = null),
+            )
+        try {
+            val valid = runtime.validateImagePaths(
+                imagePaths = listOf("/data/iris-tmp/reply-images/req-1/image-0.png"),
+                maxPathCount = 8,
+                maxPathLength = 4096,
+            )
+            assertTrue(valid.isOk, "valid static path policy must pass: ${valid.errorMessage}")
+
+            val blank = runtime.validateImagePaths(
+                imagePaths = listOf("   "),
+                maxPathCount = 8,
+                maxPathLength = 4096,
+            )
+            assertFalse(blank.isOk)
+            assertEquals("PATH_VALIDATION_FAILED", blank.errorCode)
+            assertEquals("blank image path", blank.errorMessage)
+
+            val nullByte = runtime.validateImagePaths(
+                imagePaths = listOf("/data/iris-tmp/reply-images/req-1/image-\u0000.png"),
+                maxPathCount = 8,
+                maxPathLength = 4096,
+            )
+            assertFalse(nullByte.isOk)
+            assertEquals("PATH_VALIDATION_FAILED", nullByte.errorCode)
+            assertEquals("image path contains null byte", nullByte.errorMessage)
+
+            val emojiPath = "😀".repeat(2049)
+            val tooLong = runtime.validateImagePaths(
+                imagePaths = listOf(emojiPath),
+                maxPathCount = 8,
+                maxPathLength = 4096,
+            )
+            assertFalse(tooLong.isOk)
+            assertEquals("PATH_VALIDATION_FAILED", tooLong.errorCode)
+            assertEquals("image path is too long: 4098", tooLong.errorMessage)
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `error classification dispatch returns bridge protocol error codes`() {
+        assertEquals(
+            ImageBridgeProtocol.ERROR_PATH_VALIDATION,
+            BridgeCore.classifyErrorCode("image path validation timed out", isIllegalArgument = true),
+        )
+        assertEquals(
+            ImageBridgeProtocol.ERROR_TIMEOUT,
+            BridgeCore.classifyErrorCode("CHATROOM OPEN DISPATCH TIMED OUT", isIllegalArgument = false),
+        )
+        assertEquals(
+            ImageBridgeProtocol.ERROR_BAD_REQUEST,
+            BridgeCore.classifyErrorCode("bad request from caller", isIllegalArgument = true),
+        )
+        assertEquals(
+            ImageBridgeProtocol.ERROR_SEND_FAILED,
+            BridgeCore.classifyErrorCode("send failed", isIllegalArgument = false),
+        )
     }
 
     @Test

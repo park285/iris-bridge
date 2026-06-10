@@ -33,6 +33,39 @@ class ImageBridgeRequestHandlerDedupeTest {
     }
 
     @Test
+    fun `health request with requestId is not deduplicated`() {
+        var healthCount = 0
+        val metrics = BridgeMetrics()
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = {
+                    healthCount += 1
+                    readyTextHealthSnapshot().copy(metrics = metrics.snapshot(), restartCount = healthCount)
+                },
+                handshakeValidator = developmentHandshakeValidator(),
+                metrics = metrics,
+                logError = { _, _, _ -> },
+            )
+        val request =
+            ImageBridgeProtocol.ImageBridgeRequest(
+                action = ImageBridgeProtocol.ACTION_HEALTH,
+                protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
+                requestId = "read-only-health-1",
+                token = "bridge-token",
+            )
+
+        val first = handler.handle(request)
+        val second = handler.handle(request)
+
+        assertEquals(1, first.restartCount)
+        assertEquals(2, second.restartCount)
+        assertEquals(2, healthCount)
+        val health = handler.handle(healthRequest())
+        assertEquals(0, health.metrics?.muxRequestDeduplicated)
+    }
+
+    @Test
     fun `open chatroom request without requestId fails before opener`() {
         var openCount = 0
         val metrics = BridgeMetrics()

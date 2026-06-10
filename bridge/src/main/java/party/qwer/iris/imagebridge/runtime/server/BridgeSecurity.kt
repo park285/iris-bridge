@@ -2,6 +2,7 @@ package party.qwer.iris.imagebridge.runtime.server
 
 import android.os.Process
 import party.qwer.iris.resolveBridgeReplyImageDir
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import java.io.File
 import java.nio.file.Files
 
@@ -69,18 +70,20 @@ internal class BridgeImagePathValidator(
     rootPaths: Collection<String> = DEFAULT_ALLOWED_IMAGE_ROOTS,
     private val maxPathCount: Int = MAX_IMAGE_PATH_COUNT,
     private val maxPathLength: Int = MAX_IMAGE_PATH_LENGTH,
+    private val staticValidator: BridgeImagePathStaticValidator = BridgeImagePathStaticValidator(),
 ) {
     constructor(rootPath: String) : this(listOf(rootPath), MAX_IMAGE_PATH_COUNT, MAX_IMAGE_PATH_LENGTH)
+
+    constructor(
+        bridgeCore: BridgeCoreRuntime,
+        rootPaths: Collection<String> = DEFAULT_ALLOWED_IMAGE_ROOTS,
+    ) : this(rootPaths, MAX_IMAGE_PATH_COUNT, MAX_IMAGE_PATH_LENGTH, BridgeImagePathStaticValidator(bridgeCore))
 
     private val allowedRoots = rootPaths.map { rootPath -> File(rootPath).canonicalFile }
 
     fun validate(imagePaths: List<String>): List<ValidatedBridgeImagePath> {
-        require(imagePaths.isNotEmpty()) { "no image paths" }
-        require(imagePaths.size <= maxPathCount) { "too many image paths: ${imagePaths.size}" }
+        staticValidator.validate(imagePaths, maxPathCount, maxPathLength)
         return imagePaths.map { path ->
-            require(path.isNotBlank()) { "blank image path" }
-            require(path.length <= maxPathLength) { "image path is too long: ${path.length}" }
-            require('\u0000' !in path) { "image path contains null byte" }
             val rawFile = File(path)
             require(!Files.isSymbolicLink(rawFile.toPath())) { "image path must not be a symbolic link: $path" }
             val imageFile = rawFile.canonicalFile
@@ -99,6 +102,8 @@ internal class BridgeImagePathValidator(
 
     companion object {
         internal const val LEGACY_OUTBOX_IMAGE_ROOT = "/sdcard/Android/data/com.kakao.talk/files/iris-outbox-images"
+        internal const val LEGACY_OUTBOX_IMAGE_ROOT_REVANCED =
+            "/sdcard/Android/data/com.kakao.talk.revanced/files/iris-outbox-images"
         internal const val RUNTIME_REPLY_IMAGE_ROOT = "/data/iris-tmp/reply-images"
         internal const val MAX_IMAGE_PATH_COUNT = 8
         internal const val MAX_IMAGE_PATH_LENGTH = 4096

@@ -1,7 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.core
 
 object BridgeCore {
-    const val EXPECTED_ABI_VERSION: Int = 1
+    const val EXPECTED_ABI_VERSION: Int = 5
 
     external fun nativeCreateContext(
         mode: String?,
@@ -27,6 +27,36 @@ object BridgeCore {
         handle: Long,
         requestJson: String,
     ): String
+
+    external fun nativeValidateRequestAdmission(
+        handle: Long,
+        action: String,
+        requestId: String?,
+    ): String
+
+    external fun nativeValidateTextRequest(
+        handle: Long,
+        hasRoomId: Boolean,
+        roomId: Long,
+        message: String?,
+        markdown: Boolean,
+        attachmentJson: String?,
+        mentionsJson: String?,
+    ): String
+
+    external fun nativeValidateImagePaths(
+        handle: Long,
+        imagePathsJson: String,
+        maxPathCount: Int,
+        maxPathLength: Int,
+    ): String
+
+    external fun nativeClassifyErrorCode(
+        message: String,
+        isIllegalArgument: Boolean,
+    ): String
+
+    external fun nativeRequestRequiresRequestId(action: String): Boolean
 
     external fun nativeVerifyLeases(
         handle: Long,

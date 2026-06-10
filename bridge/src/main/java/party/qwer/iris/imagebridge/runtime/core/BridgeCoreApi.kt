@@ -1,6 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.core
 
 import android.util.Log
+import party.qwer.iris.ImageBridgeProtocol
 
 private const val TAG = "IrisBridge"
 private const val LIBRARY_NAME = "iris_bridge_core"
@@ -63,6 +64,33 @@ fun BridgeCore.mentionsHashFromJson(mentionsJson: String?): String? {
             bridgeCoreLogError("bridge-core mentions hash threw", error)
             null
         }
+}
+
+fun BridgeCore.requestRequiresRequestId(action: String): Boolean {
+    if (!bridgeCoreLoadLibraryOnce()) return true
+    return runCatching { nativeRequestRequiresRequestId(action) }
+        .getOrElse { error ->
+            bridgeCoreLogError("bridge-core request admission threw", error)
+            true
+        }
+}
+
+fun BridgeCore.classifyErrorCode(
+    message: String,
+    isIllegalArgument: Boolean,
+): String {
+    if (!bridgeCoreLoadLibraryOnce()) return ImageBridgeProtocol.ERROR_INTERNAL
+    return runCatching {
+        val envelope = BridgeCoreEnvelope.parse(nativeClassifyErrorCode(message, isIllegalArgument))
+        if (envelope.isOk) {
+            envelope.string("classifiedErrorCode") ?: ImageBridgeProtocol.ERROR_INTERNAL
+        } else {
+            ImageBridgeProtocol.ERROR_INTERNAL
+        }
+    }.getOrElse { error ->
+        bridgeCoreLogError("bridge-core error classification threw", error)
+        ImageBridgeProtocol.ERROR_INTERNAL
+    }
 }
 
 fun BridgeCore.replyHookVerify(

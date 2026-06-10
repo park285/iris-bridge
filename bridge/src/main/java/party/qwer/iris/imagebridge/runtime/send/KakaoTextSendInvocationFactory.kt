@@ -19,7 +19,7 @@ internal class KakaoTextSendInvocationFactory(
     private val logInfo: (String, String) -> Unit = { tag, message -> Log.i(tag, message) },
     private val requestCompanionClassProvider: () -> Class<*> = {
         Class.forName(
-            REQUEST_COMPANION_CLASS,
+            registry.target.dexClassName("manager.send.ChatSendingLogRequest\$a"),
             false,
             registry.chatRoomClass.classLoader,
         )
@@ -126,7 +126,4 @@ internal class KakaoTextSendInvocationFactory(
         binding.invoke(chatRoom, sendingLog)
     }
 
-    private companion object {
-        private const val REQUEST_COMPANION_CLASS = "com.kakao.talk.manager.send.ChatSendingLogRequest\$a"
-    }
 }

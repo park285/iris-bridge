@@ -10,6 +10,8 @@ import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTargetContext
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMarkdownPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
@@ -22,7 +24,7 @@ private const val IRIS_BRIDGE_TAG = "IrisBridge"
 class IrisBridgeModule : XposedModule() {
     companion object {
         private const val TAG = IRIS_BRIDGE_TAG
-        private const val TARGET_PACKAGE = "com.kakao.talk"
+        private val SUPPORTED_PACKAGES = KakaoTalkTarget.SUPPORTED_PACKAGES
         private val markdownPendingContexts = ReplyMarkdownPendingContextStore()
         private val mentionPendingContexts = ReplyMentionPendingContextStore()
         private val leveragePendingContexts = ReplyLeveragePendingContextStore()
@@ -40,21 +42,23 @@ class IrisBridgeModule : XposedModule() {
     private val hookInstaller = ModernBridgeHookInstaller(this)
 
     override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
-        if (param.packageName != TARGET_PACKAGE) return
-        Log.i(TAG, "loaded into $TARGET_PACKAGE, hooking Application.onCreate")
+        if (param.packageName !in SUPPORTED_PACKAGES) return
+        val target = KakaoTalkTarget.resolve(param.packageName)
+        Log.i(TAG, "loaded into ${target.packageName}, hooking Application.onCreate")
         val onCreate = Application::class.java.getDeclaredMethod("onCreate")
         hookInstaller.hookAfter(onCreate) { invocation ->
-            startBridge(invocation.thisObject as Application, param.classLoader)
+            startBridge(invocation.thisObject as Application, param.classLoader, target)
         }
     }
 
     private fun startBridge(
         app: Application,
         classLoader: ClassLoader,
+        target: KakaoTalkTargetContext,
     ) {
-        Log.i(TAG, "Application.onCreate — starting image bridge server")
+        Log.i(TAG, "Application.onCreate — starting image bridge server for ${target.packageName}")
         val bridgeCore = loadBridgeCore()
-        val discovery = discoverKakaoClassRegistryForBridge { KakaoClassRegistry.discover(classLoader) }
+        val discovery = discoverKakaoClassRegistryForBridge { KakaoClassRegistry.discover(classLoader, target) }
         discovery.registry?.let { defaultBridgeDiscovery.install(it, hookInstaller) }
         markdownHooks.install(classLoader, discovery.registry, hookInstaller)
         defaultImageBridgeServer.start(

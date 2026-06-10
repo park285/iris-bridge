@@ -77,6 +77,22 @@ internal object LegacyNameSensitiveRecorder {
     val calls = mutableListOf<String>()
 }
 
+internal class ModernEntityNameChatRoom private constructor(
+    val roomId: Long,
+) {
+    companion object {
+        @JvmField
+        val CompanionResolver = Resolver()
+    }
+
+    class Resolver {
+        fun b(entity: FakeRoomEntity): ModernEntityNameChatRoom {
+            LegacyNameSensitiveRecorder.calls += "b"
+            return ModernEntityNameChatRoom(entity.roomId)
+        }
+    }
+}
+
 internal class FakeChatRoomManager {
     companion object {
         @JvmStatic

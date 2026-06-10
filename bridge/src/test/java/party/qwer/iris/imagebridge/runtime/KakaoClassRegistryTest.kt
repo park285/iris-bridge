@@ -167,6 +167,15 @@ class KakaoClassRegistryTest {
     }
 
     @Test
+    fun `bridge spec remains ready for share manager image fallback path`() {
+        val status = BridgeHookSpecVerifier(buildModernEntityNameRegistry()).verify()
+
+        assertTrue(status.ready)
+        assertTrue(status.checks.any { it.name == "ShareManager#imageIntent" && it.ok })
+        assertTrue(status.checks.any { it.name == "ShareManager#imageDispatch" && it.ok })
+    }
+
+    @Test
     fun `chat media sender method resolver accepts inherited non public methods`() {
         val methods =
             KakaoClassRegistry.resolveChatMediaSenderMethodsForTest(

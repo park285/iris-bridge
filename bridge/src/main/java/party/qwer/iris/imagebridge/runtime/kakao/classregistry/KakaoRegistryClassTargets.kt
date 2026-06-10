@@ -9,7 +9,7 @@ internal fun discoverMessageType(
     discoverClass(
         classLoader,
         scanner,
-        lastKnownNames = arrayOf("Op.EnumC16810c", "Op.c"),
+        lastKnownNames = arrayOf("vr.c", "Op.EnumC16810c", "Op.c"),
         label = "MessageType",
     ) { clazz ->
         clazz.isEnum && hasEnumConstants(clazz, "Photo", "MultiPhoto")
@@ -43,7 +43,7 @@ internal fun discoverChatRoomManager(
     discoverClass(
         classLoader,
         scanner,
-        lastKnownNames = arrayOf("hp.J0"),
+        lastKnownNames = arrayOf("Kq.U0", "hp.J0"),
         label = "ChatRoomManager",
     ) { clazz ->
         hasSelfReturningAccessor(clazz) && clazz.declaredMethods.any(::isBroadRoomResolverSignature)

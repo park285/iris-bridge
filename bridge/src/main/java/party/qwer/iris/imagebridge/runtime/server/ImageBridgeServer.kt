@@ -94,6 +94,7 @@ internal class ImageBridgeServer(
                 hookInstaller,
                 this::healthSnapshot,
                 bridgeMetrics,
+                bridgeCore,
             )
         textSendCapability.set(components.textSendCapability)
         specStatus.set(components.initialSpecStatus)

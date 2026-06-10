@@ -34,6 +34,17 @@ class ChatRoomResolverTest {
     }
 
     @Test
+    fun `resolve accepts modern entity companion resolver name b`() {
+        FakeChatRuntime.reset()
+        LegacyNameSensitiveRecorder.calls.clear()
+        val resolver = ChatRoomResolver(registry = buildModernEntityNameRegistry())
+
+        resolver.resolve(888L)
+
+        assertEquals(listOf("b"), LegacyNameSensitiveRecorder.calls)
+    }
+
+    @Test
     fun `resolveFresh prefers manager path over database path`() {
         FakeChatRuntime.reset()
         val resolver = ChatRoomResolver(registry = buildFakeRegistry())

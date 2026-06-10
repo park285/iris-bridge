@@ -1,5 +1,6 @@
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONArray
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -22,6 +23,44 @@ class BridgeCoreRuntime internal constructor(
     private val lifecycle = ReentrantReadWriteLock()
 
     fun validateRequestToken(requestJson: String): BridgeCoreEnvelope = dispatch { BridgeCore.nativeValidateRequestToken(handle, requestJson) }
+
+    fun validateRequestAdmission(
+        action: String,
+        requestId: String?,
+    ): BridgeCoreEnvelope = dispatch { BridgeCore.nativeValidateRequestAdmission(handle, action, requestId) }
+
+    fun validateTextRequest(
+        roomId: Long?,
+        message: String?,
+        markdown: Boolean,
+        attachmentJson: String?,
+        mentionsJson: String?,
+    ): BridgeCoreEnvelope =
+        dispatch {
+            BridgeCore.nativeValidateTextRequest(
+                handle,
+                roomId != null,
+                roomId ?: 0L,
+                message,
+                markdown,
+                attachmentJson,
+                mentionsJson,
+            )
+        }
+
+    fun validateImagePaths(
+        imagePaths: List<String>,
+        maxPathCount: Int,
+        maxPathLength: Int,
+    ): BridgeCoreEnvelope =
+        dispatch {
+            BridgeCore.nativeValidateImagePaths(
+                handle,
+                imagePathsJson(imagePaths),
+                maxPathCount,
+                maxPathLength,
+            )
+        }
 
     fun handshakeOnHello(
         frameJson: String,
@@ -78,4 +117,9 @@ class BridgeCoreRuntime internal constructor(
             }
         }
     }
+
+    private fun imagePathsJson(imagePaths: List<String>): String =
+        JSONArray().apply {
+            imagePaths.forEach(::put)
+        }.toString()
 }

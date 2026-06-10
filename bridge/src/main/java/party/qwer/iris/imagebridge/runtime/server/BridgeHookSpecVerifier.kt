@@ -1,6 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.server
 
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoImageSendStrategy
 
 internal class BridgeHookSpecVerifier(
     private val registry: KakaoClassRegistry?,
@@ -26,7 +27,13 @@ internal class BridgeHookSpecVerifier(
         checks += checkField("MasterDatabase#roomDao") { registry.roomDaoMethod.name }
         checks += checkField("RoomDao#entityLookup") { registry.entityLookupMethod.name }
         checks += checkOptionalField("ChatMediaSender#sendSingle") { registry.singleSendMethod?.name }
-        checks += checkField("ChatMediaSender#sendMultiple") { registry.multiSendMethod.name }
+        if (registry.imageSendStrategy == KakaoImageSendStrategy.LEGACY_REFLECTION) {
+            checks += checkField("ChatMediaSender#sendMultiple") { registry.multiSendMethod.name }
+        } else {
+            checks += checkField("ShareManager#imageIntent") { requireNotNull(registry.shareManagerImageIntentMethod).name }
+            checks += checkField("ShareManager#imageDispatch") { requireNotNull(registry.shareManagerImageDispatchMethod).name }
+            checks += checkField("ShareManager image path") { registry.multiSendMethod.name }
+        }
         checks += checkOptionalField("MediaItem(String,long)") { registry.mediaItemConstructor?.toString() }
         checks += checkField("ChatRoomManager#broadResolve") { registry.broadRoomResolverMethod.name }
         checks += checkField("ChatRoomManager#directResolve") { registry.directRoomResolverMethod.name }

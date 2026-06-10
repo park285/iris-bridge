@@ -38,6 +38,12 @@ internal class BridgeRequestDeduper private constructor(
 
     private val entries = ConcurrentHashMap<String, Entry>()
 
+    fun validateAdmission(
+        action: String,
+        requestId: String?,
+    ) = (bridgeCoreProvider() ?: error("bridge core unavailable for request admission"))
+        .validateRequestAdmission(action, requestId)
+
     fun execute(
         key: String,
         block: () -> ImageBridgeProtocol.ImageBridgeResponse,

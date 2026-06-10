@@ -7,9 +7,11 @@ import android.os.Looper
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget
 
 internal class ChatRoomOpener(
     context: Context,
+    private val kakaoPackage: String = KakaoTalkTarget.OFFICIAL_PACKAGE,
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
     private val chatRoomTypeResolver: (Long) -> String? = { null },
 ) {
@@ -46,7 +48,7 @@ internal class ChatRoomOpener(
 
     private fun buildChatRoomIntent(roomId: Long): Intent =
         Intent()
-            .setClassName(KAKAO_PACKAGE, CHATROOM_HOLDER_ACTIVITY)
+            .setClassName(kakaoPackage, CHATROOM_HOLDER_ACTIVITY)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .apply {
                 putExtra(CHAT_ROOM_ID_EXTRA_KEY, roomId)
@@ -56,7 +58,6 @@ internal class ChatRoomOpener(
             }
 
     private companion object {
-        private const val KAKAO_PACKAGE = "com.kakao.talk"
         private const val CHATROOM_HOLDER_ACTIVITY = "com.kakao.talk.activity.chatroom.ChatRoomHolderActivity"
         private const val DISPATCH_TIMEOUT_SECONDS = 5L
         private const val CHAT_ROOM_ID_EXTRA_KEY = "chatRoomId"

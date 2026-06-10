@@ -4,6 +4,7 @@ package party.qwer.iris.imagebridge.runtime.kakao
 
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.KakaoClassRegistryDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.matchesChatMediaSenderClass
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget.OFFICIAL_PACKAGE
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.resolveChatMediaSendMethods
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectClassCandidate
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectMethodCandidate
@@ -12,6 +13,7 @@ import java.lang.reflect.Field
 import java.lang.reflect.Method
 
 internal class KakaoClassRegistry(
+    val target: KakaoTalkTargetContext = KakaoTalkTarget.resolve(OFFICIAL_PACKAGE),
     val mediaItemClass: Class<*>?,
     val function0Class: Class<*>,
     val function1Class: Class<*>,
@@ -33,9 +35,15 @@ internal class KakaoClassRegistry(
     val photoType: Any,
     val multiPhotoType: Any,
     val writeTypeNone: Any,
+    val imageSendStrategy: KakaoImageSendStrategy = KakaoImageSendStrategy.LEGACY_REFLECTION,
+    val shareManagerImageIntentMethod: Method? = null,
+    val shareManagerImageDispatchMethod: Method? = null,
 ) {
     companion object {
-        fun discover(classLoader: ClassLoader): KakaoClassRegistry = KakaoClassRegistryDiscovery.discover(classLoader)
+        fun discover(
+            classLoader: ClassLoader,
+            target: KakaoTalkTargetContext = KakaoTalkTarget.resolve(OFFICIAL_PACKAGE),
+        ): KakaoClassRegistry = KakaoClassRegistryDiscovery.discover(classLoader, target)
 
         internal fun selectMethodCandidateForTest(
             label: String,

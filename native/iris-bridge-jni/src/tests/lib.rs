@@ -163,6 +163,113 @@ fn dedupe_admit_reports_fresh_in_flight_and_cached_states() {
 }
 
 #[test]
+fn request_admission_reports_missing_request_id_for_side_effects() {
+    assert_error(
+        &dispatch_request_admission("send_text", None),
+        "MISSING_REQUEST_ID",
+        "requestId missing",
+    );
+    assert_ok(&dispatch_request_admission("send_text", Some("req-1")));
+    assert_ok(&dispatch_request_admission("health", None));
+}
+
+#[test]
+fn request_requires_request_id_matches_core_action_set() {
+    assert!(dispatch_request_requires_request_id("send_text"));
+    assert!(dispatch_request_requires_request_id("send_image"));
+    assert!(dispatch_request_requires_request_id("send_markdown"));
+    assert!(dispatch_request_requires_request_id("open_chatroom"));
+    assert!(!dispatch_request_requires_request_id("health"));
+    assert!(!dispatch_request_requires_request_id("inspect_chatroom"));
+    assert!(!dispatch_request_requires_request_id(
+        "snapshot_chatroom_members"
+    ));
+}
+
+#[test]
+fn validate_text_request_reports_core_verdict() {
+    let valid = assert_ok(&dispatch_validate_text_request(
+        Some(123),
+        Some("hello"),
+        false,
+        Some("  {\"P\":{\"TP\":\"List\"}}  "),
+        None,
+    ));
+    assert_eq!(valid["attachmentJson"], "{\"P\":{\"TP\":\"List\"}}");
+
+    assert_ok(&dispatch_validate_text_request(
+        Some(123),
+        Some("hello"),
+        true,
+        Some("   "),
+        None,
+    ));
+
+    assert_error(
+        &dispatch_validate_text_request(
+            Some(123),
+            Some("hello"),
+            true,
+            Some("{\"P\":{\"TP\":\"List\"}}"),
+            None,
+        ),
+        "BAD_REQUEST",
+        "attachmentJson is only supported for send_text",
+    );
+}
+
+#[test]
+fn validate_image_paths_reports_static_path_policy() {
+    assert_ok(&dispatch_validate_image_paths(
+        r#"["/data/iris-tmp/reply-images/req-1/image-0.png"]"#,
+        8,
+        4096,
+    ));
+
+    assert_error(
+        &dispatch_validate_image_paths(r#"["   "]"#, 8, 4096),
+        "PATH_VALIDATION_FAILED",
+        "blank image path",
+    );
+
+    assert_error(
+        &dispatch_validate_image_paths("not-json", 8, 4096),
+        "BAD_REQUEST",
+        "image paths JSON invalid",
+    );
+}
+
+#[test]
+fn classify_error_code_reports_native_bridge_failure_classification() {
+    let path = assert_ok(&dispatch_classify_error_code(
+        "image path validation timed out",
+        true,
+    ));
+    assert_eq!(path["classifiedErrorCode"], "PATH_VALIDATION_FAILED");
+
+    let timeout = assert_ok(&dispatch_classify_error_code(
+        "CHATROOM OPEN DISPATCH TIMED OUT",
+        false,
+    ));
+    assert_eq!(timeout["classifiedErrorCode"], "TIMEOUT");
+
+    let bad_request = assert_ok(&dispatch_classify_error_code(
+        "bad request from caller",
+        true,
+    ));
+    assert_eq!(bad_request["classifiedErrorCode"], "BAD_REQUEST");
+
+    let unauthorized = assert_ok(&dispatch_classify_error_code(
+        "unauthorized bridge token",
+        false,
+    ));
+    assert_eq!(unauthorized["classifiedErrorCode"], "UNAUTHORIZED");
+
+    let send_failed = assert_ok(&dispatch_classify_error_code("send failed", false));
+    assert_eq!(send_failed["classifiedErrorCode"], "SEND_FAILED");
+}
+
+#[test]
 fn handshake_server_proof_binds_caller_socket_name() {
     let ctx = context();
     let hello = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-1","socketName":"iris-image-bridge-mux","timestampMs":1}"#;

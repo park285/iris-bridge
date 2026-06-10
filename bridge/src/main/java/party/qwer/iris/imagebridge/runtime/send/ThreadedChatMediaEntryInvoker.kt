@@ -45,7 +45,7 @@ internal class ThreadedChatMediaEntryInvoker(
         val type = if (imagePaths.size == 1) registry.photoType else registry.multiPhotoType
         val callingPkgAttachment =
             JSONObject().apply {
-                put("callingPkg", "com.kakao.talk")
+                put("callingPkg", registry.target.packageName)
             }
         val loader = registry.chatMediaSenderClass.classLoader ?: error("no classLoader")
         val identityFunctionProxy =

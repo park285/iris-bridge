@@ -3,6 +3,7 @@ package party.qwer.iris.imagebridge.runtime.server
 import android.content.Context
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
@@ -31,11 +32,12 @@ internal fun buildBridgeRequestHandlerComponents(
     hookInstaller: BridgeHookInstaller = NoopBridgeHookInstaller,
     healthProvider: () -> ImageBridgeHealthSnapshot,
     bridgeMetrics: BridgeMetrics,
+    bridgeCore: BridgeCoreRuntime,
 ): BridgeRequestHandlerComponents {
     val imageSender = registry?.let { KakaoImageSender(it, hookInstaller) }
     val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts) }
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
-    val chatRoomOpener = chatRoomOpener(context, chatRoomResolver)
+    val chatRoomOpener = chatRoomOpener(context, registry, chatRoomResolver)
     val memberExtractor = ChatRoomMemberExtractor()
     val initialSpecStatus = BridgeHookSpecVerifier(registry, registryError).verify()
     return BridgeRequestHandlerComponents(
@@ -51,6 +53,8 @@ internal fun buildBridgeRequestHandlerComponents(
                     memberExtractor.snapshot(roomId, room, expectedMemberHints, preferredPlan)
                 },
                 metrics = bridgeMetrics,
+                textRequestValidator = BridgeTextRequestValidator(bridgeCore),
+                pathValidator = BridgeImagePathValidator(bridgeCore = bridgeCore),
             ),
         initialSpecStatus = initialSpecStatus,
         textSendCapability = textSender?.capability(),
@@ -59,13 +63,18 @@ internal fun buildBridgeRequestHandlerComponents(
 
 private fun chatRoomOpener(
     context: Context,
+    registry: KakaoClassRegistry?,
     chatRoomResolver: ChatRoomResolver?,
 ): ChatRoomOpener {
     val metadataResolver =
         ChatRoomIntentMetadataResolver { roomId ->
             chatRoomResolver?.resolve(roomId)
         }
-    return ChatRoomOpener(context, chatRoomTypeResolver = metadataResolver::resolveChatRoomType)
+    return ChatRoomOpener(
+        context,
+        kakaoPackage = registry?.target?.packageName ?: party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget.OFFICIAL_PACKAGE,
+        chatRoomTypeResolver = metadataResolver::resolveChatRoomType,
+    )
 }
 
 private fun inspectChatRoom(

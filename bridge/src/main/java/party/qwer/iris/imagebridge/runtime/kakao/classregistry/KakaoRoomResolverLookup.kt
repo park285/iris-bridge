@@ -2,6 +2,7 @@
 
 package party.qwer.iris.imagebridge.runtime.kakao.classregistry
 
+import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
@@ -29,13 +30,19 @@ internal fun resolveDirectRoomResolver(
 )
 
 internal fun resolveMasterDatabaseSingleton(masterDb: Class<*>) =
-    selectFieldCandidate(
+    selectMasterDatabaseSingletonField(masterDb).apply { isAccessible = true }
+
+private fun selectMasterDatabaseSingletonField(masterDb: Class<*>): Field {
+    val staticSelfFields =
+        masterDb.declaredFields.filter { field ->
+            Modifier.isStatic(field.modifiers) && field.type == masterDb
+        }
+    staticSelfFields.firstOrNull { field -> field.name == "q" }?.let { return it }
+    return selectFieldCandidate(
         label = "MasterDatabase singleton field on ${masterDb.name}",
-        candidates =
-            masterDb.declaredFields.filter { field ->
-                Modifier.isStatic(field.modifiers) && field.type == masterDb
-            },
-    ).apply { isAccessible = true }
+        candidates = staticSelfFields,
+    )
+}
 
 internal fun resolveRoomDao(masterDb: Class<*>) =
     selectMethodCandidate(
@@ -58,7 +65,7 @@ internal fun resolveEntityLookup(daoClass: Class<*>) =
     selectMethodCandidate(
         label = "RoomDao entity lookup on ${daoClass.name}",
         candidates = daoClass.methods.filter { method -> isRoomEntityLookupSignature(method, daoClass) },
-        preferredNames = setOf("h"),
+        preferredNames = setOf("h", "k"),
     )
 
 internal fun isBroadRoomResolverSignature(method: Method): Boolean =

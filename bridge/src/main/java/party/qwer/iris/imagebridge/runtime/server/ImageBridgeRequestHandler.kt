@@ -19,6 +19,7 @@ internal class ImageBridgeRequestHandler(
     private val metrics: BridgeMetrics = BridgeMetrics(),
     private val leaseVerifier: BridgeImageLeaseVerifier = BridgeImageLeaseVerifier(),
     private val deduper: BridgeRequestDeduper = BridgeRequestDeduper(onDedupeHit = { metrics.recordMuxRequestDeduplicated() }),
+    private val textRequestValidator: BridgeTextRequestValidator = BridgeTextRequestValidator(),
     private val logError: (String, String, Throwable) -> Unit = { tag, message, error -> Log.e(tag, message, error) },
 ) {
     private val imageActionHandler =
@@ -34,6 +35,7 @@ internal class ImageBridgeRequestHandler(
             textSender = textSender,
             serialExecutor = serialExecutor,
             metrics = metrics,
+            textRequestValidator = textRequestValidator,
         )
 
     fun handle(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =

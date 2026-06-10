@@ -389,6 +389,32 @@ class ImageBridgeRequestHandlerSendTest {
     }
 
     @Test
+    fun `send text request preserves org json lenient raw attachment`() {
+        var captured: TextSendRequest? = null
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { request -> captured = request },
+                healthProvider = { readyTextHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        val response =
+            handler.handle(
+                sendTextRequest(
+                    roomId = 123L,
+                    message = "card title",
+                    attachmentJson = "{a:1}",
+                    requestId = "card-req-lenient",
+                ),
+            )
+
+        val textRequest = assertNotNull(captured)
+        assertEquals("{a:1}", textRequest.attachmentJson)
+        assertEquals(ImageBridgeProtocol.STATUS_SENT, response.status)
+    }
+
+    @Test
     fun `send markdown request rejects raw attachment`() {
         val handler =
             ImageBridgeRequestHandler(

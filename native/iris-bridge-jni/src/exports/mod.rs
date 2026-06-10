@@ -1,5 +1,9 @@
+mod admission;
 mod context;
 mod dedupe;
+mod error_classification;
 mod handshake;
+mod image_path;
 mod reply_hook;
+mod text_request;
 mod token_lease;

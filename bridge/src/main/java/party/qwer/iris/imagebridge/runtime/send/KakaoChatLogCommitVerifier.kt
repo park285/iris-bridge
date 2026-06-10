@@ -3,6 +3,8 @@ package party.qwer.iris.imagebridge.runtime.send
 import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 
+internal fun kakaoTalkDatabasePath(packageName: String): String = "/data/data/$packageName/databases/KakaoTalk.db"
+
 internal const val KAKAO_TALK_DATABASE_PATH = "/data/data/com.kakao.talk/databases/KakaoTalk.db"
 
 internal interface KakaoChatLogCommitVerifier {

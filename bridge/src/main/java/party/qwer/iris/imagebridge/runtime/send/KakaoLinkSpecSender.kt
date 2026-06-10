@@ -2,7 +2,9 @@ package party.qwer.iris.imagebridge.runtime.send
 
 import android.util.Log
 import org.json.JSONObject
+import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectMethodBySignature
 import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Modifier
 import java.net.URLEncoder
 
 internal interface KakaoLinkSpecSender {
@@ -30,7 +32,10 @@ internal class ReflectiveKakaoLinkSpecSender(
         runCatching {
             val query = buildKakaoLinkV4EncodedQuery(rawAttachment)
             val helperClass = Class.forName(KAKAO_LINK_HELPER_CLASS, false, loader)
-            val spec = helperClass.getDeclaredMethod("b", String::class.java).apply { isAccessible = true }.invoke(null, query)
+            val spec =
+                resolveKakaoLinkParserMethod(helperClass)
+                    .apply { isAccessible = true }
+                    .invoke(null, query)
             requireNotNull(spec) { "KakaoLinkSpec parser returned null" }
             val methodName = invokeKakaoLinkSpecSend(spec, roomId)
             logInfo(
@@ -50,15 +55,20 @@ internal class ReflectiveKakaoLinkSpecSender(
         spec: Any,
         roomId: Long,
     ): String {
+        val sendCandidates =
+            spec.javaClass.methods.filter { method ->
+                !Modifier.isStatic(method.modifiers) &&
+                    method.parameterCount == 1 &&
+                    method.parameterTypes[0] == Long::class.javaPrimitiveType
+            }
         val sendByExistingChatIdMethod =
-            spec.javaClass.methods
-                .firstOrNull { method ->
-                    val types = method.parameterTypes
-                    method.name == "c" &&
-                        types.size == 1 &&
-                        types[0] == Long::class.javaPrimitiveType
-                }
-                ?: error("KakaoLinkSpec existing chat id send method not found")
+            listOf("c", "b")
+                .mapNotNull { name -> sendCandidates.singleOrNull { method -> method.name == name } }
+                .firstOrNull()
+                ?: selectMethodBySignature(
+                    label = "KakaoLinkSpec send on ${spec.javaClass.name}",
+                    candidates = sendCandidates,
+                )
         requireTruthySendResult(sendByExistingChatIdMethod.apply { isAccessible = true }.invoke(spec, roomId))
         return sendByExistingChatIdMethod.name
     }
@@ -72,6 +82,22 @@ internal class ReflectiveKakaoLinkSpecSender(
     private companion object {
         private const val KAKAO_LINK_HELPER_CLASS = "com.kakao.talk.model.kakaolink.b"
     }
+}
+
+private fun resolveKakaoLinkParserMethod(helperClass: Class<*>): java.lang.reflect.Method {
+    val parserCandidates =
+        helperClass.methods.filter { method ->
+            Modifier.isStatic(method.modifiers) &&
+                method.parameterCount == 1 &&
+                method.parameterTypes[0] == String::class.java
+        }
+    for (name in listOf("c", "b")) {
+        parserCandidates.singleOrNull { method -> method.name == name }?.let { return it }
+    }
+    return selectMethodBySignature(
+        label = "KakaoLinkSpec parser on ${helperClass.name}",
+        candidates = parserCandidates,
+    )
 }
 
 internal fun buildKakaoLinkV4EncodedQuery(rawAttachment: String): String {

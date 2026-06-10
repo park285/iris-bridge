@@ -17,7 +17,6 @@ internal data class ThreadedImagePendingContext(
 
 internal object ThreadedImageXposedInjector {
     private const val TAG = "IrisBridge"
-    private const val REQUEST_COMPANION_CLASS = "com.kakao.talk.manager.send.ChatSendingLogRequest\$a"
     private val installed = AtomicBoolean(false)
     private val pendingContext = ThreadLocal<ThreadedImagePendingContext?>()
 
@@ -38,7 +37,7 @@ internal object ThreadedImageXposedInjector {
                     requestCompanionClass =
                         runCatching {
                             Class.forName(
-                                REQUEST_COMPANION_CLASS,
+                                registry.target.dexClassName("manager.send.ChatSendingLogRequest\$a"),
                                 false,
                                 registry.chatMediaSenderClass.classLoader,
                             )

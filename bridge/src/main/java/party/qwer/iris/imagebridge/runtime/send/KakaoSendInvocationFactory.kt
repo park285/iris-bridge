@@ -6,6 +6,7 @@ import android.net.Uri
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoImageSendStrategy
 import java.io.File
 
 internal interface KakaoSendInvoker {
@@ -38,11 +39,15 @@ internal class KakaoSendInvocationFactory(
     private val pathArgumentFactory: (String) -> Any = { path -> Uri.fromFile(File(path)) },
 ) : KakaoSendInvoker {
     private val senderFactory = ChatMediaSenderInstanceFactory(registry)
+    private val shareManagerImageSender = KakaoShareManagerImageSender(registry)
     private val threadedEntryInvoker = ThreadedChatMediaEntryInvoker(registry, pathArgumentFactory)
+    private val usesLegacyImageSend = registry.imageSendStrategy == KakaoImageSendStrategy.LEGACY_REFLECTION
 
     init {
-        ThreadedImageXposedInjector.install(registry, hookInstaller)
-        threadedEntryInvoker.warmUp()
+        if (usesLegacyImageSend) {
+            ThreadedImageXposedInjector.install(registry, hookInstaller)
+            threadedEntryInvoker.warmUp()
+        }
     }
 
     override fun sendSingle(
@@ -71,6 +76,13 @@ internal class KakaoSendInvocationFactory(
         threadId: Long?,
         threadScope: Int?,
     ) {
+        if (!usesLegacyImageSend) {
+            if (threadId != null || threadScope != null) {
+                error("threaded image send is not supported on ShareManager image path")
+            }
+            shareManagerImageSender.send(chatRoom, imagePaths, pathArgumentFactory)
+            return
+        }
         val sender = senderFactory.newSender(chatRoom, threadId, threadScope)
         val uris =
             ArrayList<Any>(imagePaths.size).apply {
@@ -98,6 +110,10 @@ internal class KakaoSendInvocationFactory(
         threadId: Long,
         threadScope: Int,
     ) {
+        if (!usesLegacyImageSend) {
+            shareManagerImageSender.send(chatRoom, imagePaths, pathArgumentFactory)
+            return
+        }
         ThreadedImageXposedInjector.withThreadContext(roomId, threadId, threadScope) {
             threadedEntryInvoker.invoke(
                 sender = senderFactory.newSender(chatRoom, threadId, threadScope),

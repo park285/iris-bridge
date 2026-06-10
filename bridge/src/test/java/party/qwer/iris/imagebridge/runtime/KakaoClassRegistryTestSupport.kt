@@ -749,6 +749,91 @@ internal fun buildLegacyNameSensitiveRegistry(): KakaoClassRegistry {
     )
 }
 
+internal fun buildModernEntityNameRegistry(): KakaoClassRegistry {
+    val shareManagerClass = com.kakao.talk.manager.ShareManager::class.java
+    val intentMethod =
+        shareManagerClass.methods.first { method ->
+            method.name == "I" &&
+                method.parameterCount == 2 &&
+                method.returnType.name == "android.content.Intent"
+        }
+    val dispatchMethod =
+        shareManagerClass.methods.first { method ->
+            method.name == "h0" &&
+                method.parameterCount == 4 &&
+                method.parameterTypes[3] == Boolean::class.javaPrimitiveType
+        }
+    val singleSend =
+        FakeMediaSender::class.java.getMethod(
+            "n",
+            FakeMediaItem::class.java,
+            Boolean::class.javaPrimitiveType,
+        )
+    val multiSend =
+        FakeMediaSender::class.java.getMethod(
+            "p",
+            List::class.java,
+            FakeMessageType::class.java,
+            String::class.java,
+            JSONObject::class.java,
+            JSONObject::class.java,
+            FakeWriteType::class.java,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            FakeListener::class.java,
+        )
+    val mediaItemCtor =
+        FakeMediaItem::class.java.getConstructor(
+            String::class.java,
+            Long::class.javaPrimitiveType,
+        )
+    val masterDbField = FakeMasterDatabase::class.java.getDeclaredField("INSTANCE")
+    val roomDaoMethod = FakeMasterDatabase::class.java.getMethod("O")
+    val entityLookupMethod =
+        FakeRoomDao::class.java.getMethod(
+            "h",
+            Long::class.javaPrimitiveType,
+        )
+    val broadResolver =
+        FakeChatRoomManager::class.java.getMethod(
+            "e0",
+            Long::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+        )
+    val directResolver =
+        FakeChatRoomManager::class.java.getMethod(
+            "d0",
+            Long::class.javaPrimitiveType,
+        )
+    return KakaoClassRegistry(
+        mediaItemClass = FakeMediaItem::class.java,
+        function0Class = kotlin.jvm.functions.Function0::class.java,
+        function1Class = kotlin.jvm.functions.Function1::class.java,
+        masterDatabaseClass = FakeMasterDatabase::class.java,
+        writeTypeClass = FakeWriteType::class.java,
+        listenerClass = FakeListener::class.java,
+        chatMediaSenderClass = shareManagerClass,
+        messageTypeClass = FakeMessageType::class.java,
+        chatRoomManagerClass = FakeChatRoomManager::class.java,
+        chatRoomClass = ModernEntityNameChatRoom::class.java,
+        singleSendMethod = null,
+        multiSendMethod = intentMethod,
+        mediaItemConstructor = mediaItemCtor,
+        masterDbSingletonField = masterDbField,
+        roomDaoMethod = roomDaoMethod,
+        entityLookupMethod = entityLookupMethod,
+        broadRoomResolverMethod = broadResolver,
+        directRoomResolverMethod = directResolver,
+        photoType = FakeMessageType.Photo,
+        multiPhotoType = FakeMessageType.MultiPhoto,
+        writeTypeNone = FakeWriteType.None,
+        imageSendStrategy = party.qwer.iris.imagebridge.runtime.kakao.KakaoImageSendStrategy.SHARE_MANAGER_INTENT,
+        shareManagerImageIntentMethod = intentMethod,
+        shareManagerImageDispatchMethod = dispatchMethod,
+    )
+}
+
 internal fun buildRenamedThreadedRegistry(): KakaoClassRegistry {
     val singleSend =
         RenamedThreadedEntryMediaSender::class.java.getMethod(
