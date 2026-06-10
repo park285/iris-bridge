@@ -11,7 +11,12 @@ crate-type = ["cdylib"]
 doc = false
 
 [dependencies]
+getrandom.workspace = true
+hex.workspace = true
+iris-bridge-core = { path = "../iris-bridge-core" }
 jni = "0.21"
+serde.workspace = true
+serde_json.workspace = true
 
 [lints.rust]
 unsafe_code = "deny"
