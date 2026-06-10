@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.discovery.BridgeDiscoverySnapshot
 import party.qwer.iris.imagebridge.runtime.discovery.defaultBridgeDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
@@ -32,6 +33,7 @@ internal class ImageBridgeServer(
     private val textBridgeSendMarkdownEnabled: AtomicBoolean = AtomicBoolean(false),
     private val peerIdentityValidator: BridgePeerIdentityValidator = BridgePeerIdentityValidator(),
     private val bridgeMetrics: BridgeMetrics = BridgeMetrics(),
+    private val bridgeCoreUnavailable: AtomicBoolean = AtomicBoolean(false),
     private val discoverySnapshotProvider: () -> BridgeDiscoverySnapshot = defaultBridgeDiscovery::snapshot,
 ) {
     private val sessionAdmission: BridgeSessionAdmission = newBridgeSessionAdmission(bridgeMetrics)
@@ -51,6 +53,9 @@ internal class ImageBridgeServer(
     @Volatile
     private var clientExecutor: ExecutorService? = null
 
+    @Volatile
+    private var bridgeCore: BridgeCoreRuntime? = null
+
     fun start(
         context: Context,
         registry: KakaoClassRegistry?,
@@ -59,11 +64,19 @@ internal class ImageBridgeServer(
         leveragePendingContexts: ReplyLeveragePendingContextStore? = null,
         leverageCommitPendingContexts: ReplyLeveragePendingContextStore? = null,
         hookInstaller: BridgeHookInstaller = NoopBridgeHookInstaller,
+        bridgeCore: BridgeCoreRuntime?,
     ) {
+        if (bridgeCore == null) {
+            bridgeCoreUnavailable.set(true)
+            Log.e(TAG, "bridge-core unavailable — refusing to start mux server (fail-closed)")
+            return
+        }
         if (!running.compareAndSet(false, true)) {
             Log.w(TAG, "bridge server already running")
             return
         }
+        this.bridgeCore = bridgeCore
+        bridgeCoreUnavailable.set(false)
         restartCount.set(0)
         lastCrashMessage.set(null)
         registryAvailable.set(registry != null)
@@ -112,6 +125,7 @@ internal class ImageBridgeServer(
             metrics = bridgeMetrics.snapshot(),
             restartCount = restartCount.get(),
             lastCrashMessage = lastCrashMessage.get(),
+            bridgeCoreUnavailable = bridgeCoreUnavailable.get(),
             discoverySnapshot = discoverySnapshotProvider(),
         )
 
@@ -132,6 +146,12 @@ internal class ImageBridgeServer(
     }
 
     internal fun healthSnapshotForTest(): ImageBridgeHealthSnapshot = healthSnapshot()
+
+    internal fun stopForTest() {
+        running.set(false)
+        bridgeCore?.close()
+        bridgeCore = null
+    }
 
     internal fun isTextBridgeSendTextEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_TEXT_ENABLED")): Boolean = textBridgeSendTextEnabled(raw)
 

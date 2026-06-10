@@ -22,6 +22,7 @@ internal data class ImageBridgeHealthSnapshot(
     val metrics: party.qwer.iris.ImageBridgeProtocol.ImageBridgeMetrics? = null,
     val restartCount: Int,
     val lastCrashMessage: String?,
+    val bridgeCoreUnavailable: Boolean = false,
 )
 
 internal data class ImageBridgeCapabilitySnapshot(

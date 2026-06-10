@@ -10,6 +10,7 @@ internal fun ImageBridgeHealthSnapshot.toJson(): JSONObject =
         put("specReady", specStatus.ready)
         put("checkedAtEpochMs", specStatus.checkedAtEpochMs)
         put("restartCount", restartCount)
+        put("bridgeCoreUnavailable", bridgeCoreUnavailable)
         if (!lastCrashMessage.isNullOrBlank()) put("lastCrashMessage", lastCrashMessage)
         put("checks", JSONArray(specStatus.checks.map { it.toJson() }))
         put("discovery", discoverySnapshot.toJson())

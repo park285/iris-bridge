@@ -16,6 +16,7 @@ internal fun buildImageBridgeHealthSnapshot(
     metrics: party.qwer.iris.ImageBridgeProtocol.ImageBridgeMetrics,
     restartCount: Int,
     lastCrashMessage: String?,
+    bridgeCoreUnavailable: Boolean = false,
     discoverySnapshot: BridgeDiscoverySnapshot = defaultBridgeDiscovery.snapshot(),
 ): ImageBridgeHealthSnapshot =
     ImageBridgeHealthSnapshot(
@@ -34,4 +35,5 @@ internal fun buildImageBridgeHealthSnapshot(
         metrics = metrics,
         restartCount = restartCount,
         lastCrashMessage = lastCrashMessage,
+        bridgeCoreUnavailable = bridgeCoreUnavailable,
     )
