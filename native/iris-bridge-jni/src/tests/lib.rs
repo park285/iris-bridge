@@ -204,6 +204,47 @@ fn send_block_reason_matches_core_discovery_policy() {
 }
 
 #[test]
+fn send_block_reason_snapshot_dispatch_matches_core_discovery_policy() {
+    let hook_names = vec![
+        "ChatMediaSender#sendMultiple".to_owned(),
+        "ChatMediaSender#threadedEntry".to_owned(),
+        "ChatMediaSender#threadedInject".to_owned(),
+    ];
+    let hook_installed = vec![true, true, false];
+
+    assert_eq!(
+        dispatch_send_block_reason_from_snapshot(false, &[], &[], 1, None, None),
+        Some("bridge discovery hooks not installed".to_owned())
+    );
+    assert_eq!(
+        dispatch_send_block_reason_from_snapshot(true, &hook_names, &hook_installed, 1, None, None),
+        None
+    );
+    assert_eq!(
+        dispatch_send_block_reason_from_snapshot(
+            true,
+            &hook_names,
+            &hook_installed,
+            1,
+            Some(55),
+            Some(2),
+        ),
+        Some("bridge discovery hook not ready: ChatMediaSender#threadedInject".to_owned())
+    );
+    assert_eq!(
+        dispatch_send_block_reason_from_snapshot(
+            true,
+            &hook_names,
+            &hook_installed[..2],
+            1,
+            None,
+            None,
+        ),
+        Some("bridge discovery hook snapshot invalid".to_owned())
+    );
+}
+
+#[test]
 fn current_bridge_capabilities_dispatch_reports_rollout_and_readiness_reasons() {
     let envelope = assert_ok(&dispatch_current_bridge_capabilities(
         true, None, true, true, true, None, false, true,
@@ -463,6 +504,34 @@ fn classify_error_code_reports_native_bridge_failure_classification() {
 
     let send_failed = assert_ok(&dispatch_classify_error_code("send failed", false));
     assert_eq!(send_failed["classifiedErrorCode"], "SEND_FAILED");
+}
+
+#[test]
+fn failure_metric_bucket_dispatch_matches_bridge_metrics_contract() {
+    assert_eq!(
+        dispatch_failure_metric_bucket("PATH_VALIDATION_FAILED"),
+        "pathValidationFailure"
+    );
+    assert_eq!(
+        dispatch_failure_metric_bucket("UNAUTHORIZED"),
+        "unauthorizedClient"
+    );
+    assert_eq!(dispatch_failure_metric_bucket("TIMEOUT"), "timeout");
+    assert_eq!(dispatch_failure_metric_bucket("SEND_FAILED"), "sendFailure");
+    assert_eq!(dispatch_failure_metric_bucket("BAD_REQUEST"), "sendFailure");
+}
+
+#[test]
+fn kakao_target_dispatch_matches_bridge_package_policy() {
+    let envelope = assert_ok(&dispatch_resolve_kakao_target("com.kakao.talk.revanced"));
+    assert_eq!(envelope["packageName"], "com.kakao.talk.revanced");
+    assert_eq!(envelope["dexPackage"], "com.kakao.talk");
+
+    assert_error(
+        &dispatch_resolve_kakao_target("com.example.talk"),
+        "BAD_REQUEST",
+        "unsupported KakaoTalk package: com.example.talk",
+    );
 }
 
 #[test]

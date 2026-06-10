@@ -1,5 +1,10 @@
 package party.qwer.iris.imagebridge.runtime.kakao
 
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreEnvelope
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreJniKakaoTarget
+import party.qwer.iris.imagebridge.runtime.core.bridgeCoreLoadLibraryOnce
+import party.qwer.iris.imagebridge.runtime.core.bridgeCoreLogError
+
 internal object KakaoTalkTarget {
     const val OFFICIAL_PACKAGE = "com.kakao.talk"
     const val REVANCED_PACKAGE = "com.kakao.talk.revanced"
@@ -8,9 +13,36 @@ internal object KakaoTalkTarget {
 
     fun isSupported(packageName: String): Boolean = packageName in SUPPORTED_PACKAGES
 
-    fun resolve(packageName: String): KakaoTalkTargetContext {
+    fun resolve(
+        packageName: String,
+        nativeResolver: (String) -> KakaoTalkTargetContext? = ::resolveNativeTarget,
+    ): KakaoTalkTargetContext {
+        nativeResolver(packageName)?.let { return it }
         require(isSupported(packageName)) { "unsupported KakaoTalk package: $packageName" }
         return KakaoTalkTargetContext(packageName)
+    }
+
+    private fun resolveNativeTarget(packageName: String): KakaoTalkTargetContext? {
+        if (!bridgeCoreLoadLibraryOnce()) return null
+        return runCatching {
+            val envelope =
+                BridgeCoreEnvelope.parse(
+                    BridgeCoreJniKakaoTarget.nativeResolveKakaoTarget(packageName),
+                )
+            if (!envelope.isOk) {
+                null
+            } else {
+                val resolvedPackageName = envelope.string("packageName") ?: return@runCatching null
+                val dexPackage = envelope.string("dexPackage") ?: return@runCatching null
+                KakaoTalkTargetContext(
+                    packageName = resolvedPackageName,
+                    dexPackage = dexPackage,
+                )
+            }
+        }.getOrElse { error ->
+            bridgeCoreLogError("bridge-core KakaoTalk target policy threw", error)
+            null
+        }
     }
 }
 

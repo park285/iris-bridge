@@ -3,6 +3,7 @@
 package party.qwer.iris.imagebridge.runtime
 
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTargetContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,6 +27,32 @@ class KakaoTalkTargetTest {
             "/data/data/com.kakao.talk.revanced/databases/KakaoTalk.db",
             target.dataPath("databases/KakaoTalk.db"),
         )
+    }
+
+    @Test
+    fun `resolve uses native target policy when available`() {
+        val target =
+            KakaoTalkTarget.resolve("com.kakao.talk.revanced") { packageName ->
+                KakaoTalkTargetContext(
+                    packageName = packageName,
+                    dexPackage = "native.dex.package",
+                )
+            }
+
+        assertEquals("com.kakao.talk.revanced", target.packageName)
+        assertEquals("native.dex.package", target.dexPackage)
+        assertEquals(
+            "native.dex.package.manager.ShareManager",
+            target.dexClassName("manager.ShareManager"),
+        )
+    }
+
+    @Test
+    fun `resolve preserves Kotlin fallback when native target policy is unavailable`() {
+        val target = KakaoTalkTarget.resolve("com.kakao.talk.revanced") { null }
+
+        assertEquals("com.kakao.talk.revanced", target.packageName)
+        assertEquals("com.kakao.talk", target.dexPackage)
     }
 
     @Test

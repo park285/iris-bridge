@@ -12,7 +12,8 @@ internal object BridgeCoreJniPolicy {
 
     external fun nativeSendBlockReason(
         installAttempted: Boolean,
-        hooksJson: String,
+        hookNames: Array<String>,
+        hookInstalled: BooleanArray,
         imageCount: Int,
         threadId: Long,
         hasThreadId: Boolean,

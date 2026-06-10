@@ -20,8 +20,8 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 class BridgeCoreRuntimeTest {
     @Test
-    fun `ABI version includes request dedupe key JNI surface`() {
-        assertEquals(16, BridgeCore.EXPECTED_ABI_VERSION)
+    fun `ABI version includes current bridge core JNI surface`() {
+        assertEquals(19, BridgeCore.EXPECTED_ABI_VERSION)
     }
 
     @Test
@@ -456,20 +456,22 @@ class BridgeCoreRuntimeTest {
 
     @Test
     fun `send block reason dispatch preserves discovery hook policy`() {
-        val hooks =
-            """
-            [
-              {"name":"ChatMediaSender#sendMultiple","installed":true},
-              {"name":"ChatMediaSender#threadedEntry","installed":true},
-              {"name":"ChatMediaSender#threadedInject","installed":false}
-            ]
-            """.trimIndent()
+        val hookNames =
+            arrayOf(
+                "ChatMediaSender#sendMultiple",
+                "ChatMediaSender#threadedEntry",
+                "ChatMediaSender#threadedInject",
+            )
+        val hookInstalled = booleanArrayOf(true, true, false)
 
-        assertEquals("bridge discovery hooks not installed", BridgeCore.sendBlockReason(false, "[]", 1, null, null))
-        assertNull(BridgeCore.sendBlockReason(true, hooks, 1, null, null))
+        assertEquals(
+            "bridge discovery hooks not installed",
+            BridgeCore.sendBlockReason(false, emptyArray(), booleanArrayOf(), 1, null, null),
+        )
+        assertNull(BridgeCore.sendBlockReason(true, hookNames, hookInstalled, 1, null, null))
         assertEquals(
             "bridge discovery hook not ready: ChatMediaSender#threadedInject",
-            BridgeCore.sendBlockReason(true, hooks, 1, 55L, 2),
+            BridgeCore.sendBlockReason(true, hookNames, hookInstalled, 1, 55L, 2),
         )
     }
 

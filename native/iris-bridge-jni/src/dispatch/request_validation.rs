@@ -1,6 +1,6 @@
 use iris_bridge_core::server::Rejection;
 use iris_bridge_core::server::bridge_flags::is_truthy_flag;
-use iris_bridge_core::server::error_classification::classify_error_code;
+use iris_bridge_core::server::error_classification::{classify_error_code, failure_metric_bucket};
 use iris_bridge_core::server::image_path::{
     MaterializedImagePath, image_path_under_allowed_root, materialize_image_path,
     revalidate_image_path_snapshot, validate_image_paths,
@@ -117,6 +117,10 @@ pub fn dispatch_classify_error_code(message: &str, is_illegal_argument: bool) ->
             "classifiedErrorCode": classify_error_code(message, is_illegal_argument),
         }))
     })
+}
+
+pub fn dispatch_failure_metric_bucket(error_code: &str) -> &'static str {
+    failure_metric_bucket(error_code)
 }
 
 fn decode_allowed_roots(allowed_roots_json: &str) -> Result<Vec<String>, Rejection> {

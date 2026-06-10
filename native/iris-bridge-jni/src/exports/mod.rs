@@ -7,6 +7,7 @@ mod discovery_hooks;
 mod error_classification;
 mod handshake;
 mod image_path;
+mod kakao_target;
 mod peer_identity;
 mod reply_hook;
 mod restart_policy;

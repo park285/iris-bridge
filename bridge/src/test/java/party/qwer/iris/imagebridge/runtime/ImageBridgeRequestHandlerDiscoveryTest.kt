@@ -16,6 +16,7 @@ import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class ImageBridgeRequestHandlerDiscoveryTest {
     @Test
@@ -31,10 +32,48 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                 imageCount = 1,
                 threadId = null,
                 threadScope = null,
-                nativeSendBlockReason = { _, _, _, _, _ -> null },
+                nativeSendBlockReason = { _, _, _, _, _, _ -> null },
             )
 
         assertEquals("bridge core unavailable to evaluate bridge discovery hooks", reason)
+    }
+
+    @Test
+    fun `discovery send block reason passes hook snapshot arrays to native policy`() {
+        val snapshot =
+            BridgeDiscoverySnapshot(
+                installAttempted = true,
+                hooks =
+                    listOf(
+                        DiscoveryHookStatus(name = HOOK_SEND_MULTIPLE, installed = true, invocationCount = 3),
+                        DiscoveryHookStatus(name = HOOK_SEND_THREADED_INJECT, installed = false, invocationCount = 0),
+                    ),
+            )
+
+        val reason =
+            snapshot.sendBlockReason(
+                imageCount = 2,
+                threadId = 55L,
+                threadScope = 2,
+                nativeSendBlockReason = {
+                        installAttempted,
+                        hookNames,
+                        hookInstalled,
+                        imageCount,
+                        threadId,
+                        threadScope,
+                    ->
+                    assertEquals(true, installAttempted)
+                    assertEquals(listOf(HOOK_SEND_MULTIPLE, HOOK_SEND_THREADED_INJECT), hookNames.toList())
+                    assertEquals(listOf(true, false), hookInstalled.toList())
+                    assertEquals(2, imageCount)
+                    assertEquals(55L, threadId)
+                    assertEquals(2, threadScope)
+                    ""
+                },
+            )
+
+        assertNull(reason)
     }
 
     @Test

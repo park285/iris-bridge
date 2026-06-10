@@ -34,6 +34,8 @@ internal object BridgeCoreJniRequest {
         isIllegalArgument: Boolean,
     ): String
 
+    external fun nativeFailureMetricBucket(errorCode: String): String
+
     external fun nativeRequestRequiresRequestId(action: String): Boolean
 
     external fun nativeRequestDedupeKey(

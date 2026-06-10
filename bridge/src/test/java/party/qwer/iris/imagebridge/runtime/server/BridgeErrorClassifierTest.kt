@@ -71,4 +71,18 @@ class BridgeErrorClassifierTest {
         assertEquals(1, sendFailureMetrics.snapshot().sendFailure)
         assertEquals(ImageBridgeProtocol.ERROR_SEND_FAILED, sendFailureMetrics.snapshot().lastSendErrorCode)
     }
+
+    @Test
+    fun `recordFailure uses native metric bucket policy`() {
+        val metrics = BridgeMetrics()
+
+        metrics.recordFailure(
+            ImageBridgeProtocol.ERROR_PATH_VALIDATION,
+            failureMetricBucket = { "sendFailure" },
+        )
+
+        assertEquals(0, metrics.snapshot().pathValidationFailure)
+        assertEquals(1, metrics.snapshot().sendFailure)
+        assertEquals(ImageBridgeProtocol.ERROR_PATH_VALIDATION, metrics.snapshot().lastSendErrorCode)
+    }
 }

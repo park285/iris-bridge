@@ -94,7 +94,8 @@ fun BridgeCore.currentBridgeCapabilities(
 
 internal fun BridgeCore.sendBlockReasonRaw(
     installAttempted: Boolean,
-    hooksJson: String,
+    hookNames: Array<String>,
+    hookInstalled: BooleanArray,
     imageCount: Int,
     threadId: Long?,
     threadScope: Int?,
@@ -103,7 +104,8 @@ internal fun BridgeCore.sendBlockReasonRaw(
     return runCatching {
         BridgeCoreJniPolicy.nativeSendBlockReason(
             installAttempted,
-            hooksJson,
+            hookNames,
+            hookInstalled,
             imageCount,
             threadId ?: 0L,
             threadId != null,
@@ -118,11 +120,20 @@ internal fun BridgeCore.sendBlockReasonRaw(
 
 fun BridgeCore.sendBlockReason(
     installAttempted: Boolean,
-    hooksJson: String,
+    hookNames: Array<String>,
+    hookInstalled: BooleanArray,
     imageCount: Int,
     threadId: Long?,
     threadScope: Int?,
-): String? = sendBlockReasonRaw(installAttempted, hooksJson, imageCount, threadId, threadScope)?.ifEmpty { null }
+): String? =
+    sendBlockReasonRaw(
+        installAttempted,
+        hookNames,
+        hookInstalled,
+        imageCount,
+        threadId,
+        threadScope,
+    )?.ifEmpty { null }
 
 fun BridgeCore.classifyErrorCode(
     message: String,

@@ -4,6 +4,7 @@ mod dedupe;
 mod discovery_hooks;
 mod envelope;
 mod handshake;
+mod kakao_target;
 mod lease;
 mod mentions_hash;
 mod reply_hook;
@@ -15,15 +16,20 @@ use serde_json::json;
 
 pub use capabilities::dispatch_current_bridge_capabilities;
 pub use dedupe::{dispatch_dedupe_admit, dispatch_dedupe_complete};
+#[cfg(test)]
 pub use discovery_hooks::dispatch_send_block_reason;
+pub use discovery_hooks::{
+    DISCOVERY_HOOK_SNAPSHOT_INVALID_REASON, dispatch_send_block_reason_from_snapshot,
+};
 pub use handshake::{dispatch_handshake_on_client_proof, dispatch_handshake_on_hello};
+pub use kakao_target::dispatch_resolve_kakao_target;
 pub use lease::{
     dispatch_image_lease_facts_json, dispatch_image_lease_rejection_is_state_error,
     dispatch_verify_leases,
 };
 pub use reply_hook::{dispatch_reply_hook_sign, dispatch_reply_hook_verify};
 pub use request_validation::{
-    dispatch_allowed_peer_uids, dispatch_classify_error_code,
+    dispatch_allowed_peer_uids, dispatch_classify_error_code, dispatch_failure_metric_bucket,
     dispatch_image_path_under_allowed_root, dispatch_is_truthy_flag,
     dispatch_materialize_image_path, dispatch_normalize_security_mode, dispatch_request_admission,
     dispatch_request_dedupe_key, dispatch_request_requires_request_id,
