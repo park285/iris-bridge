@@ -273,6 +273,10 @@ dependencies {
 tasks.withType<Test>().configureEach {
     dependsOn(cargoBridgeCoreHost)
     systemProperty("java.library.path", nativeProjectDirectory.file("target/release").asFile.absolutePath)
+    // libiris_bridge_core.so는 JVM당 한 classloader에서만 로드 가능하다. Robolectric 샌드박스
+    // classloader와 일반 JUnit app classloader가 한 JVM을 공유하면 "already loaded in another
+    // classloader" UnsatisfiedLinkError가 난다. 테스트 클래스마다 JVM을 분리해 회피한다.
+    setForkEvery(1)
     // Unit tests that are not lease-policy tests exercise leaseless image sends;
     // accept the legacy raw path by default so they stay green. Lease-policy tests
     // inject an explicit BridgeImageLeaseVerifier and ignore this env.

@@ -79,6 +79,82 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
+    fun `validateRequestToken dispatch accepts a matching token and rejects a mismatch`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "production", bridgeToken = "bridge-token", requireHandshakeRaw = "true"),
+            )
+        try {
+            val ok = runtime.validateRequestToken("""{"protocolVersion":1,"token":"bridge-token"}""")
+            assertTrue(ok.isOk, "matching token must validate: ${ok.errorMessage}")
+
+            val bad = runtime.validateRequestToken("""{"protocolVersion":1,"token":"wrong"}""")
+            assertFalse(bad.isOk)
+            assertEquals("unauthorized bridge token", bad.errorMessage)
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `dispatch after close fails closed without touching the freed handle`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "production", bridgeToken = "bridge-token", requireHandshakeRaw = "true"),
+            )
+        runtime.close()
+
+        val token = runtime.validateRequestToken("""{"protocolVersion":1,"token":"bridge-token"}""")
+        assertFalse(token.isOk, "token validation must fail closed after close")
+        assertEquals("BRIDGE_CORE_CLOSED", token.errorCode)
+
+        val hello = runtime.handshakeOnHello("""{"type":"hello","protocolVersion":1,"clientNonce":"aa","socketName":"@iris-image-bridge-mux","timestampMs":1}""", 1L)
+        assertFalse(hello.isOk)
+        assertEquals("BRIDGE_CORE_CLOSED", hello.errorCode)
+
+        val proof = runtime.handshakeOnClientProof("""{"type":"client_proof","protocolVersion":1,"proof":"ff"}""")
+        assertFalse(proof.isOk)
+        assertEquals("BRIDGE_CORE_CLOSED", proof.errorCode)
+
+        val leases = runtime.verifyLeases(1L, "req-1", "[]", "[]", 1L)
+        assertFalse(leases.isOk)
+        assertEquals("BRIDGE_CORE_CLOSED", leases.errorCode)
+
+        val admit = runtime.dedupeAdmit("send_text:req-1", 1L)
+        assertFalse(admit.isOk)
+        assertEquals("BRIDGE_CORE_CLOSED", admit.errorCode)
+        assertNull(admit.dedupeState(), "closed admit must not report a dedupe state")
+
+        runtime.dedupeComplete("send_text:req-1", """{"status":"sent"}""", 1L)
+    }
+
+    @Test
+    fun `dedupe dispatch reports fresh then inFlight and caches a completed response`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "development", bridgeToken = "bridge-token", requireHandshakeRaw = null),
+            )
+        try {
+            val key = "send_text:dedupe-dispatch-1"
+            val first = runtime.dedupeAdmit(key, 1L)
+            assertTrue(first.isOk)
+            assertEquals(DedupeState.Fresh, first.dedupeState())
+
+            val second = runtime.dedupeAdmit(key, 2L)
+            assertEquals(DedupeState.InFlight, second.dedupeState())
+
+            runtime.dedupeComplete(key, """{"status":"sent"}""", 3L)
+
+            val cached = runtime.dedupeAdmit(key, 4L)
+            val state = cached.dedupeState()
+            assertTrue(state is DedupeState.Cached)
+            assertEquals("""{"status":"sent"}""", state.responseJson)
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
     fun `handshake hello then client proof round-trips through the native library`() {
         val runtime =
             assertNotNull(

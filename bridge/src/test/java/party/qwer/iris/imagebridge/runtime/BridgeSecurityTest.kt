@@ -5,6 +5,8 @@ package party.qwer.iris.imagebridge.runtime
 import party.qwer.iris.ImageBridgeHandshakeFrame
 import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.send.ImageSendRequest
 import party.qwer.iris.imagebridge.runtime.send.KakaoImageSender
 import party.qwer.iris.imagebridge.runtime.send.KakaoSendInvoker
@@ -15,11 +17,16 @@ import party.qwer.iris.imagebridge.runtime.server.BridgeSecurityMode
 import party.qwer.iris.imagebridge.runtime.server.BridgeSocketHandshakeAuthenticator
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.PipedInputStream
+import java.io.PipedOutputStream
 import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BridgeSecurityTest {
@@ -113,81 +120,85 @@ class BridgeSecurityTest {
     }
 
     @Test
-    fun `socket authenticator accepts matching client proof before request handling`() {
-        val input = ByteArrayOutputStream()
-        ImageBridgeHandshakeProtocol.writeFrame(
-            input,
-            ImageBridgeHandshakeProtocol.buildHello(
-                clientNonce = "client-nonce",
-                socketName = "iris-image-bridge-mux",
-                timestampMs = 1234L,
-            ),
-        )
-        ImageBridgeHandshakeProtocol.writeFrame(
-            input,
-            ImageBridgeHandshakeProtocol.buildClientProof(
-                bridgeToken = "bridge-token",
-                clientNonce = "client-nonce",
-                serverNonce = "server-nonce",
-            ),
-        )
-        val output = ByteArrayOutputStream()
-        val authenticator =
-            BridgeSocketHandshakeAuthenticator(
-                expectedToken = "bridge-token",
-                securityMode = BridgeSecurityMode.PRODUCTION,
-                nonceFactory = { "server-nonce" },
-            )
+    fun `socket authenticator accepts client proof computed from the emitted server nonce`() {
+        val runtime = productionHandshakeRuntime()
+        try {
+            val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
+            val outcome =
+                driveHandshake(authenticator, clientNonce = "client-nonce") { serverNonce ->
+                    ImageBridgeHandshakeProtocol.buildClientProof(
+                        bridgeToken = "bridge-token",
+                        clientNonce = "client-nonce",
+                        serverNonce = serverNonce,
+                    )
+                }
 
-        authenticator.authenticate(ByteArrayInputStream(input.toByteArray()), output, "iris-image-bridge-mux")
-
-        val serverProof = ImageBridgeHandshakeProtocol.readFrame(ByteArrayInputStream(output.toByteArray()))
-        assertEquals(ImageBridgeHandshakeProtocol.TYPE_SERVER_PROOF, serverProof.type)
-        assertTrue(
-            ImageBridgeHandshakeProtocol.proofMatches(
-                serverProof.proof,
-                ImageBridgeHandshakeProtocol.serverProof(
-                    bridgeToken = "bridge-token",
-                    clientNonce = "client-nonce",
-                    serverNonce = "server-nonce",
-                    socketName = "iris-image-bridge-mux",
-                ),
-            ),
-        )
+            assertNull(outcome.failure, "authenticator must accept a proof built from the emitted server nonce")
+            val serverProof = assertNotNull(outcome.serverProofFrame)
+            assertEquals(ImageBridgeHandshakeProtocol.TYPE_SERVER_PROOF, serverProof.type)
+            assertTrue(serverProof.serverNonce?.isNotBlank() == true, "server must emit a nonce")
+            assertTrue(serverProof.proof?.isNotBlank() == true, "server proof must be present")
+        } finally {
+            runtime.close()
+        }
     }
 
     @Test
-    fun `socket authenticator rejects bad client proof with sanitized error`() {
-        val input = ByteArrayOutputStream()
-        ImageBridgeHandshakeProtocol.writeFrame(
-            input,
-            ImageBridgeHandshakeProtocol.buildHello(
-                clientNonce = "client-nonce",
-                socketName = "iris-image-bridge-mux",
-                timestampMs = 1234L,
-            ),
-        )
-        ImageBridgeHandshakeProtocol.writeFrame(
-            input,
-            ImageBridgeHandshakeFrame(
-                type = ImageBridgeHandshakeProtocol.TYPE_CLIENT_PROOF,
-                protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
-                proof = "bad-proof",
-            ),
-        )
-        val authenticator =
-            BridgeSocketHandshakeAuthenticator(
-                expectedToken = "bridge-token",
-                securityMode = BridgeSecurityMode.PRODUCTION,
-                nonceFactory = { "server-nonce" },
+    fun `socket authenticator rejects client proof built with a wrong token`() {
+        val runtime = productionHandshakeRuntime()
+        try {
+            val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
+            val outcome =
+                driveHandshake(authenticator, clientNonce = "client-nonce") { serverNonce ->
+                    ImageBridgeHandshakeProtocol.buildClientProof(
+                        bridgeToken = "wrong-token",
+                        clientNonce = "client-nonce",
+                        serverNonce = serverNonce,
+                    )
+                }
+
+            val failure = assertNotNull(outcome.failure, "wrong-token proof must be rejected")
+            assertTrue(failure is IllegalArgumentException)
+            assertEquals(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED, failure.message)
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `socket authenticator rejects a malformed hello frame`() {
+        val runtime = productionHandshakeRuntime()
+        try {
+            val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
+            val outcome =
+                driveMalformedHandshake(authenticator) {
+                    ImageBridgeHandshakeFrame(
+                        type = ImageBridgeHandshakeProtocol.TYPE_CLIENT_PROOF,
+                        protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
+                        clientNonce = "client-nonce",
+                    )
+                }
+
+            val failure = assertNotNull(outcome.failure, "a hello with the wrong type must be rejected")
+            assertEquals(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED, failure.message)
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `socket authenticator skips the handshake in development mode`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "development", bridgeToken = "bridge-token", requireHandshakeRaw = null),
             )
-
-        val error =
-            assertFailsWith<IllegalArgumentException> {
-                authenticator.authenticate(ByteArrayInputStream(input.toByteArray()), ByteArrayOutputStream(), "iris-image-bridge-mux")
-            }
-
-        assertEquals(ImageBridgeHandshakeProtocol.AUTHENTICATION_FAILED, error.message)
+        try {
+            val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
+            // No frames are written; a required handshake would block on read. The skip returns immediately.
+            authenticator.authenticate(ByteArrayInputStream(ByteArray(0)), ByteArrayOutputStream(), "iris-image-bridge-mux")
+        } finally {
+            runtime.close()
+        }
     }
 
     @Test
@@ -426,4 +437,72 @@ class BridgeSecurityTest {
         assertEquals(listOf(image.canonicalPath), sent)
         allowedDir.deleteRecursively()
     }
+}
+
+private class HandshakeOutcome(
+    val failure: Throwable?,
+    val serverProofFrame: ImageBridgeHandshakeFrame?,
+)
+
+private fun productionHandshakeRuntime(): BridgeCoreRuntime =
+    assertNotNull(
+        BridgeCore.loadOrNull(securityMode = "production", bridgeToken = "bridge-token", requireHandshakeRaw = "true"),
+    )
+
+private fun driveHandshake(
+    authenticator: BridgeSocketHandshakeAuthenticator,
+    clientNonce: String,
+    clientProofFor: (serverNonce: String) -> ImageBridgeHandshakeFrame,
+): HandshakeOutcome {
+    val serverInputSource = PipedOutputStream()
+    val serverInput = PipedInputStream(serverInputSource)
+    val serverOutput = PipedOutputStream()
+    val clientInput = PipedInputStream(serverOutput)
+
+    val failure = AtomicReference<Throwable?>(null)
+    val worker =
+        Thread {
+            runCatching { authenticator.authenticate(serverInput, serverOutput, "iris-image-bridge-mux") }
+                .onFailure { failure.set(it) }
+        }
+    worker.start()
+
+    ImageBridgeHandshakeProtocol.writeFrame(
+        serverInputSource,
+        ImageBridgeHandshakeProtocol.buildHello(
+            clientNonce = clientNonce,
+            socketName = "iris-image-bridge-mux",
+            timestampMs = 1234L,
+        ),
+    )
+    val serverProof = ImageBridgeHandshakeProtocol.readFrame(clientInput)
+    val serverNonce = serverProof.serverNonce.orEmpty()
+    ImageBridgeHandshakeProtocol.writeFrame(serverInputSource, clientProofFor(serverNonce))
+
+    worker.join(5_000)
+    serverInputSource.close()
+    serverOutput.close()
+    return HandshakeOutcome(failure = failure.get(), serverProofFrame = serverProof)
+}
+
+private fun driveMalformedHandshake(
+    authenticator: BridgeSocketHandshakeAuthenticator,
+    helloFrame: () -> ImageBridgeHandshakeFrame,
+): HandshakeOutcome {
+    val serverInputSource = PipedOutputStream()
+    val serverInput = PipedInputStream(serverInputSource)
+    val serverOutput = ByteArrayOutputStream()
+
+    val failure = AtomicReference<Throwable?>(null)
+    val worker =
+        Thread {
+            runCatching { authenticator.authenticate(serverInput, serverOutput, "iris-image-bridge-mux") }
+                .onFailure { failure.set(it) }
+        }
+    worker.start()
+
+    ImageBridgeHandshakeProtocol.writeFrame(serverInputSource, helloFrame())
+    worker.join(5_000)
+    serverInputSource.close()
+    return HandshakeOutcome(failure = failure.get(), serverProofFrame = null)
 }

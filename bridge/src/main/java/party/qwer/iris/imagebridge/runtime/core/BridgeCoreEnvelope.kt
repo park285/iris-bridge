@@ -7,7 +7,9 @@ sealed interface DedupeState {
 
     data object InFlight : DedupeState
 
-    data class Cached(val responseJson: String?) : DedupeState
+    data class Cached(
+        val responseJson: String?,
+    ) : DedupeState
 }
 
 class BridgeCoreEnvelope private constructor(

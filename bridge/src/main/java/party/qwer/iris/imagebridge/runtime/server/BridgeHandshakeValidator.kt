@@ -1,44 +1,51 @@
 package party.qwer.iris.imagebridge.runtime.server
 
+import org.json.JSONObject
 import party.qwer.iris.ImageBridgeProtocol
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 
-internal class BridgeHandshakeValidator(
-    private val expectedToken: String = party.qwer.iris.resolveBridgeToken(),
-    private val securityMode: BridgeSecurityMode = BridgeSecurityMode.fromEnv(),
+internal class BridgeHandshakeValidator private constructor(
+    private val bridgeCoreProvider: () -> BridgeCoreRuntime?,
 ) {
+    constructor(
+        expectedToken: String = party.qwer.iris.resolveBridgeToken(),
+        securityMode: BridgeSecurityMode = BridgeSecurityMode.fromEnv(),
+    ) : this(bridgeCoreProviderFor(expectedToken, securityMode))
+
+    constructor(bridgeCore: BridgeCoreRuntime) : this({ bridgeCore })
+
     fun validate(request: ImageBridgeProtocol.ImageBridgeRequest) {
-        require(request.protocolVersion == ImageBridgeProtocol.PROTOCOL_VERSION) {
-            "unsupported protocol version"
+        val core = bridgeCoreProvider() ?: throw IllegalArgumentException("bridge core unavailable")
+        val envelope =
+            core.validateRequestToken(
+                JSONObject()
+                    .put("protocolVersion", request.protocolVersion ?: JSONObject.NULL)
+                    .put("token", request.token ?: JSONObject.NULL)
+                    .toString(),
+            )
+        if (!envelope.isOk) {
+            throw IllegalArgumentException(envelope.errorMessage ?: "bridge token rejected")
         }
-        validateToken(request.token)
-    }
-
-    private fun validateToken(actualToken: String?) {
-        when (securityMode) {
-            BridgeSecurityMode.PRODUCTION -> requireProductionToken(actualToken)
-            BridgeSecurityMode.DEVELOPMENT -> requireDevelopmentToken(actualToken)
-        }
-    }
-
-    private fun requireProductionToken(actualToken: String?) {
-        require(expectedToken.isNotBlank()) { "bridge token must be configured in production mode" }
-        require(tokensMatch(actualToken, expectedToken)) { "unauthorized bridge token" }
-    }
-
-    private fun requireDevelopmentToken(actualToken: String?) {
-        if (expectedToken.isBlank()) return
-        require(tokensMatch(actualToken, expectedToken)) { "unauthorized bridge token" }
-    }
-
-    private fun tokensMatch(
-        actual: String?,
-        expected: String,
-    ): Boolean {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val actualDigest = digest.digest((actual ?: "").toByteArray(StandardCharsets.UTF_8))
-        val expectedDigest = MessageDigest.getInstance("SHA-256").digest(expected.toByteArray(StandardCharsets.UTF_8))
-        return MessageDigest.isEqual(actualDigest, expectedDigest)
     }
 }
+
+private fun bridgeCoreProviderFor(
+    expectedToken: String,
+    securityMode: BridgeSecurityMode,
+): () -> BridgeCoreRuntime? {
+    val runtime by lazy {
+        BridgeCore.loadOrNull(
+            securityMode = securityMode.coreRawValue(),
+            bridgeToken = expectedToken,
+            requireHandshakeRaw = null,
+        )
+    }
+    return { runtime }
+}
+
+internal fun BridgeSecurityMode.coreRawValue(): String =
+    when (this) {
+        BridgeSecurityMode.DEVELOPMENT -> "development"
+        BridgeSecurityMode.PRODUCTION -> "production"
+    }
