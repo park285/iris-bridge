@@ -8,12 +8,13 @@ publish = false
 [lib]
 name = "iris_bridge_core"
 crate-type = ["cdylib"]
+doc = false
 
 [dependencies]
 jni = "0.21"
 
 [lints.rust]
-unsafe_code = "allow"
+unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 unused_must_use = "deny"
 elided_lifetimes_in_paths = "warn"
