@@ -272,6 +272,11 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     dependsOn(cargoBridgeCoreHost)
+    // host .so 내용이 Test input에 안 잡히면 Rust 변경 후 테스트가 stale green이 된다.
+    inputs
+        .file(hostBridgeCoreLibrary)
+        .withPropertyName("hostBridgeCoreLibrary")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("java.library.path", nativeProjectDirectory.file("target/release").asFile.absolutePath)
     // libiris_bridge_core.so는 JVM당 한 classloader에서만 로드 가능하다. Robolectric 샌드박스
     // classloader와 일반 JUnit app classloader가 한 JVM을 공유하면 "already loaded in another

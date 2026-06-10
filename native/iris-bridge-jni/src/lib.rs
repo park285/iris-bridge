@@ -10,7 +10,7 @@ use jni::sys::jint;
 #[cfg(test)]
 use crate::dispatch::*;
 #[cfg(test)]
-use crate::handles::BridgeCoreContext;
+use crate::handles::{BridgeCoreContext, drop_handle, into_handle, with_context};
 
 pub const ABI_VERSION: jint = 1;
 

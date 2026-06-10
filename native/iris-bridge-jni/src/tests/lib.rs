@@ -276,3 +276,19 @@ fn handshake_registry_evicts_oldest_session_beyond_capacity() {
         "bridge authentication failed",
     );
 }
+
+#[test]
+fn dispatch_after_destroy_is_rejected_as_invalid_handle() {
+    let handle = into_handle(context());
+    let live = with_context(handle, |ctx| dispatch_dedupe_admit(ctx, "send:req-live", 1))
+        .expect("live handle dispatches");
+    assert_ok(&live);
+
+    drop_handle(handle);
+
+    let stale = match with_context(handle, |ctx| dispatch_dedupe_admit(ctx, "send:req-live", 2)) {
+        Ok(envelope) => envelope,
+        Err(rejection) => invalid_handle_envelope(&rejection),
+    };
+    assert_error(&stale, "INVALID_HANDLE", "invalid BridgeCoreContext handle");
+}
