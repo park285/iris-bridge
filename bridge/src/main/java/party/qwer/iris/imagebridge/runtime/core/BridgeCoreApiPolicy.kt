@@ -92,30 +92,6 @@ fun BridgeCore.currentBridgeCapabilities(
     }
 }
 
-fun BridgeCore.serverRestartDelayMs(failureCount: Int): Long {
-    if (!bridgeCoreLoadLibraryOnce()) return serverRestartDelayMsFallback(failureCount)
-    return runCatching { BridgeCoreJniPolicy.nativeServerRestartDelayMs(failureCount) }
-        .getOrElse { error ->
-            bridgeCoreLogError("bridge-core restart delay policy threw", error)
-            serverRestartDelayMsFallback(failureCount)
-        }
-}
-
-internal fun serverRestartDelayMsFallback(failureCount: Int): Long =
-    (1_000L shl (failureCount - 1).coerceAtLeast(0).coerceAtMost(5)).coerceAtMost(30_000L)
-
-fun BridgeCore.imageLeaseRejectionIsStateError(message: String): Boolean {
-    if (!bridgeCoreLoadLibraryOnce()) return imageLeaseRejectionIsStateErrorFallback(message)
-    return runCatching { BridgeCoreJniLease.nativeImageLeaseRejectionIsStateError(message) }
-        .getOrElse { error ->
-            bridgeCoreLogError("bridge-core image lease rejection policy threw", error)
-            imageLeaseRejectionIsStateErrorFallback(message)
-        }
-}
-
-internal fun imageLeaseRejectionIsStateErrorFallback(message: String): Boolean =
-    message == "image lease required" || message.startsWith("image lease verification failed:")
-
 internal fun BridgeCore.sendBlockReasonRaw(
     installAttempted: Boolean,
     hooksJson: String,

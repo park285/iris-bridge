@@ -340,6 +340,17 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
+    fun `server restart delay fails closed to max delay when native policy is unavailable`() {
+        assertEquals(
+            30_000L,
+            BridgeCore.serverRestartDelayMs(
+                failureCount = 2,
+                restartDelayPolicy = { null },
+            ),
+        )
+    }
+
+    @Test
     fun `image path root containment dispatch preserves separator boundary`() {
         val roots = listOf("/data/iris-tmp/reply-images")
 
@@ -404,15 +415,13 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
-    fun `image lease rejection fallback preserves bridge exception policy`() {
-        assertTrue(imageLeaseRejectionIsStateErrorFallback("image lease required"))
-        assertTrue(imageLeaseRejectionIsStateErrorFallback("image lease verification failed: EXPIRED"))
+    fun `image lease rejection kind fails closed when native policy is unavailable`() {
         assertFalse(
-            imageLeaseRejectionIsStateErrorFallback(
-                "image lease last modified mismatch: /tmp/a expected=1 actual=2",
+            BridgeCore.imageLeaseRejectionIsStateError(
+                "image lease verification failed: EXPIRED",
+                rejectionKindPolicy = { null },
             ),
         )
-        assertFalse(imageLeaseRejectionIsStateErrorFallback("image file not found: /tmp/a"))
     }
 
     @Test
