@@ -46,4 +46,19 @@ class BridgeRequestHandlerComponentsTest {
         assertEquals("https://example.invalid/42", result[42L]?.profileImageUrl)
         assertEquals("Upstream Member 77", result[77L]?.nickName)
     }
+
+    @Test
+    fun `member profile fetcher can serve userdb cache when upstream discovery is unavailable`() {
+        val access =
+            buildFakeUserDbAccess { userId ->
+                if (userId == 42L) FakeUserModel(userId, "Cached Member 42") else null
+            }
+        val reader = KakaoUserDatabaseReader(access)
+
+        val fetcher = buildMemberProfileFetcherForTest(baseFetcher = null, userDbReader = reader)
+        val result = fetcher?.fetchMemberProfiles(1L, listOf(42L, 77L)).orEmpty()
+
+        assertEquals("Cached Member 42", result[42L]?.nickName)
+        assertEquals(null, result[77L])
+    }
 }

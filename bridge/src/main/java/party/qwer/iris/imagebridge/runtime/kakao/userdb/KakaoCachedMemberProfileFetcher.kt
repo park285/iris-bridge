@@ -4,7 +4,7 @@ import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.MemberProfileUpstre
 import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.UpstreamMemberProfile
 
 internal class KakaoCachedMemberProfileFetcher(
-    private val baseFetcher: MemberProfileUpstream,
+    private val baseFetcher: MemberProfileUpstream?,
     private val userDbReader: KakaoUserDatabaseReader,
 ) : MemberProfileUpstream {
     override fun fetchMemberProfiles(
@@ -16,7 +16,7 @@ internal class KakaoCachedMemberProfileFetcher(
         val deduped = userIds.filter { it > 0L }.distinct()
         if (deduped.isEmpty()) return emptyMap()
 
-        val upstreamProfiles = baseFetcher.fetchMemberProfiles(chatId, deduped)
+        val upstreamProfiles = baseFetcher?.fetchMemberProfiles(chatId, deduped).orEmpty()
         val cachedProfiles =
             userDbReader
                 .readNicknames(deduped)

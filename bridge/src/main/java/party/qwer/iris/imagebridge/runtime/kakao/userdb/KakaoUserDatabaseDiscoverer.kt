@@ -43,7 +43,11 @@ private const val USER_DATABASE_DATA_SOURCE_CLASS_NAME = "com.kakao.talk.singlet
 private const val USER_DATABASE_DATA_SOURCE_FILE_NAME = "UserDatabaseDataSource.kt"
 private const val OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAME = "t"
 
-private val USER_DATABASE_DATA_SOURCE_NAMES = arrayOf(USER_DATABASE_DATA_SOURCE_CLASS_NAME)
+private val USER_DATABASE_DATA_SOURCE_NAMES =
+    arrayOf(
+        USER_DATABASE_DATA_SOURCE_CLASS_NAME,
+        "X20.r2",
+    )
 
 private fun discoverUserDatabaseDataSourceClass(
     classLoader: ClassLoader,

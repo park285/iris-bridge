@@ -84,11 +84,12 @@ internal fun buildBridgeRequestHandlerComponents(
 private fun discoverMemberProfileFetcher(kakaoClassLoader: ClassLoader): MemberProfileUpstream? {
     val baseFetcher =
         discoverKakaoMemberFetchAccess(kakaoClassLoader)?.let(::KakaoMemberProfileFetcher)
-            ?: return null
     val userDbReader =
-        discoverKakaoUserDatabaseAccess(kakaoClassLoader, scanFallback = false)?.let(::KakaoUserDatabaseReader)
+        discoverKakaoUserDatabaseAccess(kakaoClassLoader, scanFallback = true)?.let(::KakaoUserDatabaseReader)
     if (userDbReader == null) {
         Log.w(KAKAO_CLASS_REGISTRY_TAG, "Kakao UserDatabase unavailable; using upstream member profiles only")
+    } else if (baseFetcher == null) {
+        Log.w(KAKAO_CLASS_REGISTRY_TAG, "Kakao member-fetch unavailable; using UserDatabase cache only")
     }
     return buildMemberProfileFetcher(baseFetcher, userDbReader)
 }
@@ -101,12 +102,13 @@ internal fun buildMemberProfileFetcherForTest(
 private fun buildMemberProfileFetcher(
     baseFetcher: MemberProfileUpstream?,
     userDbReader: KakaoUserDatabaseReader?,
-): MemberProfileUpstream? {
-    val upstream = baseFetcher ?: return null
-    return userDbReader?.let { reader ->
-        KakaoCachedMemberProfileFetcher(upstream, reader)
-    } ?: upstream
-}
+): MemberProfileUpstream? =
+    when {
+        baseFetcher != null && userDbReader != null -> KakaoCachedMemberProfileFetcher(baseFetcher, userDbReader)
+        baseFetcher != null -> baseFetcher
+        userDbReader != null -> KakaoCachedMemberProfileFetcher(baseFetcher = null, userDbReader = userDbReader)
+        else -> null
+    }
 
 private fun chatRoomOpener(
     context: Context,

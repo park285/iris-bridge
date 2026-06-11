@@ -14,6 +14,11 @@ class KakaoMemberFetchDiscovererTest {
     }
 
     @Test
+    fun `member fetch matcher accepts Kakao 26_4_2 LocoImpl style member API`() {
+        assertTrue(matchesMemberFetchFacadeForTest(FakeKakao2642LocoImplLikeClient::class.java))
+    }
+
+    @Test
     fun `member fetch discovery prefers latest requested member API over add-member fallback`() {
         val method = findFetchMembersMethodForTest(FakeLatestMemberFetchClient::class.java)
 
@@ -115,6 +120,24 @@ internal class FakeRoomOnlyMemberFetchClient {
                     listOf(
                         FakeMember(chatId + 1L, "Member ${chatId + 1L}"),
                     ),
+            ),
+        )
+}
+
+internal class FakeKakao2642LocoImplLikeClient {
+    companion object {
+        @JvmField
+        val b: FakeKakao2642LocoImplLikeClient = FakeKakao2642LocoImplLikeClient()
+    }
+
+    suspend fun S0(
+        chatId: Long,
+        memberIds: List<Long>,
+    ): FakeLocoResult =
+        FakeLocoResult(
+            FakeMemberResponse(
+                members =
+                    memberIds.map { memberId -> FakeMember(memberId, "Member $memberId") },
             ),
         )
 }
