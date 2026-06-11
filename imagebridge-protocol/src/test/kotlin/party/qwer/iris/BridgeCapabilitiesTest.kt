@@ -17,6 +17,7 @@ class BridgeCapabilitiesTest {
                 ImageBridgeProtocol.ACTION_INSPECT_CHATROOM,
                 ImageBridgeProtocol.ACTION_OPEN_CHATROOM,
                 ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS,
+                ImageBridgeProtocol.ACTION_FETCH_MEMBER_PROFILES,
             )
         val mappedWireNames = BridgeAction.entries.map { it.wireName }.toSet()
         assertEquals(protocolActions, mappedWireNames)
@@ -76,7 +77,7 @@ class BridgeCapabilitiesTest {
     }
 
     @Test
-    fun `read only actions are exactly health inspect and snapshot`() {
+    fun `read only actions are exactly health inspect snapshot and member profile fetch`() {
         val readOnlyWireNames =
             BridgeAction.entries
                 .filterNot { it.requiredCapability.hasSideEffect }
@@ -87,6 +88,7 @@ class BridgeCapabilitiesTest {
                 ImageBridgeProtocol.ACTION_HEALTH,
                 ImageBridgeProtocol.ACTION_INSPECT_CHATROOM,
                 ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS,
+                ImageBridgeProtocol.ACTION_FETCH_MEMBER_PROFILES,
             ),
             readOnlyWireNames,
         )

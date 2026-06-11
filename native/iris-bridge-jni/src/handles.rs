@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use iris_bridge_core::handshake::should_require_bridge_handshake;
 use iris_bridge_core::server::{
@@ -114,23 +114,29 @@ impl BridgeCoreContext {
 // 핸들은 raw pointer가 아니라 레지스트리 키다. destroy 이후의 dispatch는
 // "not found" 거부가 되고, in-flight 호출은 Arc가 수명을 보장하므로
 // use-after-free가 구조적으로 불가능하다 (unsafe-closeout 게이트 준수).
-fn registry() -> &'static Mutex<HashMap<i64, Arc<BridgeCoreContext>>> {
-    static REGISTRY: OnceLock<Mutex<HashMap<i64, Arc<BridgeCoreContext>>>> = OnceLock::new();
-    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+fn registry() -> &'static RwLock<HashMap<i64, Arc<BridgeCoreContext>>> {
+    static REGISTRY: OnceLock<RwLock<HashMap<i64, Arc<BridgeCoreContext>>>> = OnceLock::new();
+    REGISTRY.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
 static NEXT_HANDLE: AtomicI64 = AtomicI64::new(1);
 
-fn lock_registry() -> std::sync::MutexGuard<'static, HashMap<i64, Arc<BridgeCoreContext>>> {
+fn read_registry() -> std::sync::RwLockReadGuard<'static, HashMap<i64, Arc<BridgeCoreContext>>> {
     registry()
-        .lock()
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn write_registry() -> std::sync::RwLockWriteGuard<'static, HashMap<i64, Arc<BridgeCoreContext>>> {
+    registry()
+        .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 #[must_use]
 pub fn into_handle(context: BridgeCoreContext) -> i64 {
     let handle = NEXT_HANDLE.fetch_add(1, Ordering::Relaxed);
-    lock_registry().insert(handle, Arc::new(context));
+    write_registry().insert(handle, Arc::new(context));
     handle
 }
 
@@ -138,7 +144,7 @@ pub fn with_context<R>(
     handle: i64,
     body: impl FnOnce(&BridgeCoreContext) -> R,
 ) -> Result<R, Rejection> {
-    let context = lock_registry()
+    let context = read_registry()
         .get(&handle)
         .cloned()
         .ok_or_else(|| Rejection::new(ERROR_INVALID_HANDLE, "invalid BridgeCoreContext handle"))?;
@@ -146,5 +152,5 @@ pub fn with_context<R>(
 }
 
 pub fn drop_handle(handle: i64) {
-    lock_registry().remove(&handle);
+    write_registry().remove(&handle);
 }

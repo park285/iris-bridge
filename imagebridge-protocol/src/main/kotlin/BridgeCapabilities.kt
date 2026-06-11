@@ -67,6 +67,13 @@ enum class BridgeCapability(
         requiresAuthToken = true,
         threats = setOf(BridgeThreat.MEMBER_DATA_EXPOSURE),
     ),
+    FETCH_MEMBER_PROFILES(
+        "fetch-member-profiles",
+        "지정한 방의 멤버 프로필(식별자/닉네임)을 조회한다.",
+        hasSideEffect = false,
+        requiresAuthToken = true,
+        threats = setOf(BridgeThreat.MEMBER_DATA_EXPOSURE),
+    ),
     REPORT_HEALTH(
         "report-health",
         "bridge readiness와 hook 진단을 보고한다.",
@@ -93,6 +100,10 @@ enum class BridgeAction(
     SNAPSHOT_CHATROOM_MEMBERS(
         ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS,
         BridgeCapability.SNAPSHOT_CHATROOM_MEMBERS,
+    ),
+    FETCH_MEMBER_PROFILES(
+        ImageBridgeProtocol.ACTION_FETCH_MEMBER_PROFILES,
+        BridgeCapability.FETCH_MEMBER_PROFILES,
     ),
     HEALTH(ImageBridgeProtocol.ACTION_HEALTH, BridgeCapability.REPORT_HEALTH),
     ;

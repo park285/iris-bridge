@@ -261,6 +261,7 @@ ktlint {
 
 dependencies {
     implementation(project(":imagebridge-protocol"))
+    implementation(libs.kotlinx.coroutines.core)
     compileOnly(libs.libxposed.api)
 
     testImplementation(kotlin("test-junit"))

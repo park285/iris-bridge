@@ -1015,6 +1015,66 @@ fn handshake_registry_evicts_oldest_session_beyond_capacity() {
 }
 
 #[test]
+fn concurrent_with_context_dispatch_on_shared_handle_all_succeed() {
+    let handle = into_handle(context());
+    let threads = 8;
+    let calls_per_thread = 256;
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(threads));
+
+    let workers: Vec<_> = (0..threads)
+        .map(|thread_index| {
+            let barrier = std::sync::Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                for call_index in 0..calls_per_thread {
+                    let key = format!("send:req-{thread_index}-{call_index}");
+                    let envelope =
+                        with_context(handle, |ctx| dispatch_dedupe_admit(ctx, &key, call_index))
+                            .expect("shared handle dispatches under read lock");
+                    assert_ok(&envelope);
+                }
+            })
+        })
+        .collect();
+
+    for worker in workers {
+        worker.join().expect("worker thread");
+    }
+
+    drop_handle(handle);
+}
+
+#[test]
+fn drop_handle_during_in_flight_call_keeps_context_alive() {
+    let handle = into_handle(context());
+
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+
+    let worker = std::thread::spawn(move || {
+        with_context(handle, |ctx| {
+            entered_tx.send(()).expect("signal entered body");
+            release_rx.recv().expect("await release");
+            dispatch_dedupe_admit(ctx, "send:in-flight", 1)
+        })
+        .expect("in-flight dispatch holds the cloned Arc")
+    });
+
+    entered_rx.recv().expect("await body entry");
+    drop_handle(handle);
+    release_tx.send(()).expect("release in-flight body");
+
+    let envelope = worker.join().expect("in-flight worker");
+    assert_ok(&envelope);
+
+    let stale = match with_context(handle, |ctx| dispatch_dedupe_admit(ctx, "send:after", 2)) {
+        Ok(envelope) => envelope,
+        Err(rejection) => invalid_handle_envelope(&rejection),
+    };
+    assert_error(&stale, "INVALID_HANDLE", "invalid BridgeCoreContext handle");
+}
+
+#[test]
 fn dispatch_after_destroy_is_rejected_as_invalid_handle() {
     let handle = into_handle(context());
     let live = with_context(handle, |ctx| dispatch_dedupe_admit(ctx, "send:req-live", 1))
