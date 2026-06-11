@@ -61,6 +61,19 @@ class KakaoUserDatabaseReaderTest {
     }
 
     @Test
+    fun `readNicknames accepts Kakao 26_4_2 obfuscated nickname accessor r`() {
+        val access =
+            buildFakeUserDbAccess {
+                FakeObfuscatedNicknameUserModel("Bob")
+            }
+        val reader = KakaoUserDatabaseReader(access)
+
+        val result = reader.readNicknames(listOf(200L))
+
+        assertEquals("Bob", result[200L])
+    }
+
+    @Test
     fun `readNicknames skips null user entries`() {
         val access = buildFakeUserDbAccess { null }
         val reader = KakaoUserDatabaseReader(access)
@@ -215,4 +228,10 @@ private class FakeGetNicknameUserModel(
     private val value: String,
 ) {
     fun getNickname(): String = value
+}
+
+private class FakeObfuscatedNicknameUserModel(
+    private val v: String,
+) {
+    fun r(): String = v
 }

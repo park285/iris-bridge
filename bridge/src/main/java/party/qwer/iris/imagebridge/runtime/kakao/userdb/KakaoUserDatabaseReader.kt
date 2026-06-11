@@ -86,7 +86,7 @@ internal class KakaoUserDatabaseReader(
 
     private companion object {
         const val READ_TIMEOUT_MS = 2_000L
-        val NICKNAME_METHODS = listOf("getNickName", "getNickname", "f", "nickname")
-        val NICKNAME_FIELDS = listOf("nickname", "f")
+        val NICKNAME_METHODS = listOf("getNickName", "getNickname", "r", "f", "nickname")
+        val NICKNAME_FIELDS = listOf("v", "nickname", "f")
     }
 }

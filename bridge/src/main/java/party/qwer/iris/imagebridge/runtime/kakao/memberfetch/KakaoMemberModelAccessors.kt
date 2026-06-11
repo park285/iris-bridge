@@ -75,6 +75,7 @@ private fun userIdMethodsFor(member: Any): List<String> =
     when (member.javaClass.name) {
         "cq.i" -> CQ_MEMBER_USER_ID_METHODS
         "Qr.r" -> QR_MEMBER_USER_ID_METHODS
+        "Jr.i" -> JR_MEMBER_USER_ID_METHODS
         else -> DEFAULT_USER_ID_METHODS
     }
 
@@ -82,6 +83,7 @@ private fun nicknameMethodsFor(member: Any): List<String> =
     when (member.javaClass.name) {
         "cq.i" -> CQ_MEMBER_NICKNAME_METHODS
         "Qr.r" -> QR_MEMBER_NICKNAME_METHODS
+        "Jr.i" -> JR_MEMBER_NICKNAME_METHODS
         else -> DEFAULT_NICKNAME_METHODS
     }
 
@@ -89,6 +91,7 @@ private fun profileUrlMethodsFor(member: Any): List<String> =
     when (member.javaClass.name) {
         "cq.i" -> CQ_MEMBER_PROFILE_URL_METHODS
         "Qr.r" -> QR_MEMBER_PROFILE_URL_METHODS
+        "Jr.i" -> JR_MEMBER_PROFILE_URL_METHODS
         else -> DEFAULT_PROFILE_URL_METHODS
     }
 
@@ -98,6 +101,9 @@ private val CQ_MEMBER_PROFILE_URL_METHODS = listOf("getProfileUrl", "j", "d", "g
 private val QR_MEMBER_USER_ID_METHODS = listOf("getUserId", "e")
 private val QR_MEMBER_NICKNAME_METHODS = listOf("getNickName", "g")
 private val QR_MEMBER_PROFILE_URL_METHODS = listOf("getProfileUrl", "i", "d", "h")
+private val JR_MEMBER_USER_ID_METHODS = listOf("getUserId", "n")
+private val JR_MEMBER_NICKNAME_METHODS = listOf("getNickName", "f")
+private val JR_MEMBER_PROFILE_URL_METHODS = listOf("getProfileUrl", "j", "d", "g")
 private val DEFAULT_USER_ID_METHODS = listOf("getUserId", "n", "e")
 private val DEFAULT_NICKNAME_METHODS = listOf("getNickName", "f", "g")
 private val DEFAULT_PROFILE_URL_METHODS = listOf("getProfileUrl", "j", "i", "d", "h", "g")
