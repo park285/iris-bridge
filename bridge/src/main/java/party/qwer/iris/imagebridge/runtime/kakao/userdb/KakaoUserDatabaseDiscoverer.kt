@@ -39,7 +39,11 @@ internal fun discoverKakaoUserDatabaseAccess(
         null
     }
 
-private val USER_DATABASE_DATA_SOURCE_NAMES = arrayOf("com.kakao.talk.singleton.UserDatabaseDataSource")
+private const val USER_DATABASE_DATA_SOURCE_CLASS_NAME = "com.kakao.talk.singleton.UserDatabaseDataSource"
+private const val USER_DATABASE_DATA_SOURCE_FILE_NAME = "UserDatabaseDataSource.kt"
+private const val OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAME = "t"
+
+private val USER_DATABASE_DATA_SOURCE_NAMES = arrayOf(USER_DATABASE_DATA_SOURCE_CLASS_NAME)
 
 private fun discoverUserDatabaseDataSourceClass(
     classLoader: ClassLoader,
@@ -67,16 +71,51 @@ private fun matchesUserDatabaseDataSource(clazz: Class<*>): Boolean {
     return findGetUserByIdV2Method(clazz) != null
 }
 
-private fun findGetUserByIdV2Method(clazz: Class<*>): Method? =
-    clazz.methods.firstOrNull { method ->
-        method.name == "getUserByIdV2" &&
-            method.parameterCount == 2 &&
-            (
-                method.parameterTypes[0] == Long::class.javaPrimitiveType ||
-                    method.parameterTypes[0] == Long::class.javaObjectType
-            ) &&
-            kotlin.coroutines.Continuation::class.java.isAssignableFrom(method.parameterTypes[1])
+private fun findGetUserByIdV2Method(clazz: Class<*>): Method? {
+    val signatureMatches = clazz.methods.filter(::hasGetUserByIdV2Signature)
+    return signatureMatches.firstOrNull { method ->
+        isGetUserByIdV2MethodName(method.name)
+    } ?: findObfuscatedGetUserByIdV2Method(clazz, signatureMatches)
+}
+
+private fun hasGetUserByIdV2Signature(method: Method): Boolean =
+    method.parameterCount == 2 &&
+        (
+            method.parameterTypes[0] == Long::class.javaPrimitiveType ||
+                method.parameterTypes[0] == Long::class.javaObjectType
+        ) &&
+        kotlin.coroutines.Continuation::class.java.isAssignableFrom(method.parameterTypes[1])
+
+private fun isGetUserByIdV2MethodName(name: String): Boolean = name == "getUserByIdV2" || name.startsWith("getUserByIdV2-")
+
+private fun findObfuscatedGetUserByIdV2Method(
+    clazz: Class<*>,
+    signatureMatches: List<Method>,
+): Method? {
+    if (!hasSingleGetUserByIdV2DebugMetadata(clazz)) return null
+    return signatureMatches.singleOrNull { method ->
+        method.declaringClass == clazz &&
+            method.name == OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAME
     }
+}
+
+private fun hasSingleGetUserByIdV2DebugMetadata(clazz: Class<*>): Boolean =
+    runCatching {
+        clazz.declaredClasses.count { nestedClass ->
+            nestedClass.annotations.any { annotation ->
+                annotation.stringValue("c") == USER_DATABASE_DATA_SOURCE_CLASS_NAME &&
+                    annotation.stringValue("f") == USER_DATABASE_DATA_SOURCE_FILE_NAME &&
+                    annotation.stringValue("m")?.startsWith("getUserByIdV2") == true
+            }
+        } == 1
+    }.getOrDefault(false)
+
+private fun Annotation.stringValue(name: String): String? =
+    runCatching {
+        javaClass.methods
+            .firstOrNull { method -> method.name == name && method.parameterCount == 0 }
+            ?.invoke(this) as? String
+    }.getOrNull()
 
 private fun resolveUserDatabaseSingleton(clazz: Class<*>): Any? {
     clazz.declaredFields
