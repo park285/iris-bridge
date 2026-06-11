@@ -1,10 +1,12 @@
 package party.qwer.iris.imagebridge.runtime.server
 
 import android.content.Context
+import android.util.Log
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.kakao.classregistry.KAKAO_CLASS_REGISTRY_TAG
 import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.KakaoMemberProfileFetcher
 import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.MemberProfileUpstream
 import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.discoverKakaoMemberFetchAccess
@@ -40,20 +42,13 @@ internal fun buildBridgeRequestHandlerComponents(
     healthProvider: () -> ImageBridgeHealthSnapshot,
     bridgeMetrics: BridgeMetrics,
     bridgeCore: BridgeCoreRuntime,
+    kakaoClassLoader: ClassLoader = context.classLoader,
 ): BridgeRequestHandlerComponents {
     val imageSender = registry?.let { KakaoImageSender(it, hookInstaller) }
     val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts) }
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
     val chatRoomOpener = chatRoomOpener(context, registry, chatRoomResolver)
-    val memberProfileFetcher: MemberProfileUpstream? =
-        discoverKakaoMemberFetchAccess(context.classLoader)?.let { fetchAccess ->
-            discoverKakaoUserDatabaseAccess(context.classLoader)?.let { userDbAccess ->
-                KakaoCachedMemberProfileFetcher(
-                    KakaoMemberProfileFetcher(fetchAccess),
-                    KakaoUserDatabaseReader(userDbAccess),
-                )
-            }
-        }
+    val memberProfileFetcher = discoverMemberProfileFetcher(kakaoClassLoader)
     val memberExtractor = ChatRoomMemberExtractor()
     val memberSnapshotEnricher =
         ChatRoomMemberSnapshotEnricher(
@@ -84,6 +79,33 @@ internal fun buildBridgeRequestHandlerComponents(
         initialSpecStatus = initialSpecStatus,
         textSendCapability = textSender?.capability(),
     )
+}
+
+private fun discoverMemberProfileFetcher(kakaoClassLoader: ClassLoader): MemberProfileUpstream? {
+    val baseFetcher =
+        discoverKakaoMemberFetchAccess(kakaoClassLoader)?.let(::KakaoMemberProfileFetcher)
+            ?: return null
+    val userDbReader =
+        discoverKakaoUserDatabaseAccess(kakaoClassLoader, scanFallback = false)?.let(::KakaoUserDatabaseReader)
+    if (userDbReader == null) {
+        Log.w(KAKAO_CLASS_REGISTRY_TAG, "Kakao UserDatabase unavailable; using upstream member profiles only")
+    }
+    return buildMemberProfileFetcher(baseFetcher, userDbReader)
+}
+
+internal fun buildMemberProfileFetcherForTest(
+    baseFetcher: MemberProfileUpstream?,
+    userDbReader: KakaoUserDatabaseReader?,
+): MemberProfileUpstream? = buildMemberProfileFetcher(baseFetcher, userDbReader)
+
+private fun buildMemberProfileFetcher(
+    baseFetcher: MemberProfileUpstream?,
+    userDbReader: KakaoUserDatabaseReader?,
+): MemberProfileUpstream? {
+    val upstream = baseFetcher ?: return null
+    return userDbReader?.let { reader ->
+        KakaoCachedMemberProfileFetcher(upstream, reader)
+    } ?: upstream
 }
 
 private fun chatRoomOpener(

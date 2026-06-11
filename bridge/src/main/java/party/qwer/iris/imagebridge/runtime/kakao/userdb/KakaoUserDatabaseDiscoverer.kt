@@ -10,16 +10,17 @@ import party.qwer.iris.imagebridge.runtime.kakao.classregistry.isConcreteClass
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
-internal fun discoverKakaoUserDatabaseAccess(classLoader: ClassLoader): KakaoUserDatabaseAccess? =
+internal fun discoverKakaoUserDatabaseAccess(
+    classLoader: ClassLoader,
+    scanFallback: Boolean = true,
+): KakaoUserDatabaseAccess? =
     runCatching {
         val scanner = DexClassScanner(classLoader)
         val dataSourceClass =
-            discoverClass(
+            discoverUserDatabaseDataSourceClass(
                 classLoader = classLoader,
                 scanner = scanner,
-                lastKnownNames = arrayOf("com.kakao.talk.singleton.UserDatabaseDataSource"),
-                label = "UserDatabaseDataSource",
-                signatureMatcher = ::matchesUserDatabaseDataSource,
+                scanFallback = scanFallback,
             )
         val singleton =
             resolveUserDatabaseSingleton(dataSourceClass)
@@ -32,9 +33,34 @@ internal fun discoverKakaoUserDatabaseAccess(classLoader: ClassLoader): KakaoUse
             getUserByIdV2Method = getUserByIdV2Method,
         )
     }.getOrElse { error ->
-        Log.w(KAKAO_CLASS_REGISTRY_TAG, "Kakao UserDatabase discovery failed: ${error.message}")
+        runCatching {
+            Log.w(KAKAO_CLASS_REGISTRY_TAG, "Kakao UserDatabase discovery failed: ${error.message}")
+        }
         null
     }
+
+private val USER_DATABASE_DATA_SOURCE_NAMES = arrayOf("com.kakao.talk.singleton.UserDatabaseDataSource")
+
+private fun discoverUserDatabaseDataSourceClass(
+    classLoader: ClassLoader,
+    scanner: DexClassScanner,
+    scanFallback: Boolean,
+): Class<*> {
+    if (scanFallback) {
+        return discoverClass(
+            classLoader = classLoader,
+            scanner = scanner,
+            lastKnownNames = USER_DATABASE_DATA_SOURCE_NAMES,
+            label = "UserDatabaseDataSource",
+            signatureMatcher = ::matchesUserDatabaseDataSource,
+        )
+    }
+    return USER_DATABASE_DATA_SOURCE_NAMES.firstNotNullOfOrNull { name ->
+        runCatching {
+            Class.forName(name, false, classLoader)
+        }.getOrNull()?.takeIf(::matchesUserDatabaseDataSource)
+    } ?: error("UserDatabaseDataSource not found at known names ${USER_DATABASE_DATA_SOURCE_NAMES.toList()}")
+}
 
 private fun matchesUserDatabaseDataSource(clazz: Class<*>): Boolean {
     if (!isConcreteClass(clazz)) return false

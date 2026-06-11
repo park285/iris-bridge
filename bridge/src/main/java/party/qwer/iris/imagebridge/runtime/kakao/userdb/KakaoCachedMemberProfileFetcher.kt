@@ -16,12 +16,19 @@ internal class KakaoCachedMemberProfileFetcher(
         val deduped = userIds.filter { it > 0L }.distinct()
         if (deduped.isEmpty()) return emptyMap()
 
-        baseFetcher.fetchMemberProfiles(chatId, deduped)
+        val upstreamProfiles = baseFetcher.fetchMemberProfiles(chatId, deduped)
+        val cachedProfiles =
+            userDbReader
+                .readNicknames(deduped)
+                .map { (userId, nickName) ->
+                    userId to
+                        UpstreamMemberProfile(
+                            userId = userId,
+                            nickName = nickName,
+                            profileImageUrl = upstreamProfiles[userId]?.profileImageUrl,
+                        )
+                }.toMap()
 
-        return userDbReader
-            .readNicknames(deduped)
-            .map { (userId, nickName) ->
-                userId to UpstreamMemberProfile(userId = userId, nickName = nickName, profileImageUrl = null)
-            }.toMap()
+        return upstreamProfiles + cachedProfiles
     }
 }

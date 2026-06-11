@@ -70,6 +70,7 @@ class IrisBridgeModule : XposedModule() {
             leverageCommitPendingContexts,
             hookInstaller,
             bridgeCore,
+            kakaoClassLoader = classLoader,
         )
     }
 

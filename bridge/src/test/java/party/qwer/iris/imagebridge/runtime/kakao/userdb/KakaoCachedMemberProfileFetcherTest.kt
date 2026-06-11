@@ -16,11 +16,11 @@ class KakaoCachedMemberProfileFetcherTest {
         val baseFetcher =
             MemberProfileUpstream { chatId, userIds ->
                 warmCalls += chatId to userIds.toList()
-                userIds.associateWith { userId -> UpstreamMemberProfile(userId, "WIRE_$userId", null) }
+                userIds.associateWith { userId -> UpstreamMemberProfile(userId, "Member $userId", null) }
             }
         val access =
             buildFakeUserDbAccess { userId ->
-                if (userId == 101L) FakeUserModel(101L, "RealName Alice") else null
+                if (userId == 101L) FakeUserModel(101L, "Cached Member 101") else null
             }
         val dbReader = KakaoUserDatabaseReader(access)
         val fetcher = KakaoCachedMemberProfileFetcher(baseFetcher, dbReader)
@@ -29,15 +29,15 @@ class KakaoCachedMemberProfileFetcherTest {
 
         assertEquals(1, warmCalls.size)
         assertEquals(10L, warmCalls[0].first)
-        assertEquals("RealName Alice", result[101L]?.nickName)
-        assertTrue(999L !in result)
+        assertEquals("Cached Member 101", result[101L]?.nickName)
+        assertEquals("Member 999", result[999L]?.nickName)
     }
 
     @Test
-    fun `fetchMemberProfiles never returns LOCO wire nicknames`() {
+    fun `fetchMemberProfiles falls back to upstream member API when userdb misses`() {
         val baseFetcher =
             MemberProfileUpstream { _, userIds ->
-                userIds.associateWith { userId -> UpstreamMemberProfile(userId, "WIRE_PLAINTEXT_$userId", null) }
+                userIds.associateWith { userId -> UpstreamMemberProfile(userId, "Member $userId", null) }
             }
         val access = buildFakeUserDbAccess { null }
         val dbReader = KakaoUserDatabaseReader(access)
@@ -45,7 +45,7 @@ class KakaoCachedMemberProfileFetcherTest {
 
         val result = fetcher.fetchMemberProfiles(chatId = 1L, userIds = listOf(42L))
 
-        assertTrue(result.isEmpty(), "Wire plaintext must not appear in result when DB has no entry")
+        assertEquals("Member 42", result[42L]?.nickName)
     }
 
     @Test

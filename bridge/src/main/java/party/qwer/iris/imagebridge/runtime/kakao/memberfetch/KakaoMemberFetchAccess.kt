@@ -7,6 +7,7 @@ import java.lang.reflect.Method
 internal data class KakaoMemberFetchAccess(
     val clientSingleton: Any,
     val fetchMembersMethod: Method,
+    val roomFetchMembersMethod: Method? = null,
     val resultClass: Class<*>,
     val unwrapValueMethod: Method,
     val unwrapErrorMethod: Method,

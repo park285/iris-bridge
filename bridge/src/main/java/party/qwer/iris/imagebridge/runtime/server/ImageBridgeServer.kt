@@ -65,6 +65,7 @@ internal class ImageBridgeServer(
         leverageCommitPendingContexts: ReplyLeveragePendingContextStore? = null,
         hookInstaller: BridgeHookInstaller = NoopBridgeHookInstaller,
         bridgeCore: BridgeCoreRuntime?,
+        kakaoClassLoader: ClassLoader = context.classLoader,
     ) {
         if (bridgeCore == null) {
             bridgeCoreUnavailable.set(true)
@@ -95,6 +96,7 @@ internal class ImageBridgeServer(
                 this::healthSnapshot,
                 bridgeMetrics,
                 bridgeCore,
+                kakaoClassLoader = kakaoClassLoader,
             )
         textSendCapability.set(components.textSendCapability)
         specStatus.set(components.initialSpecStatus)

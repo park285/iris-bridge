@@ -6,6 +6,7 @@ import java.lang.reflect.Field
 /** DEX에서 시그니처 조건으로 타겟 클래스를 탐색한다. */
 internal class DexClassScanner(
     private val classLoader: ClassLoader,
+    private val classNameProvider: (() -> List<String>)? = null,
 ) {
     companion object {
         private const val TAG = "IrisBridge"
@@ -25,7 +26,7 @@ internal class DexClassScanner(
             )
     }
 
-    private val classNames: List<String> by lazy { enumerateClassNames() }
+    private val classNames: List<String> by lazy { classNameProvider?.invoke() ?: enumerateClassNames() }
 
     fun find(predicate: (Class<*>) -> Boolean): Class<*>? = findAll(predicate).firstOrNull()
 
@@ -37,9 +38,33 @@ internal class DexClassScanner(
                 runCatching {
                     Class.forName(name, false, classLoader)
                 }.getOrNull() ?: continue
-            if (predicate(clazz)) matches += clazz
+            if (matchesSafely(name, clazz, predicate)) matches += clazz
         }
         return matches
+    }
+
+    private fun matchesSafely(
+        name: String,
+        clazz: Class<*>,
+        predicate: (Class<*>) -> Boolean,
+    ): Boolean =
+        try {
+            predicate(clazz)
+        } catch (error: LinkageError) {
+            logSkippedClass(name, error)
+            false
+        } catch (error: RuntimeException) {
+            logSkippedClass(name, error)
+            false
+        }
+
+    private fun logSkippedClass(
+        name: String,
+        error: Throwable,
+    ) {
+        runCatching {
+            Log.d(TAG, "DEX scan skipped $name: ${error.message}")
+        }
     }
 
     private fun enumerateClassNames(): List<String> =
