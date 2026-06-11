@@ -124,7 +124,8 @@ class BridgeCoreRuntime internal constructor(
     }
 
     private fun imagePathsJson(imagePaths: List<String>): String =
-        JSONArray().apply {
-            imagePaths.forEach(::put)
-        }.toString()
+        JSONArray()
+            .apply {
+                imagePaths.forEach(::put)
+            }.toString()
 }

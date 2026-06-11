@@ -1,3 +1,5 @@
+@file:Suppress("FunctionName")
+
 package com.kakao.talk.manager
 
 import android.content.Context

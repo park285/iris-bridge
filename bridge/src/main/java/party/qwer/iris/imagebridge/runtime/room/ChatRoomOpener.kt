@@ -4,10 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
-import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget
 
 internal class ChatRoomOpener(
     context: Context,

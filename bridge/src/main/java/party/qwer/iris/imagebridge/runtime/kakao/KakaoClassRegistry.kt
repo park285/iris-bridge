@@ -2,9 +2,9 @@
 
 package party.qwer.iris.imagebridge.runtime.kakao
 
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget.OFFICIAL_PACKAGE
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.KakaoClassRegistryDiscovery
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.matchesChatMediaSenderClass
-import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget.OFFICIAL_PACKAGE
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.resolveChatMediaSendMethods
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectClassCandidate
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectMethodCandidate

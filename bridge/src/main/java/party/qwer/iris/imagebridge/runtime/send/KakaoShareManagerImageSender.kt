@@ -76,4 +76,3 @@ internal fun discoverShareManagerImageMethods(
         )
     return intentMethod to dispatchMethod
 }
-

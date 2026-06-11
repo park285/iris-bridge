@@ -29,8 +29,7 @@ internal fun resolveDirectRoomResolver(
     preferredNames = setOf("d0"),
 )
 
-internal fun resolveMasterDatabaseSingleton(masterDb: Class<*>) =
-    selectMasterDatabaseSingletonField(masterDb).apply { isAccessible = true }
+internal fun resolveMasterDatabaseSingleton(masterDb: Class<*>) = selectMasterDatabaseSingletonField(masterDb).apply { isAccessible = true }
 
 private fun selectMasterDatabaseSingletonField(masterDb: Class<*>): Field {
     val staticSelfFields =

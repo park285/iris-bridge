@@ -37,8 +37,7 @@ internal fun resolveChatRoomManagerAccessor(registry: KakaoClassRegistry): () ->
                             else -> 3
                         }
                     }.thenBy { it.name },
-                )
-                ?.apply { isAccessible = true }
+                )?.apply { isAccessible = true }
                 ?: error("ChatRoomManager companion accessor not found")
         return { accessor.invoke(companion) ?: error("ChatRoomManager companion accessor returned null") }
     }

@@ -1,10 +1,9 @@
 package party.qwer.iris.imagebridge.runtime.send
 
 import android.content.Context
-import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectMethodBySignature
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.resolveShareManagerSingleton
+import party.qwer.iris.imagebridge.runtime.kakao.classregistry.selectMethodBySignature
 import java.lang.reflect.Method
-import java.lang.reflect.Modifier
 
 internal class KakaoShareManagerTextInvoker(
     private val target: Any,

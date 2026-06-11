@@ -125,5 +125,4 @@ internal class KakaoTextSendInvocationFactory(
         }
         binding.invoke(chatRoom, sendingLog)
     }
-
 }

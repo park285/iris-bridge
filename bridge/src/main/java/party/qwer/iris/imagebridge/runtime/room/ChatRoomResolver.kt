@@ -76,5 +76,4 @@ internal class ChatRoomResolver(
         constructor.isAccessible = true
         return ConstructorRoomEntityResolver(constructor)
     }
-
 }
