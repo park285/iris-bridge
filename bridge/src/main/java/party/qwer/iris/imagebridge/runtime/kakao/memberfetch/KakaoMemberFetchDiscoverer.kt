@@ -9,6 +9,7 @@ import party.qwer.iris.imagebridge.runtime.kakao.classregistry.discoverClass
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.hasSelfReturningAccessor
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.isBroadRoomResolverSignature
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.isConcreteClass
+import party.qwer.iris.imagebridge.runtime.kakao.isKotlinContinuationType
 import java.lang.reflect.Modifier
 
 internal fun discoverKakaoMemberFetchAccess(classLoader: ClassLoader): KakaoMemberFetchAccess? =

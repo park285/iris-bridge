@@ -2,6 +2,7 @@
 
 package party.qwer.iris.imagebridge.runtime.kakao.userdb
 
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -67,5 +68,41 @@ class KakaoUserDatabaseReaderTest {
 
         assertEquals(1, callCount[1L])
         assertEquals(1, callCount[2L])
+    }
+
+    @Test
+    fun `readNicknames uses continuation proxy when access method requires foreign continuation type`() {
+        val instance = FakeForeignContinuationUserDataSource()
+        val method =
+            FakeForeignContinuationUserDataSource::class.java.methods.first { method ->
+                method.name == "getUserByIdV2"
+            }
+        val reader =
+            KakaoUserDatabaseReader(
+                KakaoUserDatabaseAccess(
+                    singleton = instance,
+                    getUserByIdV2Method = method,
+                ),
+            )
+
+        val result = reader.readNicknames(listOf(77L))
+
+        assertEquals("Proxy77", result[77L])
+    }
+}
+
+private interface FakeForeignContinuation {
+    fun getContext(): Any?
+
+    fun resumeWith(result: Any?)
+}
+
+private class FakeForeignContinuationUserDataSource {
+    fun getUserByIdV2(
+        userId: Long,
+        continuation: FakeForeignContinuation,
+    ): Any {
+        continuation.resumeWith(FakeUserModel(userId, "Proxy$userId"))
+        return COROUTINE_SUSPENDED
     }
 }

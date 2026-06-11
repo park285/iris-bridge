@@ -7,6 +7,7 @@ import party.qwer.iris.imagebridge.runtime.kakao.DexClassScanner
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.KAKAO_CLASS_REGISTRY_TAG
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.discoverClass
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.isConcreteClass
+import party.qwer.iris.imagebridge.runtime.kakao.isKotlinContinuationType
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
@@ -88,7 +89,7 @@ private fun hasGetUserByIdV2Signature(method: Method): Boolean =
             method.parameterTypes[0] == Long::class.javaPrimitiveType ||
                 method.parameterTypes[0] == Long::class.javaObjectType
         ) &&
-        kotlin.coroutines.Continuation::class.java.isAssignableFrom(method.parameterTypes[1])
+        method.parameterTypes[1].isKotlinContinuationType()
 
 private fun isGetUserByIdV2MethodName(name: String): Boolean = name == "getUserByIdV2" || name.startsWith("getUserByIdV2-")
 

@@ -7,7 +7,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.KAKAO_CLASS_REGISTRY_TAG
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import party.qwer.iris.imagebridge.runtime.kakao.createKakaoContinuationArgument
+import party.qwer.iris.imagebridge.runtime.kakao.isKakaoCoroutineSuspendedMarker
 import kotlin.coroutines.resume
 
 internal class KakaoUserDatabaseReader(
@@ -36,8 +37,17 @@ internal class KakaoUserDatabaseReader(
                 val result =
                     access.getUserByIdV2Method
                         .apply { isAccessible = true }
-                        .invoke(access.singleton, userId, cont)
-                if (result !== COROUTINE_SUSPENDED && cont.isActive) {
+                        .invoke(
+                            access.singleton,
+                            userId,
+                            createKakaoContinuationArgument(
+                                access.getUserByIdV2Method.parameterTypes[1],
+                                cont,
+                                proxyLabel = "IrisUserDbContinuationProxy",
+                                failureLogPrefix = "user database",
+                            ),
+                        )
+                if (!result.isKakaoCoroutineSuspendedMarker() && cont.isActive) {
                     cont.resume(result)
                 }
             }.onFailure { error ->

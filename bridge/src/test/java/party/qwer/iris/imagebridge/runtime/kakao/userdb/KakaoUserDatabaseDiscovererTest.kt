@@ -2,10 +2,14 @@
 
 package party.qwer.iris.imagebridge.runtime.kakao.userdb
 
+import java.net.URLClassLoader
+import java.nio.file.Files
+import javax.tools.ToolProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class KakaoUserDatabaseDiscovererTest {
     @Test
@@ -63,6 +67,18 @@ class KakaoUserDatabaseDiscovererTest {
         assertNotNull(method)
         assertEquals("getUserByIdV2", method.name)
     }
+
+    @Test
+    fun `findGetUserByIdV2Method accepts Continuation loaded by target classloader`() {
+        val clazz = compileForeignContinuationUserDataSource()
+
+        val method = findGetUserByIdV2MethodForTest(clazz)
+
+        assertNotNull(method)
+        assertEquals("getUserByIdV2", method.name)
+        assertEquals("kotlin.coroutines.Continuation", method.parameterTypes[1].name)
+        assertTrue(!kotlin.coroutines.Continuation::class.java.isAssignableFrom(method.parameterTypes[1]))
+    }
 }
 
 private fun findGetUserByIdV2MethodForTest(clazz: Class<*>): java.lang.reflect.Method? {
@@ -76,4 +92,49 @@ private fun findGetUserByIdV2MethodForTest(clazz: Class<*>): java.lang.reflect.M
         }
     method.isAccessible = true
     return method.invoke(null, clazz) as java.lang.reflect.Method?
+}
+
+private fun compileForeignContinuationUserDataSource(): Class<*> {
+    val tempDir = Files.createTempDirectory("iris-userdb-continuation-test")
+    val sourceRoot = tempDir.resolve("src")
+    val outputRoot = tempDir.resolve("out")
+    Files.createDirectories(sourceRoot.resolve("kotlin/coroutines"))
+    Files.createDirectories(sourceRoot.resolve("fake"))
+    Files.createDirectories(outputRoot)
+    val continuationSource = sourceRoot.resolve("kotlin/coroutines/Continuation.java")
+    val dataSourceSource = sourceRoot.resolve("fake/CrossLoaderUserDataSource.java")
+    continuationSource.toFile().writeText(
+        """
+        package kotlin.coroutines;
+        public interface Continuation {
+        }
+        """.trimIndent(),
+    )
+    dataSourceSource.toFile().writeText(
+        """
+        package fake;
+        public final class CrossLoaderUserDataSource {
+            public Object getUserByIdV2(long userId, kotlin.coroutines.Continuation continuation) {
+                return null;
+            }
+        }
+        """.trimIndent(),
+    )
+    val compiler = ToolProvider.getSystemJavaCompiler()
+    assertNotNull(compiler, "JDK compiler is required for this test")
+    val result =
+        compiler.run(
+            null,
+            null,
+            null,
+            "-classpath",
+            "",
+            "-d",
+            outputRoot.toString(),
+            continuationSource.toString(),
+            dataSourceSource.toString(),
+        )
+    assertEquals(0, result)
+    val loader = URLClassLoader(arrayOf(outputRoot.toUri().toURL()), null)
+    return Class.forName("fake.CrossLoaderUserDataSource", false, loader)
 }

@@ -2,6 +2,7 @@
 
 package party.qwer.iris.imagebridge.runtime.kakao.memberfetch
 
+import party.qwer.iris.imagebridge.runtime.kakao.isKotlinContinuationType
 import java.lang.reflect.Method
 
 internal fun Method.isRoomSuspendFetchMembersMethod(): Boolean =
@@ -12,7 +13,3 @@ internal fun Method.isRequestedSuspendFetchMembersMethod(): Boolean =
     parameterCount == 3 &&
         List::class.java.isAssignableFrom(parameterTypes[1]) &&
         parameterTypes[2].isKotlinContinuationType()
-
-internal fun Class<*>.isKotlinContinuationType(): Boolean = name == kotlinClassName("coroutines", "Continuation")
-
-internal fun kotlinClassName(vararg segments: String): String = ("kotlin." + segments.joinToString("."))
