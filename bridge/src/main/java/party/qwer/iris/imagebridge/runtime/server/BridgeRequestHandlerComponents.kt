@@ -41,13 +41,14 @@ internal fun buildBridgeRequestHandlerComponents(
     val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts) }
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
     val chatRoomOpener = chatRoomOpener(context, registry, chatRoomResolver)
+    val memberProfileFetcher =
+        discoverKakaoMemberFetchAccess(context.classLoader)?.let { access ->
+            KakaoMemberProfileFetcher(access)
+        }
     val memberExtractor = ChatRoomMemberExtractor()
     val memberSnapshotEnricher =
         ChatRoomMemberSnapshotEnricher(
-            upstreamFetcher =
-                discoverKakaoMemberFetchAccess(context.classLoader)?.let { access ->
-                    KakaoMemberProfileFetcher(access)
-                },
+            upstreamFetcher = memberProfileFetcher,
         )
     val initialSpecStatus = BridgeHookSpecVerifier(registry, registryError).verify()
     return BridgeRequestHandlerComponents(
@@ -62,6 +63,10 @@ internal fun buildBridgeRequestHandlerComponents(
                     val room = resolveFreshChatRoom(chatRoomResolver, registryError, roomId)
                     val snapshot = memberExtractor.snapshot(roomId, room, expectedMemberHints, preferredPlan)
                     memberSnapshotEnricher.enrich(snapshot, expectedMemberHints)
+                },
+                memberProfileFetcher = { roomId, userIds ->
+                    requireNotNull(memberProfileFetcher) { "Kakao member profile fetcher unavailable" }
+                        .fetchMemberProfiles(roomId, userIds)
                 },
                 metrics = bridgeMetrics,
                 textRequestValidator = BridgeTextRequestValidator(bridgeCore),

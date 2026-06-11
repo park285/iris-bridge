@@ -314,7 +314,7 @@ class KakaoLinkSpecSenderTest {
 
         val sent =
             sender.send(
-                roomId = 464252100463241L,
+                roomId = 88006000000001L,
                 chatRoom = null,
                 message = "테스트",
                 rawAttachment =
@@ -332,7 +332,7 @@ class KakaoLinkSpecSenderTest {
             )
 
         assertTrue(sent)
-        assertEquals(listOf("c:464252100463241"), FakeKakaoLinkSpecRecorder.calls)
+        assertEquals(listOf("c:88006000000001"), FakeKakaoLinkSpecRecorder.calls)
     }
 
     @Test
@@ -346,7 +346,7 @@ class KakaoLinkSpecSenderTest {
 
         val sent =
             sender.send(
-                roomId = 464252100463241L,
+                roomId = 88006000000001L,
                 chatRoom = null,
                 message = "테스트",
                 rawAttachment =
@@ -372,7 +372,7 @@ class KakaoLinkSpecSenderTest {
             )
 
         assertTrue(sent)
-        assertEquals(listOf("c:464252100463241"), FakeKakaoLinkSpecRecorder.calls)
+        assertEquals(listOf("c:88006000000001"), FakeKakaoLinkSpecRecorder.calls)
     }
 
     @Test

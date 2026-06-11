@@ -2,7 +2,9 @@
 
 package party.qwer.iris.imagebridge.runtime
 
+import org.json.JSONObject
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.UpstreamMemberProfile
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -171,5 +173,40 @@ class ImageBridgeRequestHandlerChatRoomActionTest {
                 ?.nickname,
         )
         assertTrue(response.memberSnapshot?.usedPreferredPlan == true)
+    }
+
+    @Test
+    fun `fetch member profiles action returns upstream payload without snapshot extraction`() {
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                chatRoomMemberSnapshotProvider = { _, _, _ -> error("snapshot should not be called") },
+                memberProfileFetcher = { roomId, userIds ->
+                    assertEquals(55L, roomId)
+                    assertEquals(listOf(90_001L, 90_002L), userIds)
+                    mapOf(
+                        90_001L to UpstreamMemberProfile(90_001L, "Member Alpha", null),
+                        90_002L to UpstreamMemberProfile(90_002L, "Member Beta", "https://example.test/p.png"),
+                    )
+                },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        val response =
+            handler.handle(
+                fetchMemberProfilesRequest(
+                    roomId = 55L,
+                    memberIds = listOf(90_001L, 90_002L, 90_001L),
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_OK, response.status)
+        val members = JSONObject(response.payloadJson.orEmpty()).getJSONArray("members")
+        assertEquals(90_001L, members.getJSONObject(0).getLong("userId"))
+        assertEquals("Member Alpha", members.getJSONObject(0).getString("nickname"))
+        assertEquals(90_002L, members.getJSONObject(1).getLong("userId"))
+        assertEquals("Member Beta", members.getJSONObject(1).getString("nickname"))
+        assertEquals("https://example.test/p.png", members.getJSONObject(1).getString("profileImageUrl"))
     }
 }

@@ -13,7 +13,7 @@ class ChatRoomMemberSnapshotEnricherTest {
         val fetcher =
             MemberProfileUpstream { _, userIds ->
                 userIds.associateWith { userId ->
-                    UpstreamMemberProfile(userId, "국헌", null)
+                    UpstreamMemberProfile(userId, "Member Alpha", null)
                 }
             }
         val enricher = ChatRoomMemberSnapshotEnricher(fetcher)
@@ -24,7 +24,7 @@ class ChatRoomMemberSnapshotEnricherTest {
                 members =
                     listOf(
                         ImageBridgeProtocol.ChatRoomMemberSnapshot(
-                            userId = 243_338_321L,
+                            userId = 90_003L,
                             nickname = "creatorUserId",
                         ),
                     ),
@@ -33,10 +33,10 @@ class ChatRoomMemberSnapshotEnricherTest {
         val enriched =
             enricher.enrich(
                 snapshot,
-                listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 243_338_321L)),
+                listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 90_003L)),
             )
 
-        assertEquals("국헌", enriched.members.single().nickname)
+        assertEquals("Member Alpha", enriched.members.single().nickname)
     }
 
     @Test

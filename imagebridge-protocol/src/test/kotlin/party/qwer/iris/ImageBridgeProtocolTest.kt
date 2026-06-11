@@ -206,4 +206,20 @@ class ImageBridgeProtocolTest {
         val restored = ImageBridgeProtocol.readRequestFrame(ByteArrayInputStream(buffer.toByteArray()))
         assertEquals("profile.mentionUserId", restored.preferredMemberPlan?.mentionUserIdPath)
     }
+
+    @Test
+    fun `fetch member profiles request preserves member ids`() {
+        val request =
+            ImageBridgeProtocol.buildFetchMemberProfilesRequest(
+                roomId = 42L,
+                memberIds = listOf(90_001L, 90_002L),
+            )
+        val buffer = ByteArrayOutputStream()
+
+        ImageBridgeProtocol.writeFrame(buffer, request)
+
+        val restored = ImageBridgeProtocol.readRequestFrame(ByteArrayInputStream(buffer.toByteArray()))
+        assertEquals(ImageBridgeProtocol.ACTION_FETCH_MEMBER_PROFILES, restored.action)
+        assertEquals(listOf(90_001L, 90_002L), restored.memberIds)
+    }
 }

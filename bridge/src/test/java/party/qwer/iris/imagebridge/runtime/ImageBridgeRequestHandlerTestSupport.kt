@@ -198,6 +198,17 @@ internal fun snapshotChatRoomMembersRequest(
         token = token,
     )
 
+internal fun fetchMemberProfilesRequest(
+    roomId: Long,
+    memberIds: List<Long>,
+    token: String? = null,
+): ImageBridgeProtocol.ImageBridgeRequest =
+    ImageBridgeProtocol.buildFetchMemberProfilesRequest(
+        roomId = roomId,
+        memberIds = memberIds,
+        token = token,
+    )
+
 internal fun developmentHandshakeValidator(): BridgeHandshakeValidator =
     BridgeHandshakeValidator(
         expectedToken = "",

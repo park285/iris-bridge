@@ -500,16 +500,16 @@ class ChatRoomMemberExtractorTest {
                 roomId = 1L,
                 room =
                     Room(
-                        q = listOf(Member(7L, "박준우")),
+                        q = listOf(Member(7L, "테스트회원")),
                         displayUserIds = linkedMapOf(7L to "display_user_ids"),
                     ),
                 expectedMemberHints =
                     listOf(
-                        ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "박준우"),
+                        ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "테스트회원"),
                     ),
             )
 
-        assertEquals("박준우", result.members.single().nickname)
+        assertEquals("테스트회원", result.members.single().nickname)
         assertEquals("$.q", result.sourcePath)
     }
 

@@ -101,6 +101,19 @@ interface ImageBridgeRequestFactory {
             memberHints = memberHints,
             preferredMemberPlan = preferredMemberPlan,
         )
+
+    fun buildFetchMemberProfilesRequest(
+        roomId: Long,
+        memberIds: List<Long>,
+        token: String? = null,
+    ): ImageBridgeRequest =
+        ImageBridgeRequest(
+            action = ImageBridgeProtocol.ACTION_FETCH_MEMBER_PROFILES,
+            protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
+            roomId = roomId,
+            token = token,
+            memberIds = memberIds,
+        )
 }
 
 private fun textRequest(

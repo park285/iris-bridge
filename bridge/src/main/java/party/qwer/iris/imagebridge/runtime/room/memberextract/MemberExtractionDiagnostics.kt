@@ -17,7 +17,7 @@ internal class MemberExtractionDiagnostics(
                 .joinToString(separator = " || ") { container -> debugSummary(container) }
         Log.w(
             TAG,
-            "missing member candidates roomId=$roomId expectedMemberIds=${expectedMemberIds.take(MAX_DEBUG_MEMBER_IDS)} expectedNicknames=${expectedNicknames.values.take(MAX_DEBUG_NICKNAMES)} containers=${containers.size} summary=$summary",
+            "missing member candidates roomId=$roomId expectedMemberCount=${expectedMemberIds.size} expectedNicknameCount=${expectedNicknames.size} containers=${containers.size} summary=$summary",
         )
     }
 
@@ -29,13 +29,19 @@ internal class MemberExtractionDiagnostics(
             views
                 .flatMap { view ->
                     view.values.mapNotNull { (path, value) ->
-                        when (value) {
-                            is PrimitiveValue.StringValue -> "$path=${value.value.take(MAX_DEBUG_VALUE_LENGTH)}"
-                            is PrimitiveValue.LongValue -> "$path=${value.value}"
-                        }
+                        redactedDiagnosticSample(path, value)
                     }
                 }.distinct()
                 .take(MAX_DEBUG_SAMPLE_COUNT)
         return "path=${container.path} type=${candidateCollector.typeLabel(container)} classes=$classes paths=$paths samples=$samples"
     }
 }
+
+internal fun redactedDiagnosticSample(
+    path: String,
+    value: PrimitiveValue,
+): String =
+    when (value) {
+        is PrimitiveValue.StringValue -> "$path=<string:${value.value.length} chars>"
+        is PrimitiveValue.LongValue -> "$path=<long>"
+    }

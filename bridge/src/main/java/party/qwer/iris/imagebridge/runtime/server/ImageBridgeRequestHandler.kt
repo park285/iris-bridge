@@ -2,6 +2,7 @@ package party.qwer.iris.imagebridge.runtime.server
 
 import android.util.Log
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.UpstreamMemberProfile
 import party.qwer.iris.imagebridge.runtime.send.ImageSendRequest
 import party.qwer.iris.imagebridge.runtime.send.RoomThreadSerialExecutor
 import party.qwer.iris.imagebridge.runtime.send.TextSendRequest
@@ -13,6 +14,7 @@ internal class ImageBridgeRequestHandler(
     private val chatRoomInspector: ((Long) -> String)? = null,
     private val chatRoomOpener: ((Long) -> Unit)? = null,
     private val chatRoomMemberSnapshotProvider: ((Long, List<ImageBridgeProtocol.ChatRoomMemberHint>, ImageBridgeProtocol.ChatRoomMemberExtractionPlan?) -> ImageBridgeProtocol.ChatRoomMembersSnapshot)? = null,
+    private val memberProfileFetcher: ((Long, List<Long>) -> Map<Long, UpstreamMemberProfile>)? = null,
     private val handshakeValidator: BridgeHandshakeValidator = BridgeHandshakeValidator(),
     private val serialExecutor: RoomThreadSerialExecutor = RoomThreadSerialExecutor(),
     private val pathValidator: BridgeImagePathValidator = BridgeImagePathValidator(),
@@ -37,6 +39,7 @@ internal class ImageBridgeRequestHandler(
             metrics = metrics,
             textRequestValidator = textRequestValidator,
         )
+    private val memberProfileActionHandler = BridgeMemberProfileActionHandler(memberProfileFetcher)
 
     fun handle(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =
         try {
@@ -62,6 +65,7 @@ internal class ImageBridgeRequestHandler(
             ImageBridgeProtocol.ACTION_INSPECT_CHATROOM -> handleInspectChatRoom(request)
             ImageBridgeProtocol.ACTION_OPEN_CHATROOM -> handleOpenChatRoom(request)
             ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS -> handleSnapshotChatRoomMembers(request)
+            ImageBridgeProtocol.ACTION_FETCH_MEMBER_PROFILES -> memberProfileActionHandler.handle(request)
             else ->
                 bridgeFailureResponse(
                     error = "unknown action: $action",
