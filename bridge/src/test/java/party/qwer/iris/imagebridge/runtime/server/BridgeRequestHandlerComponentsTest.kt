@@ -7,6 +7,7 @@ import party.qwer.iris.imagebridge.runtime.kakao.userdb.KakaoUserDatabaseReader
 import party.qwer.iris.imagebridge.runtime.kakao.userdb.buildFakeUserDbAccess
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class BridgeRequestHandlerComponentsTest {
@@ -48,7 +49,7 @@ class BridgeRequestHandlerComponentsTest {
     }
 
     @Test
-    fun `member profile fetcher can serve userdb cache when upstream discovery is unavailable`() {
+    fun `member profile fetcher does not serve userdb cache when upstream discovery is unavailable`() {
         val access =
             buildFakeUserDbAccess { userId ->
                 if (userId == 42L) FakeUserModel(userId, "Cached Member 42") else null
@@ -56,9 +57,7 @@ class BridgeRequestHandlerComponentsTest {
         val reader = KakaoUserDatabaseReader(access)
 
         val fetcher = buildMemberProfileFetcherForTest(baseFetcher = null, userDbReader = reader)
-        val result = fetcher?.fetchMemberProfiles(1L, listOf(42L, 77L)).orEmpty()
 
-        assertEquals("Cached Member 42", result[42L]?.nickName)
-        assertEquals(null, result[77L])
+        assertNull(fetcher)
     }
 }

@@ -2,6 +2,7 @@
 
 package party.qwer.iris.imagebridge.runtime.kakao.userdb
 
+import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,6 +48,19 @@ class KakaoUserDatabaseReaderTest {
     }
 
     @Test
+    fun `readNicknames accepts Kakao 26_4_2 getNickname accessor`() {
+        val access =
+            buildFakeUserDbAccess {
+                FakeGetNicknameUserModel("Alice")
+            }
+        val reader = KakaoUserDatabaseReader(access)
+
+        val result = reader.readNicknames(listOf(100L))
+
+        assertEquals("Alice", result[100L])
+    }
+
+    @Test
     fun `readNicknames skips null user entries`() {
         val access = buildFakeUserDbAccess { null }
         val reader = KakaoUserDatabaseReader(access)
@@ -89,6 +103,66 @@ class KakaoUserDatabaseReaderTest {
 
         assertEquals("Proxy77", result[77L])
     }
+
+    @Test
+    fun `readNicknames unwraps boxed Kakao Result from continuation proxy`() {
+        val instance = FakeBoxedResultUserDataSource()
+        val method =
+            FakeBoxedResultUserDataSource::class.java.methods.first { method ->
+                method.name == "getUserByIdV2"
+            }
+        val reader =
+            KakaoUserDatabaseReader(
+                KakaoUserDatabaseAccess(
+                    singleton = instance,
+                    getUserByIdV2Method = method,
+                ),
+            )
+
+        val result = reader.readNicknames(listOf(88L))
+
+        assertEquals("Boxed88", result[88L])
+    }
+
+    @Test
+    fun `readNicknames unwraps nested boxed Kakao Result from continuation proxy`() {
+        val instance = FakeNestedBoxedResultUserDataSource()
+        val method =
+            FakeNestedBoxedResultUserDataSource::class.java.methods.first { method ->
+                method.name == "getUserByIdV2"
+            }
+        val reader =
+            KakaoUserDatabaseReader(
+                KakaoUserDatabaseAccess(
+                    singleton = instance,
+                    getUserByIdV2Method = method,
+                ),
+            )
+
+        val result = reader.readNicknames(listOf(89L))
+
+        assertEquals("Nested89", result[89L])
+    }
+
+    @Test
+    fun `readNicknames unwraps nested boxed Kakao Result when continuation type is shared`() {
+        val instance = FakeSharedContinuationNestedResultUserDataSource()
+        val method =
+            FakeSharedContinuationNestedResultUserDataSource::class.java.methods.first { method ->
+                method.name == "getUserByIdV2"
+            }
+        val reader =
+            KakaoUserDatabaseReader(
+                KakaoUserDatabaseAccess(
+                    singleton = instance,
+                    getUserByIdV2Method = method,
+                ),
+            )
+
+        val result = reader.readNicknames(listOf(90L))
+
+        assertEquals("Shared90", result[90L])
+    }
 }
 
 private interface FakeForeignContinuation {
@@ -105,4 +179,40 @@ private class FakeForeignContinuationUserDataSource {
         continuation.resumeWith(FakeUserModel(userId, "Proxy$userId"))
         return COROUTINE_SUSPENDED
     }
+}
+
+private class FakeBoxedResultUserDataSource {
+    fun getUserByIdV2(
+        userId: Long,
+        continuation: FakeForeignContinuation,
+    ): Any {
+        continuation.resumeWith(Result.success(FakeUserModel(userId, "Boxed$userId")))
+        return COROUTINE_SUSPENDED
+    }
+}
+
+private class FakeNestedBoxedResultUserDataSource {
+    fun getUserByIdV2(
+        userId: Long,
+        continuation: FakeForeignContinuation,
+    ): Any {
+        continuation.resumeWith(Result.success(Result.success(FakeUserModel(userId, "Nested$userId"))))
+        return COROUTINE_SUSPENDED
+    }
+}
+
+private class FakeSharedContinuationNestedResultUserDataSource {
+    fun getUserByIdV2(
+        userId: Long,
+        continuation: Continuation<Any?>,
+    ): Any {
+        continuation.resumeWith(Result.success(Result.success(FakeUserModel(userId, "Shared$userId"))))
+        return COROUTINE_SUSPENDED
+    }
+}
+
+private class FakeGetNicknameUserModel(
+    private val value: String,
+) {
+    fun getNickname(): String = value
 }

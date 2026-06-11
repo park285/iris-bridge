@@ -18,11 +18,18 @@ private annotation class FakeDebugMetadata(
     val m: String,
 )
 
+private annotation class FakeR8DebugMetadata(
+    val m310941c: String,
+    val m310942f: String,
+    val m310943l: IntArray,
+    val m310944m: String,
+)
+
 internal class FakeUserDataSource(
-    private val lookup: (Long) -> FakeUserModel?,
+    private val lookup: (Long) -> Any?,
 ) {
     @Suppress("UNUSED_PARAMETER")
-    suspend fun getUserByIdV2(userId: Long): FakeUserModel? = lookup(userId)
+    suspend fun getUserByIdV2(userId: Long): Any? = lookup(userId)
 }
 
 internal class FakeMangledUserDataSource(
@@ -43,6 +50,36 @@ internal class FakeObfuscatedUserDataSource(
         f = "UserDatabaseDataSource.kt",
         l = [41],
         m = "getUserByIdV2-gIAlu-s",
+    )
+    private class UserByIdContinuation
+}
+
+internal class FakeJadxObfuscatedUserDataSource(
+    private val lookup: (Long) -> FakeUserModel?,
+) {
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun m113412t(userId: Long): FakeUserModel? = lookup(userId)
+
+    @FakeDebugMetadata(
+        c = "com.kakao.talk.singleton.UserDatabaseDataSource",
+        f = "UserDatabaseDataSource.kt",
+        l = [41],
+        m = "getUserByIdV2-gIAlu-s",
+    )
+    private class UserByIdContinuation
+}
+
+internal class FakeR8MetadataObfuscatedUserDataSource(
+    private val lookup: (Long) -> FakeUserModel?,
+) {
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun m113412t(userId: Long): FakeUserModel? = lookup(userId)
+
+    @FakeR8DebugMetadata(
+        m310941c = "com.kakao.talk.singleton.UserDatabaseDataSource",
+        m310942f = "UserDatabaseDataSource.kt",
+        m310943l = [41],
+        m310944m = "getUserByIdV2-gIAlu-s",
     )
     private class UserByIdContinuation
 }
@@ -102,7 +139,7 @@ internal class FakeExactAndObfuscatedUserDataSource(
     private class UserByIdContinuation
 }
 
-internal fun buildFakeUserDbAccess(lookup: (Long) -> FakeUserModel?): KakaoUserDatabaseAccess {
+internal fun buildFakeUserDbAccess(lookup: (Long) -> Any?): KakaoUserDatabaseAccess {
     val instance = FakeUserDataSource(lookup)
     val method =
         FakeUserDataSource::class.java.methods.first { method ->

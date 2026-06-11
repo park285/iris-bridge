@@ -49,6 +49,32 @@ class KakaoCachedMemberProfileFetcherTest {
     }
 
     @Test
+    fun `fetchMemberProfiles only reads userdb for upstream confirmed members`() {
+        val dbReadIds = mutableListOf<Long>()
+        val baseFetcher =
+            MemberProfileUpstream { _, _ ->
+                mapOf(101L to UpstreamMemberProfile(101L, "Member 101", null))
+            }
+        val access =
+            buildFakeUserDbAccess { userId ->
+                dbReadIds += userId
+                when (userId) {
+                    101L -> FakeUserModel(101L, "Cached Member 101")
+                    202L -> FakeUserModel(202L, "Cached Member 202")
+                    else -> null
+                }
+            }
+        val dbReader = KakaoUserDatabaseReader(access)
+        val fetcher = KakaoCachedMemberProfileFetcher(baseFetcher, dbReader)
+
+        val result = fetcher.fetchMemberProfiles(chatId = 1L, userIds = listOf(101L, 202L))
+
+        assertEquals(listOf(101L), dbReadIds)
+        assertEquals("Cached Member 101", result[101L]?.nickName)
+        assertEquals(null, result[202L])
+    }
+
+    @Test
     fun `fetchMemberProfiles returns empty for empty userIds`() {
         val baseFetcher = MemberProfileUpstream { _, _ -> emptyMap() }
         val access = buildFakeUserDbAccess { null }
@@ -71,7 +97,10 @@ class KakaoCachedMemberProfileFetcherTest {
 
     @Test
     fun `fetchMemberProfiles skips invalid user ids`() {
-        val baseFetcher = MemberProfileUpstream { _, _ -> emptyMap() }
+        val baseFetcher =
+            MemberProfileUpstream { _, userIds ->
+                userIds.filter { it == 5L }.associateWith { userId -> UpstreamMemberProfile(userId, "Member $userId", null) }
+            }
         val access =
             buildFakeUserDbAccess { userId ->
                 if (userId == 5L) FakeUserModel(5L, "Valid") else null

@@ -51,7 +51,7 @@ internal class KakaoUserDatabaseReader(
                     cont.resume(result)
                 }
             }.onFailure { error ->
-                Log.w(KAKAO_CLASS_REGISTRY_TAG, "getUserByIdV2($userId) failed: ${error.message}")
+                Log.w(KAKAO_CLASS_REGISTRY_TAG, "getUserByIdV2 failed: ${error.message}")
                 if (cont.isActive) {
                     cont.resume(null)
                 }
@@ -86,7 +86,7 @@ internal class KakaoUserDatabaseReader(
 
     private companion object {
         const val READ_TIMEOUT_MS = 2_000L
-        val NICKNAME_METHODS = listOf("getNickName", "f", "nickname")
+        val NICKNAME_METHODS = listOf("getNickName", "getNickname", "f", "nickname")
         val NICKNAME_FIELDS = listOf("nickname", "f")
     }
 }

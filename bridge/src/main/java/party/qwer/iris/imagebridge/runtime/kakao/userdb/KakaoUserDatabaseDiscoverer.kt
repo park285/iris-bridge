@@ -2,6 +2,7 @@
 
 package party.qwer.iris.imagebridge.runtime.kakao.userdb
 
+import android.content.Context
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.kakao.DexClassScanner
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.KAKAO_CLASS_REGISTRY_TAG
@@ -9,11 +10,11 @@ import party.qwer.iris.imagebridge.runtime.kakao.classregistry.discoverClass
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.isConcreteClass
 import party.qwer.iris.imagebridge.runtime.kakao.isKotlinContinuationType
 import java.lang.reflect.Method
-import java.lang.reflect.Modifier
 
 internal fun discoverKakaoUserDatabaseAccess(
     classLoader: ClassLoader,
     scanFallback: Boolean = true,
+    context: Context? = null,
 ): KakaoUserDatabaseAccess? =
     runCatching {
         val scanner = DexClassScanner(classLoader)
@@ -24,7 +25,10 @@ internal fun discoverKakaoUserDatabaseAccess(
                 scanFallback = scanFallback,
             )
         val singleton =
-            resolveUserDatabaseSingleton(dataSourceClass)
+            resolveUserDatabaseSingleton(
+                dataSourceClass,
+                dependencies = resolveUserDatabaseFactoryDependencies(context, classLoader),
+            )
                 ?: error("UserDatabaseDataSource singleton not found on ${dataSourceClass.name}")
         val getUserByIdV2Method =
             findGetUserByIdV2Method(dataSourceClass)
@@ -42,13 +46,16 @@ internal fun discoverKakaoUserDatabaseAccess(
 
 private const val USER_DATABASE_DATA_SOURCE_CLASS_NAME = "com.kakao.talk.singleton.UserDatabaseDataSource"
 private const val USER_DATABASE_DATA_SOURCE_FILE_NAME = "UserDatabaseDataSource.kt"
-private const val OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAME = "t"
 
 private val USER_DATABASE_DATA_SOURCE_NAMES =
     arrayOf(
         USER_DATABASE_DATA_SOURCE_CLASS_NAME,
+        "X20.C36045r2",
         "X20.r2",
     )
+
+private val KNOWN_OBFUSCATED_USER_DATABASE_DATA_SOURCE_NAMES = setOf("X20.C36045r2", "X20.r2")
+private val OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAMES = setOf("t", "m113412t")
 
 private fun discoverUserDatabaseDataSourceClass(
     classLoader: ClassLoader,
@@ -56,6 +63,11 @@ private fun discoverUserDatabaseDataSourceClass(
     scanFallback: Boolean,
 ): Class<*> {
     if (scanFallback) {
+        logKnownUserDatabaseCandidateDiagnostics(
+            classLoader = classLoader,
+            names = USER_DATABASE_DATA_SOURCE_NAMES,
+            signatureMatcher = ::matchesUserDatabaseDataSource,
+        )
         return discoverClass(
             classLoader = classLoader,
             scanner = scanner,
@@ -97,11 +109,16 @@ private fun findObfuscatedGetUserByIdV2Method(
     clazz: Class<*>,
     signatureMatches: List<Method>,
 ): Method? {
-    if (!hasSingleGetUserByIdV2DebugMetadata(clazz)) return null
-    return signatureMatches.singleOrNull { method ->
-        method.declaringClass == clazz &&
-            method.name == OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAME
+    val obfuscatedMethod =
+        signatureMatches.singleOrNull { method ->
+            method.declaringClass == clazz &&
+                method.name in OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAMES
+        } ?: return null
+    if (clazz.name in KNOWN_OBFUSCATED_USER_DATABASE_DATA_SOURCE_NAMES) {
+        return obfuscatedMethod
     }
+    if (!hasSingleGetUserByIdV2DebugMetadata(clazz)) return null
+    return obfuscatedMethod
 }
 
 private fun hasSingleGetUserByIdV2DebugMetadata(clazz: Class<*>): Boolean =
@@ -118,32 +135,11 @@ private fun hasSingleGetUserByIdV2DebugMetadata(clazz: Class<*>): Boolean =
 private fun Annotation.stringValue(name: String): String? =
     runCatching {
         javaClass.methods
-            .firstOrNull { method -> method.name == name && method.parameterCount == 0 }
-            ?.invoke(this) as? String
+            .firstOrNull { method ->
+                method.parameterCount == 0 &&
+                    (
+                        method.name == name ||
+                            method.name.endsWith(name, ignoreCase = true)
+                    )
+            }?.invoke(this) as? String
     }.getOrNull()
-
-private fun resolveUserDatabaseSingleton(clazz: Class<*>): Any? {
-    clazz.declaredFields
-        .filter { field -> Modifier.isStatic(field.modifiers) && field.type == clazz }
-        .forEach { field ->
-            runCatching {
-                field.isAccessible = true
-                return field.get(null)
-            }
-        }
-    clazz.declaredFields
-        .filter { field -> Modifier.isStatic(field.modifiers) && field.type != clazz }
-        .forEach { holder ->
-            runCatching {
-                holder.isAccessible = true
-                val holderValue = holder.get(null) ?: return@forEach
-                holder.type.methods
-                    .filter { method -> method.parameterCount == 0 && method.returnType == clazz }
-                    .forEach { accessor ->
-                        accessor.isAccessible = true
-                        accessor.invoke(holderValue)?.let { return it }
-                    }
-            }
-        }
-    return null
-}

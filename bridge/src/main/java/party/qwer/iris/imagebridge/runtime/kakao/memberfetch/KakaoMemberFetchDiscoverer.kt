@@ -21,7 +21,11 @@ internal fun discoverKakaoMemberFetchAccess(classLoader: ClassLoader): KakaoMemb
                 scanner = scanner,
                 lastKnownNames =
                     arrayOf(
+                        "p306Er.C7625d",
+                        "Er.d",
                         "com.kakao.talk.core.loco.Loco",
+                        "com.kakao.talk.core.loco.d",
+                        "com.kakao.talk.core.loco.C52511d",
                         "ry0.C1298d",
                         "Xp.d",
                     ),
@@ -79,6 +83,8 @@ private fun hasMemberFetchSingletonCandidate(clazz: Class<*>): Boolean = clazz.d
 
 internal fun findFetchMembersMethodForTest(clazz: Class<*>): java.lang.reflect.Method? = findFetchMembersMethod(clazz)
 
+private val REQUESTED_MEMBER_FETCH_METHOD_NAMES = listOf("Y", "m22152Y", "S0", "m189027S0")
+
 private fun findFetchMembersMethod(clazz: Class<*>): java.lang.reflect.Method? =
     findSuspendRequestedMembersMethod(clazz)
         ?: findSuspendRoomMembersMethod(clazz)
@@ -93,7 +99,9 @@ private fun findSuspendRequestedMembersMethod(clazz: Class<*>): java.lang.reflec
                 method.parameterTypes[2].isKotlinContinuationType() &&
                 method.returnType == Any::class.java
         }
-    return candidates.singleOrNull { method -> method.name == "Y" }
+    return REQUESTED_MEMBER_FETCH_METHOD_NAMES.firstNotNullOfOrNull { preferredName ->
+        candidates.singleOrNull { method -> method.name == preferredName }
+    }
         ?: candidates.singleOrNull()
 }
 

@@ -16,11 +16,24 @@ class KakaoUserDatabaseDiscovererTest {
     fun `discoverKakaoUserDatabaseAccess returns null without scan when known class is absent`() {
         val access =
             discoverKakaoUserDatabaseAccess(
-                checkNotNull(KakaoUserDatabaseDiscovererTest::class.java.classLoader),
+                URLClassLoader(emptyArray(), null),
                 scanFallback = false,
             )
 
         assertNull(access)
+    }
+
+    @Test
+    fun `discoverKakaoUserDatabaseAccess resolves KakaoTalk 26_4_2 obfuscated UserDatabaseDataSource`() {
+        val access =
+            discoverKakaoUserDatabaseAccess(
+                checkNotNull(KakaoUserDatabaseDiscovererTest::class.java.classLoader),
+                scanFallback = false,
+            )
+
+        assertNotNull(access)
+        assertEquals("X20.C36045r2", access.singleton.javaClass.name)
+        assertEquals("m113412t", access.getUserByIdV2Method.name)
     }
 
     @Test
@@ -37,6 +50,50 @@ class KakaoUserDatabaseDiscovererTest {
 
         assertNotNull(method)
         assertEquals("t", method.name)
+    }
+
+    @Test
+    fun `findGetUserByIdV2Method accepts jadx-style obfuscated method when debug metadata identifies getUserByIdV2`() {
+        val method = findGetUserByIdV2MethodForTest(FakeJadxObfuscatedUserDataSource::class.java)
+
+        assertNotNull(method)
+        assertEquals("m113412t", method.name)
+    }
+
+    @Test
+    fun `findGetUserByIdV2Method accepts R8 debug metadata accessor names`() {
+        val method = findGetUserByIdV2MethodForTest(FakeR8MetadataObfuscatedUserDataSource::class.java)
+
+        assertNotNull(method)
+        assertEquals("m113412t", method.name)
+    }
+
+    @Test
+    fun `findGetUserByIdV2Method accepts known 26_4_2 runtime class when debug metadata is unavailable`() {
+        val method = findGetUserByIdV2MethodForTest(Class.forName("X20.r2"))
+
+        assertNotNull(method)
+        assertEquals("t", method.name)
+    }
+
+    @Test
+    fun `resolveUserDatabaseSingleton accepts package-private companion default factory`() {
+        val singleton = resolveUserDatabaseSingleton(Class.forName("X20.r2"))
+
+        assertNotNull(singleton)
+        assertEquals("X20.r2", singleton.javaClass.name)
+    }
+
+    @Test
+    fun `resolveUserDatabaseSingleton accepts explicit companion factory dependencies`() {
+        val singleton =
+            resolveUserDatabaseSingleton(
+                Class.forName("X20.ExplicitFactoryDataSource"),
+                dependencies = listOf(Any(), Any()),
+            )
+
+        assertNotNull(singleton)
+        assertEquals("X20.ExplicitFactoryDataSource", singleton.javaClass.name)
     }
 
     @Test

@@ -48,7 +48,7 @@ internal fun buildBridgeRequestHandlerComponents(
     val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts) }
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
     val chatRoomOpener = chatRoomOpener(context, registry, chatRoomResolver)
-    val memberProfileFetcher = discoverMemberProfileFetcher(kakaoClassLoader)
+    val memberProfileFetcher = discoverMemberProfileFetcher(context, kakaoClassLoader)
     val memberExtractor = ChatRoomMemberExtractor()
     val memberSnapshotEnricher =
         ChatRoomMemberSnapshotEnricher(
@@ -81,15 +81,18 @@ internal fun buildBridgeRequestHandlerComponents(
     )
 }
 
-private fun discoverMemberProfileFetcher(kakaoClassLoader: ClassLoader): MemberProfileUpstream? {
+private fun discoverMemberProfileFetcher(
+    context: Context,
+    kakaoClassLoader: ClassLoader,
+): MemberProfileUpstream? {
     val baseFetcher =
         discoverKakaoMemberFetchAccess(kakaoClassLoader)?.let(::KakaoMemberProfileFetcher)
     val userDbReader =
-        discoverKakaoUserDatabaseAccess(kakaoClassLoader, scanFallback = true)?.let(::KakaoUserDatabaseReader)
+        discoverKakaoUserDatabaseAccess(kakaoClassLoader, scanFallback = true, context = context)?.let(::KakaoUserDatabaseReader)
     if (userDbReader == null) {
         Log.w(KAKAO_CLASS_REGISTRY_TAG, "Kakao UserDatabase unavailable; using upstream member profiles only")
     } else if (baseFetcher == null) {
-        Log.w(KAKAO_CLASS_REGISTRY_TAG, "Kakao member-fetch unavailable; using UserDatabase cache only")
+        Log.w(KAKAO_CLASS_REGISTRY_TAG, "Kakao member-fetch unavailable; room-scoped member profiles disabled")
     }
     return buildMemberProfileFetcher(baseFetcher, userDbReader)
 }
@@ -106,7 +109,6 @@ private fun buildMemberProfileFetcher(
     when {
         baseFetcher != null && userDbReader != null -> KakaoCachedMemberProfileFetcher(baseFetcher, userDbReader)
         baseFetcher != null -> baseFetcher
-        userDbReader != null -> KakaoCachedMemberProfileFetcher(baseFetcher = null, userDbReader = userDbReader)
         else -> null
     }
 

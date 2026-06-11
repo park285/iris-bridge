@@ -20,7 +20,7 @@ internal fun createKakaoContinuationArgument(
     proxyLabel: String,
     failureLogPrefix: String,
 ): Any {
-    if (continuationType.isInstance(continuation)) {
+    if (!continuationType.isInterface && continuationType.isInstance(continuation)) {
         return continuation
     }
     val emptyContext = emptyCoroutineContextFor(continuationType)
@@ -68,16 +68,41 @@ private fun extractKakaoResumeValue(
     result: Any?,
     failureLogPrefix: String,
 ): Any? {
-    if (result?.javaClass?.name != kotlinClassName("Result\$Failure")) {
-        return result
+    val value = result.unwrapBoxedKotlinResults()
+    if (value?.javaClass?.name != kotlinClassName("Result\$Failure")) {
+        return value
     }
     val exception =
         runCatching {
-            result.javaClass
+            value.javaClass
                 .getDeclaredField("exception")
                 .apply { isAccessible = true }
-                .get(result)
+                .get(value)
         }.getOrNull()
-    Log.w(KAKAO_CLASS_REGISTRY_TAG, "$failureLogPrefix suspend result failed: ${exception ?: result}")
+    Log.w(KAKAO_CLASS_REGISTRY_TAG, "$failureLogPrefix suspend result failed: ${exception ?: value}")
     return null
 }
+
+private fun Any?.unwrapBoxedKotlinResults(): Any? {
+    var value = this
+    repeat(MAX_RESULT_UNWRAP_DEPTH) {
+        if (value?.javaClass?.name != kotlinClassName("Result")) {
+            return value
+        }
+        val unboxed =
+            runCatching {
+                value
+                    ?.javaClass
+                    ?.getDeclaredMethod("unbox-impl")
+                    ?.apply { isAccessible = true }
+                    ?.invoke(value)
+            }.getOrDefault(value)
+        if (unboxed === value) {
+            return value
+        }
+        value = unboxed
+    }
+    return value
+}
+
+private const val MAX_RESULT_UNWRAP_DEPTH = 4

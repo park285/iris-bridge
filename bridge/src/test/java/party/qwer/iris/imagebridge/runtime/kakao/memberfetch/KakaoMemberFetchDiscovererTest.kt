@@ -2,12 +2,26 @@
 
 package party.qwer.iris.imagebridge.runtime.kakao.memberfetch
 
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+@RunWith(RobolectricTestRunner::class)
 class KakaoMemberFetchDiscovererTest {
+    @Test
+    fun `member fetch discovery resolves KakaoTalk 26_4_2 Loco wrapper known name`() {
+        val access = discoverKakaoMemberFetchAccess(checkNotNull(KakaoMemberFetchDiscovererTest::class.java.classLoader))
+
+        assertNotNull(access)
+        assertEquals("p306Er.C7625d", access.clientSingleton.javaClass.name)
+        assertEquals("m22152Y", access.fetchMembersMethod.name)
+        assertEquals("com.kakao.talk.core.loco.f", access.resultClass.name)
+    }
+
     @Test
     fun `member fetch matcher accepts latest suspend member API singleton`() {
         assertTrue(matchesMemberFetchFacadeForTest(FakeLatestMemberFetchClient::class.java))
@@ -23,6 +37,13 @@ class KakaoMemberFetchDiscovererTest {
         val method = findFetchMembersMethodForTest(FakeLatestMemberFetchClient::class.java)
 
         assertEquals("Y", method?.name)
+    }
+
+    @Test
+    fun `member fetch discovery prefers Kakao 26_4_2 wrapper requested member API`() {
+        val method = findFetchMembersMethodForTest(Class.forName("p306Er.C7625d"))
+
+        assertEquals("m22152Y", method?.name)
     }
 
     @Test

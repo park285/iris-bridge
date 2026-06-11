@@ -17,9 +17,10 @@ internal class KakaoCachedMemberProfileFetcher(
         if (deduped.isEmpty()) return emptyMap()
 
         val upstreamProfiles = baseFetcher?.fetchMemberProfiles(chatId, deduped).orEmpty()
+        val upstreamConfirmedIds = upstreamProfiles.keys.filter { userId -> userId in deduped }
         val cachedProfiles =
             userDbReader
-                .readNicknames(deduped)
+                .readNicknames(upstreamConfirmedIds)
                 .map { (userId, nickName) ->
                     userId to
                         UpstreamMemberProfile(
