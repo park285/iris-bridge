@@ -66,6 +66,14 @@ internal fun BridgeCore.memberFieldNicknameQualityScore(value: String): Int =
         BridgeCoreJniMemberField.nativeMemberNicknameQualityScore(value)
     }
 
+internal fun BridgeCore.memberFieldNicknameIsTrustedForDisplay(
+    userId: Long,
+    nickname: String,
+): Boolean =
+    memberFieldBoolean("bridge-core member trusted nickname policy threw") {
+        BridgeCoreJniMemberField.nativeMemberNicknameIsTrustedForDisplay(userId, nickname)
+    }
+
 internal fun BridgeCore.memberFieldGenericLabelPenalty(value: String): Int =
     memberFieldInt("bridge-core member generic label policy threw", defaultValue = 0) {
         BridgeCoreJniMemberField.nativeMemberGenericLabelPenalty(value)

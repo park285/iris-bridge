@@ -1,7 +1,8 @@
 use iris_bridge_core::server::member_field_checks::{
     generic_label_penalty, looks_like_mention_user_id_value, looks_like_nickname,
-    looks_like_profile_url, nickname_quality_score, parse_role_code_from_long,
-    parse_role_code_from_string, path_hint_score, primitive_long_value_from_string,
+    looks_like_profile_url, nickname_is_trusted_for_display, nickname_quality_score,
+    parse_role_code_from_long, parse_role_code_from_string, path_hint_score,
+    primitive_long_value_from_string,
 };
 
 pub fn dispatch_member_parse_role_code_from_long(value: i64) -> Option<i32> {
@@ -46,4 +47,8 @@ pub fn dispatch_member_nickname_quality_score(value: &str) -> i32 {
 
 pub fn dispatch_member_generic_label_penalty(value: &str) -> i32 {
     generic_label_penalty(value)
+}
+
+pub fn dispatch_member_nickname_is_trusted_for_display(user_id: i64, nickname: &str) -> bool {
+    nickname_is_trusted_for_display(user_id, nickname)
 }

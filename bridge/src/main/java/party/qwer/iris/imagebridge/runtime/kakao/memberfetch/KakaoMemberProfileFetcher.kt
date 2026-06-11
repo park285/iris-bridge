@@ -6,19 +6,6 @@ import android.os.Looper
 import android.util.Log
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.KAKAO_CLASS_REGISTRY_TAG
 
-internal data class UpstreamMemberProfile(
-    val userId: Long,
-    val nickName: String,
-    val profileImageUrl: String?,
-)
-
-internal fun interface MemberProfileUpstream {
-    fun fetchMemberProfiles(
-        chatId: Long,
-        userIds: Collection<Long>,
-    ): Map<Long, UpstreamMemberProfile>
-}
-
 internal class KakaoMemberProfileFetcher(
     private val access: KakaoMemberFetchAccess,
 ) : MemberProfileUpstream {

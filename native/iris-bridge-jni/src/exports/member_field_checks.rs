@@ -8,9 +8,9 @@ use jni::sys::{jboolean, jint, jlong};
 
 use crate::dispatch::{
     dispatch_member_looks_like_mention_user_id_value, dispatch_member_looks_like_nickname,
-    dispatch_member_looks_like_profile_url, dispatch_member_parse_role_code_from_long,
-    dispatch_member_parse_role_code_from_string, dispatch_member_path_hint_score,
-    dispatch_member_primitive_long_value_from_string,
+    dispatch_member_looks_like_profile_url, dispatch_member_nickname_is_trusted_for_display,
+    dispatch_member_parse_role_code_from_long, dispatch_member_parse_role_code_from_string,
+    dispatch_member_path_hint_score, dispatch_member_primitive_long_value_from_string,
 };
 use crate::marshal::{
     catch_jstring, read_optional_string, read_string, read_string_array, return_optional_string,
@@ -112,6 +112,22 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJ
         dispatch_member_path_hint_score(&path, &preferred_tokens, &discouraged_tokens)
     }))
     .unwrap_or(0)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniMemberField_nativeMemberNicknameIsTrustedForDisplay<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    user_id: jlong,
+    nickname: JString<'local>,
+) -> jboolean {
+    let outcome = catch_unwind(AssertUnwindSafe(|| {
+        let nickname = read_string(&mut env, &nickname);
+        dispatch_member_nickname_is_trusted_for_display(user_id, &nickname)
+    }));
+    jboolean::from(outcome.unwrap_or(false))
 }
 
 #[unsafe(no_mangle)]

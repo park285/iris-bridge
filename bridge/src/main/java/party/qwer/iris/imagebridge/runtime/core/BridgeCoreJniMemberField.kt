@@ -27,4 +27,9 @@ internal object BridgeCoreJniMemberField {
     external fun nativeMemberNicknameQualityScore(value: String): Int
 
     external fun nativeMemberGenericLabelPenalty(value: String): Int
+
+    external fun nativeMemberNicknameIsTrustedForDisplay(
+        userId: Long,
+        nickname: String,
+    ): Boolean
 }

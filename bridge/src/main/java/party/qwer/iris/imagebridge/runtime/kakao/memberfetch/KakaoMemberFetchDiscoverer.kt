@@ -30,12 +30,8 @@ internal fun discoverKakaoMemberFetchAccess(classLoader: ClassLoader): KakaoMemb
             resolveMemberFetchSingleton(clientClass)
                 ?: error("member-fetch client singleton not found on ${clientClass.name}")
         val fetchMembersMethod =
-            clientClass.methods.singleOrNull { method ->
-                method.name == "i" &&
-                    method.parameterCount == 2 &&
-                    method.parameterTypes[0] == Long::class.javaPrimitiveType &&
-                    List::class.java.isAssignableFrom(method.parameterTypes[1])
-            } ?: error("member-fetch client#i(long, List) not found on ${clientClass.name}")
+            findFetchMembersMethod(clientClass)
+                ?: error("member-fetch client(long, List) not found on ${clientClass.name}")
         val resultClass = discoverMemberFetchResultClass(classLoader, scanner)
         val unwrapValueMethod =
             resultClass.methods.singleOrNull { method ->
@@ -65,12 +61,19 @@ private fun matchesMemberFetchFacade(clazz: Class<*>): Boolean {
     if (!isConcreteClass(clazz) || !hasSelfReturningAccessor(clazz)) {
         return false
     }
-    return clazz.methods.any { method ->
-        method.name == "i" &&
-            method.parameterCount == 2 &&
-            method.parameterTypes[0] == Long::class.javaPrimitiveType &&
-            List::class.java.isAssignableFrom(method.parameterTypes[1])
-    }
+    return findFetchMembersMethod(clazz) != null
+}
+
+private fun findFetchMembersMethod(clazz: Class<*>): java.lang.reflect.Method? {
+    val candidates =
+        clazz.methods.filter { method ->
+            !Modifier.isStatic(method.modifiers) &&
+                method.parameterCount == 2 &&
+                method.parameterTypes[0] == Long::class.javaPrimitiveType &&
+                List::class.java.isAssignableFrom(method.parameterTypes[1])
+        }
+    return candidates.singleOrNull { method -> method.name == "i" }
+        ?: candidates.singleOrNull()
 }
 
 private fun resolveMemberFetchSingleton(clazz: Class<*>): Any? {

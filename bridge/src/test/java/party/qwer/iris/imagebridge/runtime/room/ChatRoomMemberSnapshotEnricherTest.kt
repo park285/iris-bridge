@@ -9,6 +9,37 @@ import kotlin.test.assertTrue
 
 class ChatRoomMemberSnapshotEnricherTest {
     @Test
+    fun `enrich replaces reflection artifact nickname from upstream fetch`() {
+        val fetcher =
+            MemberProfileUpstream { _, userIds ->
+                userIds.associateWith { userId ->
+                    UpstreamMemberProfile(userId, "국헌", null)
+                }
+            }
+        val enricher = ChatRoomMemberSnapshotEnricher(fetcher)
+        val snapshot =
+            ImageBridgeProtocol.ChatRoomMembersSnapshot(
+                roomId = 55L,
+                scannedAtEpochMs = 1L,
+                members =
+                    listOf(
+                        ImageBridgeProtocol.ChatRoomMemberSnapshot(
+                            userId = 243_338_321L,
+                            nickname = "creatorUserId",
+                        ),
+                    ),
+            )
+
+        val enriched =
+            enricher.enrich(
+                snapshot,
+                listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 243_338_321L)),
+            )
+
+        assertEquals("국헌", enriched.members.single().nickname)
+    }
+
+    @Test
     fun `enrich fills blank nickname from upstream fetch`() {
         val fetcher =
             MemberProfileUpstream { _, userIds ->

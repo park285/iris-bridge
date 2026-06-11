@@ -44,12 +44,12 @@ internal class ChatRoomMemberSnapshotEnricher(
     ): Set<Long> {
         val hinted =
             hints
-                .filter { hint -> hint.userId > 0L && hint.nickname.isNullOrBlank() }
+                .filter { hint -> memberNicknameNeedsUpstream(hint.userId, hint.nickname) }
                 .map { it.userId }
                 .toSet()
         val fromSnapshot =
             snapshot.members
-                .filter { member -> member.userId > 0L && member.nickname.isBlank() }
+                .filter { member -> memberNicknameNeedsUpstream(member.userId, member.nickname) }
                 .map { it.userId }
                 .toSet()
         return hinted + fromSnapshot
@@ -65,7 +65,7 @@ internal class ChatRoomMemberSnapshotEnricher(
         val merged =
             members.map { member ->
                 val upstream = upstreamProfiles[member.userId] ?: return@map member
-                if (member.nickname.isNotBlank()) {
+                if (!memberNicknameNeedsUpstream(member.userId, member.nickname)) {
                     return@map member
                 }
                 member.copy(

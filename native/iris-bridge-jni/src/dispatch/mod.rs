@@ -45,9 +45,9 @@ pub use lease::{
 pub use member_field_checks::{
     dispatch_member_generic_label_penalty, dispatch_member_looks_like_mention_user_id_value,
     dispatch_member_looks_like_nickname, dispatch_member_looks_like_profile_url,
-    dispatch_member_nickname_quality_score, dispatch_member_parse_role_code_from_long,
-    dispatch_member_parse_role_code_from_string, dispatch_member_path_hint_score,
-    dispatch_member_primitive_long_value_from_string,
+    dispatch_member_nickname_is_trusted_for_display, dispatch_member_nickname_quality_score,
+    dispatch_member_parse_role_code_from_long, dispatch_member_parse_role_code_from_string,
+    dispatch_member_path_hint_score, dispatch_member_primitive_long_value_from_string,
 };
 pub use reply_attachment_text::{
     dispatch_reply_attachment_session_id, dispatch_reply_attachment_text_looks_like,
