@@ -5,10 +5,13 @@ import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.KakaoMemberProfileFetcher
+import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.discoverKakaoMemberFetchAccess
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntentMetadataResolver
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberExtractor
+import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberSnapshotEnricher
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomOpener
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 import party.qwer.iris.imagebridge.runtime.room.defaultChatRoomIntrospector
@@ -39,6 +42,13 @@ internal fun buildBridgeRequestHandlerComponents(
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
     val chatRoomOpener = chatRoomOpener(context, registry, chatRoomResolver)
     val memberExtractor = ChatRoomMemberExtractor()
+    val memberSnapshotEnricher =
+        ChatRoomMemberSnapshotEnricher(
+            upstreamFetcher =
+                discoverKakaoMemberFetchAccess(context.classLoader)?.let { access ->
+                    KakaoMemberProfileFetcher(access)
+                },
+        )
     val initialSpecStatus = BridgeHookSpecVerifier(registry, registryError).verify()
     return BridgeRequestHandlerComponents(
         requestHandler =
@@ -50,7 +60,8 @@ internal fun buildBridgeRequestHandlerComponents(
                 chatRoomOpener = chatRoomOpener::open,
                 chatRoomMemberSnapshotProvider = { roomId, expectedMemberHints, preferredPlan ->
                     val room = resolveFreshChatRoom(chatRoomResolver, registryError, roomId)
-                    memberExtractor.snapshot(roomId, room, expectedMemberHints, preferredPlan)
+                    val snapshot = memberExtractor.snapshot(roomId, room, expectedMemberHints, preferredPlan)
+                    memberSnapshotEnricher.enrich(snapshot, expectedMemberHints)
                 },
                 metrics = bridgeMetrics,
                 textRequestValidator = BridgeTextRequestValidator(bridgeCore),
