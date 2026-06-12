@@ -9,6 +9,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.imagebridge.runtime.BridgeHandshakeTestFixtures
+import party.qwer.iris.imagebridge.runtime.room.memberextract.ElementView
+import party.qwer.iris.imagebridge.runtime.room.memberextract.PrimitiveValue
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.assertEquals
@@ -22,7 +24,7 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(31, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(32, BridgeCore.EXPECTED_ABI_VERSION)
     }
 
     @Test
@@ -528,43 +530,122 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
-    fun `member role code policy distinguishes no match from unavailable core`() {
-        assertNull(BridgeCore.memberFieldParseRoleCodeFromString("guest") { -1 })
-        assertEquals(4, BridgeCore.memberFieldParseRoleCodeFromString("manager") { 4 })
+    fun `member extraction fails closed before native dispatch when core is unavailable`() {
+        var nativeCalled = false
 
         val error =
             assertFailsWith<IllegalStateException> {
-                BridgeCore.memberFieldParseRoleCodeFromString("manager") { null }
+                BridgeCore.memberExtractionEvaluate(
+                    containers = emptyList(),
+                    expectedMemberHints = emptyList(),
+                    preferredPlan = null,
+                    loadCompatibleCore = { false },
+                    nativeEvaluate = {
+                        nativeCalled = true
+                        """{"ok":true,"found":false}"""
+                    },
+                )
             }
 
-        assertEquals("bridge core unavailable to parse member role code", error.message)
+        assertEquals("bridge core unavailable to evaluate member extraction", error.message)
+        assertFalse(nativeCalled)
     }
 
     @Test
-    fun `member boolean policy fails closed when native policy is unavailable`() {
-        assertTrue(BridgeCore.memberFieldLooksLikeNickname("Alice") { true })
+    fun `member extraction serializes containers and hints into ordered request JSON`() {
+        var capturedRequest: String? = null
 
-        val error =
-            assertFailsWith<IllegalStateException> {
-                BridgeCore.memberFieldLooksLikeNickname("Alice") { null }
-            }
+        val evaluation =
+            BridgeCore.memberExtractionEvaluate(
+                containers =
+                    listOf(
+                        MemberExtractionContainerData(
+                            path = "$.q",
+                            containerType = "collection",
+                            views =
+                                listOf(
+                                    ElementView(
+                                        className = "com.kakao.test.Member",
+                                        values =
+                                            linkedMapOf(
+                                                "a" to PrimitiveValue.LongValue(7L),
+                                                "b" to PrimitiveValue.StringValue("Alice"),
+                                            ),
+                                    ),
+                                ),
+                        ),
+                    ),
+                expectedMemberHints = listOf(ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L, nickname = "Alice")),
+                preferredPlan = null,
+                loadCompatibleCore = { true },
+                nativeEvaluate = { request ->
+                    capturedRequest = request
+                    """{"ok":true,"found":false}"""
+                },
+            )
 
-        assertEquals("bridge core unavailable to evaluate member nickname policy", error.message)
+        assertNull(evaluation)
+        val request = JSONObject(assertNotNull(capturedRequest))
+        assertEquals(7L, request.getJSONArray("expectedMembers").getJSONObject(0).getLong("userId"))
+        val container = request.getJSONArray("containers").getJSONObject(0)
+        assertEquals("$.q", container.getString("path"))
+        assertEquals("collection", container.getString("containerType"))
+        val values =
+            container
+                .getJSONArray("views")
+                .getJSONObject(0)
+                .getJSONArray("values")
+        assertEquals("a", values.getJSONArray(0).getString(0))
+        assertEquals(7L, values.getJSONArray(0).getLong(1))
+        assertEquals("b", values.getJSONArray(1).getString(0))
+        assertEquals("Alice", values.getJSONArray(1).getString(1))
     }
 
     @Test
-    fun `member score policy fails closed when native policy is unavailable`() {
-        assertEquals(
-            25,
-            BridgeCore.memberFieldPathHintScore("$.members.nickname", setOf("nickname"), emptySet()) { _, _, _ -> 25 },
-        )
+    fun `member extraction parses snapshot envelope and surfaces rejection`() {
+        val snapshotEnvelope =
+            """
+            {"ok":true,"found":true,"snapshot":{
+              "sourcePath":"$.q","sourceClassName":"com.kakao.test.Member",
+              "members":[{"userId":7,"nickname":"Alice","roleCode":4,"profileImageUrl":null,"mentionUserId":"text-ping-7"}],
+              "selectedPlan":{"containerPath":"$.q","sourceClassName":"com.kakao.test.Member","userIdPath":"a","nicknamePath":"b",
+                "rolePath":null,"profileImagePath":null,"mentionUserIdPath":null,"fingerprint":"$.q|com.kakao.test.Member|a|b"},
+              "confidence":"HIGH","confidenceScore":11000,"usedPreferredPlan":true,"candidateGap":null}}
+            """.trimIndent()
 
-        val error =
-            assertFailsWith<IllegalStateException> {
-                BridgeCore.memberFieldPathHintScore("$.members.nickname", setOf("nickname"), emptySet()) { _, _, _ -> null }
+        val evaluation =
+            assertNotNull(
+                BridgeCore.memberExtractionEvaluate(
+                    containers = emptyList(),
+                    expectedMemberHints = emptyList(),
+                    preferredPlan = null,
+                    loadCompatibleCore = { true },
+                    nativeEvaluate = { snapshotEnvelope },
+                ),
+            )
+
+        assertEquals("$.q", evaluation.sourcePath)
+        assertEquals(listOf(7L), evaluation.members.map { it.userId })
+        assertEquals(4, evaluation.members.single().roleCode)
+        assertEquals("text-ping-7", evaluation.members.single().mentionUserId)
+        assertNull(evaluation.members.single().profileImageUrl)
+        assertEquals("$.q|com.kakao.test.Member|a|b", evaluation.selectedPlan.fingerprint)
+        assertEquals(ImageBridgeProtocol.ChatRoomSnapshotConfidence.HIGH, evaluation.confidence)
+        assertEquals(true, evaluation.usedPreferredPlan)
+        assertNull(evaluation.candidateGap)
+
+        val rejection =
+            assertFailsWith<IllegalArgumentException> {
+                BridgeCore.memberExtractionEvaluate(
+                    containers = emptyList(),
+                    expectedMemberHints = emptyList(),
+                    preferredPlan = null,
+                    loadCompatibleCore = { true },
+                    nativeEvaluate = { """{"ok":false,"errorCode":"BAD_REQUEST","error":"unknown containerType: set"}""" },
+                )
             }
 
-        assertEquals("bridge core unavailable to score member field path", error.message)
+        assertEquals("unknown containerType: set", rejection.message)
     }
 
     @Test

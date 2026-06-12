@@ -1,12 +1,12 @@
 package party.qwer.iris.imagebridge.runtime.room
 
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.MemberExtractionContainerData
+import party.qwer.iris.imagebridge.runtime.core.memberExtractionEvaluate
 import party.qwer.iris.imagebridge.runtime.room.memberextract.MemberCandidateCollector
-import party.qwer.iris.imagebridge.runtime.room.memberextract.MemberContainerScorer
 import party.qwer.iris.imagebridge.runtime.room.memberextract.MemberElementFlattener
 import party.qwer.iris.imagebridge.runtime.room.memberextract.MemberExtractionDiagnostics
-import party.qwer.iris.imagebridge.runtime.room.memberextract.MemberExtractionPlanMapper
-import party.qwer.iris.imagebridge.runtime.room.memberextract.MemberFieldSelector
 import party.qwer.iris.imagebridge.runtime.room.memberextract.MemberReflectionWalker
 
 internal class ChatRoomMemberExtractor(
@@ -18,15 +18,7 @@ internal class ChatRoomMemberExtractor(
             reflectionWalker = reflectionWalker,
             flattener = MemberElementFlattener(reflectionWalker),
         )
-    private val scorer =
-        MemberContainerScorer(
-            candidateCollector = candidateCollector,
-            fieldSelector = MemberFieldSelector(),
-        )
-    private val planMapper = MemberExtractionPlanMapper()
     private val diagnostics = MemberExtractionDiagnostics(candidateCollector)
-    private val snapshotBuilder = ChatRoomMemberSnapshotBuilder(clock, scorer, planMapper, diagnostics)
-    private val preferredPlanApplier = PreferredMemberPlanApplier(candidateCollector, scorer, snapshotBuilder)
 
     fun snapshot(
         roomId: Long,
@@ -34,24 +26,35 @@ internal class ChatRoomMemberExtractor(
         expectedMemberHints: Collection<ImageBridgeProtocol.ChatRoomMemberHint> = emptyList(),
         preferredPlan: ImageBridgeProtocol.ChatRoomMemberExtractionPlan? = null,
     ): ImageBridgeProtocol.ChatRoomMembersSnapshot {
-        val expected = expectedMemberHintsFrom(expectedMemberHints)
         val containers = candidateCollector.collectContainers(room)
-
-        preferredPlan
-            ?.let(planMapper::toInternalPlan)
-            ?.let { plan ->
-                preferredPlanApplier.apply(
-                    roomId = roomId,
-                    containers = containers,
-                    expected = expected,
-                    preferredPlan = plan,
-                )
-            }?.let { return it }
-
-        return snapshotBuilder.discoverBestSnapshot(
+        val evaluation =
+            BridgeCore.memberExtractionEvaluate(
+                containers =
+                    containers.map { container ->
+                        MemberExtractionContainerData(
+                            path = container.path,
+                            containerType = candidateCollector.typeLabel(container),
+                            views = candidateCollector.views(container),
+                        )
+                    },
+                expectedMemberHints = expectedMemberHints,
+                preferredPlan = preferredPlan,
+            ) ?: run {
+                val expected = expectedMemberHintsFrom(expectedMemberHints)
+                diagnostics.logMissingCandidateDiagnostics(roomId, containers, expected.ids, expected.nicknames)
+                error("chatroom member candidates not found")
+            }
+        return ImageBridgeProtocol.ChatRoomMembersSnapshot(
             roomId = roomId,
-            containers = containers,
-            expected = expected,
+            sourcePath = evaluation.sourcePath,
+            sourceClassName = evaluation.sourceClassName,
+            scannedAtEpochMs = clock(),
+            members = evaluation.members,
+            selectedPlan = evaluation.selectedPlan,
+            confidence = evaluation.confidence,
+            confidenceScore = evaluation.confidenceScore,
+            usedPreferredPlan = evaluation.usedPreferredPlan,
+            candidateGap = evaluation.candidateGap,
         )
     }
 

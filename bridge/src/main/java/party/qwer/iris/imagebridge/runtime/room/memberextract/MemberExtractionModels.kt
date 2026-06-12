@@ -1,7 +1,5 @@
 package party.qwer.iris.imagebridge.runtime.room.memberextract
 
-import party.qwer.iris.ImageBridgeProtocol
-
 internal sealed interface ContainerCandidate {
     val path: String
 
@@ -26,55 +24,9 @@ internal sealed interface PrimitiveValue {
     ) : PrimitiveValue
 }
 
-internal data class ExtractionPlan(
-    val containerPath: String,
-    val sourceClassName: String?,
-    val userIdPath: String,
-    val nicknamePath: String,
-    val rolePath: String? = null,
-    val profileImagePath: String? = null,
-    val mentionUserIdPath: String? = null,
-) {
-    fun fingerprint(): String =
-        listOfNotNull(
-            containerPath,
-            sourceClassName,
-            userIdPath,
-            nicknamePath,
-            rolePath,
-            profileImagePath,
-            mentionUserIdPath,
-        ).joinToString("|")
-}
-
 internal data class ElementView(
     val className: String,
     val values: Map<String, PrimitiveValue>,
-)
-
-internal data class CandidateStringValue(
-    val path: String,
-    val value: String,
-    val userId: Long?,
-)
-
-internal data class ScoredPath(
-    val path: String,
-    val score: Int,
-    val genericPenalty: Int = 0,
-)
-
-internal data class RankedContainerCandidate(
-    val plan: ExtractionPlan,
-    val members: List<ImageBridgeProtocol.ChatRoomMemberSnapshot>,
-    val score: Int,
-    val expectedNicknameMatches: Int,
-    val matchedExpectedCount: Int,
-    val hasRolePath: Boolean,
-    val hasProfilePath: Boolean,
-    val sourceClassName: String?,
-    val containerType: String,
-    val genericLabelPenalty: Int,
 )
 
 internal const val MAX_GRAPH_DEPTH = 4
@@ -86,7 +38,4 @@ internal const val MAX_DEBUG_CONTAINER_SUMMARY = 8
 internal const val MAX_DEBUG_VIEW_COUNT = 2
 internal const val MAX_DEBUG_PATHS = 10
 internal const val MAX_DEBUG_SAMPLE_COUNT = 12
-internal const val MAX_DEBUG_VALUE_LENGTH = 48
-internal const val MAX_DEBUG_MEMBER_IDS = 8
-internal const val MAX_DEBUG_NICKNAMES = 8
 internal const val TAG = "IrisBridge"

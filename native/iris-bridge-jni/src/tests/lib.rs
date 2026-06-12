@@ -257,45 +257,37 @@ fn send_block_reason_snapshot_dispatch_matches_core_discovery_policy() {
 }
 
 #[test]
-fn member_field_dispatch_matches_core_member_extraction_policy() {
-    assert_eq!(dispatch_member_parse_role_code_from_long(4), Some(4));
-    assert_eq!(
-        dispatch_member_parse_role_code_from_string("manager"),
-        Some(4)
-    );
-    assert_eq!(dispatch_member_parse_role_code_from_string("guest"), None);
+fn member_field_dispatch_matches_core_trusted_nickname_policy() {
+    assert!(dispatch_member_nickname_is_trusted_for_display(7, "홍길동"));
+    assert!(!dispatch_member_nickname_is_trusted_for_display(7, "7"));
+    assert!(!dispatch_member_nickname_is_trusted_for_display(7, " "));
+}
 
-    assert!(dispatch_member_looks_like_nickname("홍길동"));
-    assert!(!dispatch_member_looks_like_nickname(
-        "Welcome to '카푸치노'."
-    ));
-    assert!(dispatch_member_looks_like_profile_url(
-        "https://example.com/profile.webp"
-    ));
-    assert_eq!(
-        dispatch_member_primitive_long_value_from_string(" -42 "),
-        Some("-42".to_owned())
-    );
-    assert_eq!(
-        dispatch_member_path_hint_score(
-            "$.members.profile.nickname",
-            &["member".to_owned(), "nickname".to_owned()],
-            &["backup".to_owned()],
-        ),
-        50
-    );
-    assert!(dispatch_member_looks_like_mention_user_id_value(
-        "text-ping-7",
-        Some(7),
-        Some("Alice"),
-    ));
-    assert!(!dispatch_member_looks_like_mention_user_id_value(
-        "Alice",
-        Some(7),
-        Some("Alice"),
-    ));
-    assert_eq!(dispatch_member_nickname_quality_score("[홍길동]"), 42);
-    assert_eq!(dispatch_member_generic_label_penalty("notice"), 220);
+#[test]
+fn member_extraction_dispatch_returns_snapshot_envelope() {
+    let request = serde_json::json!({
+        "expectedMembers": [{ "userId": 7, "nickname": "Alice" }],
+        "containers": [{
+            "path": "$.members",
+            "containerType": "collection",
+            "views": [{
+                "className": "com.kakao.test.Member",
+                "values": [["a", 7], ["b", "Alice"]],
+            }],
+        }],
+    });
+
+    let envelope = dispatch_member_extraction_evaluate(&request.to_string());
+    let value: Value = serde_json::from_str(&envelope).expect("envelope JSON");
+    assert_eq!(value["ok"], true);
+    assert_eq!(value["found"], true);
+    assert_eq!(value["snapshot"]["sourcePath"], "$.members");
+    assert_eq!(value["snapshot"]["members"][0]["userId"], 7);
+
+    let invalid = dispatch_member_extraction_evaluate("not-json");
+    let invalid_value: Value = serde_json::from_str(&invalid).expect("error envelope JSON");
+    assert_eq!(invalid_value["ok"], false);
+    assert_eq!(invalid_value["errorCode"], "BAD_REQUEST");
 }
 
 #[test]
