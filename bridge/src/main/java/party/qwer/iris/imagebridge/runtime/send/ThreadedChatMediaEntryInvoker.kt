@@ -32,46 +32,21 @@ internal class ThreadedChatMediaEntryInvoker(
     fun invoke(
         sender: Any,
         imagePaths: List<String>,
+        contentTypes: List<String> = emptyList(),
     ) {
         val method =
             runCatching { entryMethod }
                 .getOrElse { error ->
                     throw IllegalStateException("threaded entry method not ready", error)
                 }
-        val uris =
-            ArrayList<Any>(imagePaths.size).apply {
-                imagePaths.forEach { path -> add(pathArgumentFactory(path)) }
-            }
-        val type = if (imagePaths.size == 1) registry.photoType else registry.multiPhotoType
-        val callingPkgAttachment =
-            JSONObject().apply {
-                put("callingPkg", registry.target.packageName)
-            }
+        val uris = mediaUris(imagePaths, pathArgumentFactory)
+        val normalizedContentTypes = normalizeMediaContentTypes(imagePaths, contentTypes)
+        val type = mediaMessageType(registry, imagePaths, normalizedContentTypes)
+        val callingPkgAttachment = callingPackageAttachment(registry.target.packageName)
         val loader = registry.chatMediaSenderClass.classLoader ?: error("no classLoader")
-        val identityFunctionProxy =
-            Proxy.newProxyInstance(loader, arrayOf(registry.function1Class)) { _, method, args ->
-                when (method.name) {
-                    "invoke" -> args?.getOrNull(0)
-                    "toString" -> "IrisBridgeIdentityFunction"
-                    "hashCode" -> 0
-                    "equals" -> false
-                    else -> null
-                }
-            }
-        val noopFunctionProxy =
-            Proxy.newProxyInstance(loader, arrayOf(registry.function1Class)) { _, method, _ ->
-                when (method.name) {
-                    "invoke" -> null
-                    "toString" -> "IrisBridgeNoopFunction"
-                    "hashCode" -> 0
-                    "equals" -> false
-                    else -> null
-                }
-            }
-        val writeTypeConnect =
-            registry.writeTypeClass.enumConstants?.firstOrNull { constant ->
-                (constant as Enum<*>).name == "Connect"
-            } ?: registry.writeTypeNone
+        val identityFunctionProxy = identityFunctionProxy(loader, registry.function1Class)
+        val noopFunctionProxy = noopFunctionProxy(loader, registry.function1Class)
+        val writeTypeConnect = writeTypeConnect(registry)
 
         defaultBridgeDiscovery.recordHook(HOOK_SEND_THREADED_ENTRY, "uris=${uris.size} type=$type")
         method.invoke(
@@ -89,6 +64,52 @@ internal class ThreadedChatMediaEntryInvoker(
         )
     }
 }
+
+private fun mediaUris(
+    imagePaths: List<String>,
+    pathArgumentFactory: (String) -> Any,
+): ArrayList<Any> =
+    ArrayList<Any>(imagePaths.size).apply {
+        imagePaths.forEach { path -> add(pathArgumentFactory(path)) }
+    }
+
+private fun callingPackageAttachment(packageName: String): JSONObject =
+    JSONObject().apply {
+        put("callingPkg", packageName)
+    }
+
+private fun identityFunctionProxy(
+    loader: ClassLoader,
+    function1Class: Class<*>,
+): Any =
+    Proxy.newProxyInstance(loader, arrayOf(function1Class)) { _, method, args ->
+        when (method.name) {
+            "invoke" -> args?.getOrNull(0)
+            "toString" -> "IrisBridgeIdentityFunction"
+            "hashCode" -> 0
+            "equals" -> false
+            else -> null
+        }
+    }
+
+private fun noopFunctionProxy(
+    loader: ClassLoader,
+    function1Class: Class<*>,
+): Any =
+    Proxy.newProxyInstance(loader, arrayOf(function1Class)) { _, method, _ ->
+        when (method.name) {
+            "invoke" -> null
+            "toString" -> "IrisBridgeNoopFunction"
+            "hashCode" -> 0
+            "equals" -> false
+            else -> null
+        }
+    }
+
+private fun writeTypeConnect(registry: KakaoClassRegistry): Any =
+    registry.writeTypeClass.enumConstants?.firstOrNull { constant ->
+        (constant as Enum<*>).name == "Connect"
+    } ?: registry.writeTypeNone
 
 internal fun selectThreadedChatMediaEntryMethodForTest(
     chatMediaSenderClass: Class<*>,

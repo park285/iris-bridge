@@ -60,4 +60,32 @@ class ThreadedChatMediaEntryInvokerTest {
         assertEquals(false, RenamedThreadedEntryMediaSender.lastShareOriginal)
         assertEquals(true, RenamedThreadedEntryMediaSender.lastHighQuality)
     }
+
+    @Test
+    fun `threaded entry invoker sends single mp4 as video`() {
+        RenamedThreadedEntryMediaSender.reset()
+        val invoker =
+            ThreadedChatMediaEntryInvoker(
+                registry = buildRenamedThreadedRegistry(),
+                pathArgumentFactory = { path -> "uri:$path" },
+            )
+
+        invoker.invoke(
+            sender =
+                RenamedThreadedEntryMediaSender(
+                    chatRoom = FakeChatRoom(),
+                    threadId = 3805486995143352321L,
+                    sendWithThread = { false },
+                    attachmentDecorator = { payload -> payload },
+                ),
+            imagePaths = listOf("/tmp/thread-profile.mp4"),
+            contentTypes = listOf("video/mp4"),
+        )
+
+        assertEquals(listOf("/tmp/thread-profile.mp4"), RenamedThreadedEntryMediaSender.sentUris)
+        assertEquals(FakeMessageType.Video, RenamedThreadedEntryMediaSender.lastType)
+        assertEquals(FakeWriteType.Connect, RenamedThreadedEntryMediaSender.lastWriteType)
+        assertEquals(false, RenamedThreadedEntryMediaSender.lastShareOriginal)
+        assertEquals(true, RenamedThreadedEntryMediaSender.lastHighQuality)
+    }
 }

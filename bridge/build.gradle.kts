@@ -171,15 +171,29 @@ private fun Exec.injectAndroidNdkToolchain(apiLevel: Int = 33) {
 private fun registerAssembleOutputCopyTask(variantName: String) {
     val assembleTaskName = "assemble${variantName.replaceFirstChar { it.uppercase() }}"
     val copyTaskName = "sync${variantName.replaceFirstChar { it.uppercase() }}ApkToOutput"
+    val apkOutputDirectory = rootProject.layout.projectDirectory.dir("output")
+    val variantApkDirectory = layout.buildDirectory.dir("outputs/apk/$variantName")
     val copyTask =
         tasks.register<Copy>(copyTaskName) {
-            from(layout.buildDirectory.dir("outputs/apk/$variantName"))
+            from(variantApkDirectory)
             include("*.apk")
-            into(rootProject.layout.projectDirectory.dir("output"))
+            into(apkOutputDirectory)
             rename { "IrisBridge-$variantName.apk" }
+        }
+    val canonicalReleaseCopyTask =
+        if (variantName == "release") {
+            tasks.register<Copy>("syncReleaseApkToCanonicalOutput") {
+                from(variantApkDirectory)
+                include("*.apk")
+                into(apkOutputDirectory)
+                rename { "IrisBridge.apk" }
+            }
+        } else {
+            null
         }
     tasks.matching { it.name == assembleTaskName }.configureEach {
         finalizedBy(copyTask)
+        canonicalReleaseCopyTask?.let { finalizedBy(it) }
     }
 }
 

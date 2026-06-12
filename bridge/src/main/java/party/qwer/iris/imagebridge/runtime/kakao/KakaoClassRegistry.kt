@@ -35,6 +35,7 @@ internal class KakaoClassRegistry(
     val photoType: Any,
     val multiPhotoType: Any,
     val writeTypeNone: Any,
+    val videoType: Any = photoType,
     val imageSendStrategy: KakaoImageSendStrategy = KakaoImageSendStrategy.LEGACY_REFLECTION,
     val shareManagerImageIntentMethod: Method? = null,
     val shareManagerImageDispatchMethod: Method? = null,

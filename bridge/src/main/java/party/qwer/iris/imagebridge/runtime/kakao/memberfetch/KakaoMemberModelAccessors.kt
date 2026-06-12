@@ -15,6 +15,7 @@ internal fun memberObjectToProfile(member: Any): UpstreamMemberProfile? {
         userId = userId,
         nickName = nickName,
         profileImageUrl = invokeString(member, profileUrlMethodsFor(member))?.takeIf(String::isNotBlank),
+        accessPermit = invokeString(member, accessPermitMethodsFor(member))?.takeIf(String::isNotBlank),
     )
 }
 
@@ -95,15 +96,54 @@ private fun profileUrlMethodsFor(member: Any): List<String> =
         else -> DEFAULT_PROFILE_URL_METHODS
     }
 
+private fun accessPermitMethodsFor(member: Any): List<String> =
+    when (member.javaClass.name) {
+        "cq.i" -> CQ_MEMBER_ACCESS_PERMIT_METHODS
+        "Qr.r" -> QR_MEMBER_ACCESS_PERMIT_METHODS
+        "Jr.i" -> JR_MEMBER_ACCESS_PERMIT_METHODS
+        else -> DEFAULT_ACCESS_PERMIT_METHODS
+    }
+
 private val CQ_MEMBER_USER_ID_METHODS = listOf("getUserId", "n")
 private val CQ_MEMBER_NICKNAME_METHODS = listOf("getNickName", "f")
-private val CQ_MEMBER_PROFILE_URL_METHODS = listOf("getProfileUrl", "j", "d", "g")
+private val CQ_MEMBER_PROFILE_URL_METHODS =
+    listOf("getOriginalProfileUrl", "g", "getFullProfileUrl", "d", "getProfileUrl", "j")
+private val CQ_MEMBER_ACCESS_PERMIT_METHODS = listOf("getAccessPermit", "a")
 private val QR_MEMBER_USER_ID_METHODS = listOf("getUserId", "e")
 private val QR_MEMBER_NICKNAME_METHODS = listOf("getNickName", "g")
-private val QR_MEMBER_PROFILE_URL_METHODS = listOf("getProfileUrl", "i", "d", "h")
+private val QR_MEMBER_PROFILE_URL_METHODS =
+    listOf(
+        "getOriginalProfileUrl",
+        "getOriginalProfileImageUrl",
+        "h",
+        "getFullProfileUrl",
+        "getFullProfileImageUrl",
+        "d",
+        "getProfileUrl",
+        "getProfileImageUrl",
+        "i",
+    )
+private val QR_MEMBER_ACCESS_PERMIT_METHODS = listOf("getAccessPermit", "a")
 private val JR_MEMBER_USER_ID_METHODS = listOf("getUserId", "n")
 private val JR_MEMBER_NICKNAME_METHODS = listOf("getNickName", "f")
-private val JR_MEMBER_PROFILE_URL_METHODS = listOf("getProfileUrl", "j", "d", "g")
+private val JR_MEMBER_PROFILE_URL_METHODS =
+    listOf("getOriginalProfileUrl", "g", "getFullProfileUrl", "d", "getProfileUrl", "j")
+private val JR_MEMBER_ACCESS_PERMIT_METHODS = listOf("getAccessPermit", "a")
 private val DEFAULT_USER_ID_METHODS = listOf("getUserId", "n", "e")
 private val DEFAULT_NICKNAME_METHODS = listOf("getNickName", "f", "g")
-private val DEFAULT_PROFILE_URL_METHODS = listOf("getProfileUrl", "j", "i", "d", "h", "g")
+private val DEFAULT_PROFILE_URL_METHODS =
+    listOf(
+        "getOriginalProfileUrl",
+        "getOriginalProfileImageUrl",
+        "getFullProfileUrl",
+        "getFullProfileImageUrl",
+        "getProfileUrl",
+        "getProfileImageUrl",
+        "j",
+        "i",
+        "k",
+        "d",
+        "h",
+        "g",
+    )
+private val DEFAULT_ACCESS_PERMIT_METHODS = listOf("getAccessPermit", "a")

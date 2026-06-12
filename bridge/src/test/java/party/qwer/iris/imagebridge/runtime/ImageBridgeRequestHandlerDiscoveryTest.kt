@@ -8,6 +8,7 @@ import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_MULTIPLE
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_SINGLE
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_ENTRY
 import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SEND_THREADED_INJECT
+import party.qwer.iris.imagebridge.runtime.discovery.HOOK_SHARE_MANAGER_IMAGE_DISPATCH
 import party.qwer.iris.imagebridge.runtime.discovery.sendBlockReason
 import party.qwer.iris.imagebridge.runtime.server.BridgeImagePathValidator
 import party.qwer.iris.imagebridge.runtime.server.BridgeSpecStatus
@@ -321,6 +322,62 @@ class ImageBridgeRequestHandlerDiscoveryTest {
 
         assertEquals("failed", response.status)
         assertEquals("bridge discovery hook not ready: ChatMediaSender#threadedInject", response.error)
+        file.delete()
+    }
+
+    @Test
+    fun `threaded send image request rejects ShareManager image dispatch fallback`() {
+        var sendCalls = 0
+        val file = Files.createTempFile("iris-bridge", ".png").toFile().apply { writeText("x") }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { sendCalls += 1 },
+                healthProvider = {
+                    ImageBridgeHealthSnapshot(
+                        running = true,
+                        specStatus = BridgeSpecStatus(ready = true, checkedAtEpochMs = 1L, checks = emptyList()),
+                        discoverySnapshot =
+                            BridgeDiscoverySnapshot(
+                                installAttempted = true,
+                                hooks =
+                                    listOf(
+                                        DiscoveryHookStatus(name = HOOK_SHARE_MANAGER_IMAGE_DISPATCH, installed = true, invocationCount = 0),
+                                        DiscoveryHookStatus(name = HOOK_SEND_THREADED_ENTRY, installed = false, invocationCount = 0),
+                                        DiscoveryHookStatus(name = HOOK_SEND_THREADED_INJECT, installed = false, invocationCount = 0),
+                                    ),
+                            ),
+                        restartCount = 0,
+                        lastCrashMessage = null,
+                    )
+                },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = testImageLeaseVerifier(),
+                logError = { _, _, _ -> },
+            )
+
+        val response =
+            handler.handle(
+                sendImageRequest(
+                    roomId = 1L,
+                    imagePaths = listOf(file.absolutePath),
+                    threadId = 55L,
+                    threadScope = 2,
+                    imageLeases =
+                        listOf(
+                            signedTestImageLease(
+                                requestId = "image-request",
+                                roomId = 1L,
+                                canonicalPath = file.canonicalPath,
+                            ),
+                        ),
+                ),
+            )
+
+        assertEquals("failed", response.status)
+        assertEquals("bridge discovery hook not ready: ChatMediaSender#threadedEntry", response.error)
+        assertEquals(0, sendCalls)
         file.delete()
     }
 }

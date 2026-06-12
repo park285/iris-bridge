@@ -448,6 +448,27 @@ class ReplyMarkdownSendingLogAccessTest {
     }
 
     @Test
+    fun `reads sending log message from modern getter`() {
+        val log = FakeSendingLogWithModernMessageGetter("hello")
+
+        assertEquals("hello", ReplyMarkdownSendingLogAccess.readMessageText(log))
+    }
+
+    @Test
+    fun `reads sending log message from Kakao 26 getter`() {
+        val log = FakeSendingLogWithKakao26MessageGetter("hello")
+
+        assertEquals("hello", ReplyMarkdownSendingLogAccess.readMessageText(log))
+    }
+
+    @Test
+    fun `prefers string message getter over non string legacy getter`() {
+        val log = FakeSendingLogWithNonStringLegacyGetter("hello")
+
+        assertEquals("hello", ReplyMarkdownSendingLogAccess.readMessageText(log))
+    }
+
+    @Test
     fun `writes thread metadata through setters when available`() {
         val log = FakeSendingLogWithSetters()
 
@@ -615,6 +636,26 @@ private class FakeSendingLogWithSetters {
     fun J1(value: Long?) {
         threadId = value
     }
+}
+
+private class FakeSendingLogWithModernMessageGetter(
+    private val message: String,
+) {
+    fun getMessage(): String = message
+}
+
+private class FakeSendingLogWithKakao26MessageGetter(
+    private val message: String,
+) {
+    fun g0(): String = message
+}
+
+private class FakeSendingLogWithNonStringLegacyGetter(
+    private val message: String,
+) {
+    fun f0(): Any = Any()
+
+    fun getMessage(): String = message
 }
 
 private class FakeSendingLogWithFields {

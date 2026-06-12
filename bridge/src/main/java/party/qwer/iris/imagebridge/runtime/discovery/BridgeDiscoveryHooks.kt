@@ -11,6 +11,7 @@ internal const val HOOK_SEND_SINGLE = "ChatMediaSender#sendSingle"
 internal const val HOOK_SEND_MULTIPLE = "ChatMediaSender#sendMultiple"
 internal const val HOOK_SEND_THREADED_ENTRY = "ChatMediaSender#threadedEntry"
 internal const val HOOK_SEND_THREADED_INJECT = "ChatMediaSender#threadedInject"
+internal const val HOOK_SHARE_MANAGER_IMAGE_DISPATCH = "ShareManager#imageDispatch"
 
 internal val defaultDiscoveryHookNames =
     listOf(
@@ -25,4 +26,5 @@ internal val defaultDiscoveryHookNames =
         HOOK_SEND_MULTIPLE,
         HOOK_SEND_THREADED_ENTRY,
         HOOK_SEND_THREADED_INJECT,
+        HOOK_SHARE_MANAGER_IMAGE_DISPATCH,
     )

@@ -489,6 +489,7 @@ class BridgeSecurityTest {
                         override fun sendSingle(
                             chatRoom: Any,
                             imagePath: String,
+                            contentType: String?,
                             threadId: Long?,
                             threadScope: Int?,
                         ) {
@@ -498,6 +499,7 @@ class BridgeSecurityTest {
                         override fun sendMultiple(
                             chatRoom: Any,
                             imagePaths: List<String>,
+                            contentTypes: List<String>,
                             threadId: Long?,
                             threadScope: Int?,
                         ) {
@@ -508,6 +510,7 @@ class BridgeSecurityTest {
                             roomId: Long,
                             chatRoom: Any,
                             imagePaths: List<String>,
+                            contentTypes: List<String>,
                             threadId: Long,
                             threadScope: Int,
                         ) {
@@ -521,6 +524,7 @@ class BridgeSecurityTest {
             ImageSendRequest(
                 roomId = 1L,
                 imagePaths = validated,
+                contentTypes = listOf("image/png"),
                 threadId = null,
                 threadScope = null,
                 requestId = "req-canonical",

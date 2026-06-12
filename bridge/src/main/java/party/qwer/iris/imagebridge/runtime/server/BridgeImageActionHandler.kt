@@ -25,6 +25,7 @@ internal class BridgeImageActionHandler(
             ImageSendRequest(
                 roomId = roomId,
                 imagePaths = validatedPaths,
+                contentTypes = imageContentTypes(request),
                 threadId = request.threadId,
                 threadScope = request.threadScope,
                 requestId = requestId,
@@ -43,5 +44,17 @@ internal class BridgeImageActionHandler(
         val completedAtEpochMs = System.currentTimeMillis()
         metrics.recordSendSuccess(completedAtEpochMs, completedAtEpochMs - startedAtEpochMs)
         return ImageBridgeProtocol.buildSuccessResponse(requestId)
+    }
+
+    private fun imageContentTypes(request: ImageBridgeProtocol.ImageBridgeRequest): List<String> {
+        val byIndex =
+            request.imageLeases.associate { lease ->
+                lease.payload.imageIndex to
+                    lease.payload.contentType
+                        .substringBefore(';')
+                        .trim()
+                        .lowercase()
+            }
+        return request.imagePaths.indices.map { index -> byIndex[index].orEmpty() }
     }
 }

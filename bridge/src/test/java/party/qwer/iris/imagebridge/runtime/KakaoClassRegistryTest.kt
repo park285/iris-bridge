@@ -27,6 +27,8 @@ class KakaoClassRegistryTest {
         assertEquals(FakeMessageType.Photo, registry.photoType)
         assertNotNull(registry.multiPhotoType)
         assertEquals(FakeMessageType.MultiPhoto, registry.multiPhotoType)
+        assertNotNull(registry.videoType)
+        assertEquals(FakeMessageType.Video, registry.videoType)
         assertNotNull(registry.writeTypeNone)
         assertEquals(FakeWriteType.None, registry.writeTypeNone)
     }
@@ -142,6 +144,19 @@ class KakaoClassRegistryTest {
             )
 
         assertEquals(MultiOnlyMediaSender::class.java, selected)
+    }
+
+    @Test
+    fun `chat media sender selector accepts 26_4_2 three argument constructor`() {
+        val selected =
+            KakaoClassRegistry.selectChatMediaSenderCandidateForTest(
+                candidates = listOf(ModernChatMediaSender26_4_2::class.java),
+                messageTypeClass = FakeMessageType::class.java,
+                function0Class = kotlin.jvm.functions.Function0::class.java,
+                function1Class = kotlin.jvm.functions.Function1::class.java,
+            )
+
+        assertEquals(ModernChatMediaSender26_4_2::class.java, selected)
     }
 
     @Test

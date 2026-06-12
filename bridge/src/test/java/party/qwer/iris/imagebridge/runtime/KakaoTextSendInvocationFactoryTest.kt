@@ -103,6 +103,38 @@ class KakaoTextSendInvocationFactoryTest {
     }
 
     @Test
+    fun `factory validates modern text sending log message getter`() {
+        FakeTextRequestRecorder.reset()
+        ShareManager.reset()
+        val registry = buildFakeRegistry()
+        val factory =
+            KakaoTextSendInvocationFactory(
+                registry = registry,
+                logInfo = { _, _ -> },
+                requestCompanionClassProvider = { ModernTextRequestCompanion::class.java },
+            )
+        val chatRoom = FakeChatRoomModel.CompanionResolver.c(FakeRoomEntity(123L))
+
+        factory.send(
+            roomId = 123L,
+            chatRoom = chatRoom,
+            message = "thread usage",
+            markdown = false,
+            threadId = 55L,
+            threadScope = 2,
+            mentionsJson = null,
+            attachmentJson = null,
+            requestId = "req-modern-text",
+        )
+
+        val sendingLog = FakeTextRequestRecorder.sendingLog as ModernFakeTextSendingLog
+        assertEquals(123L, sendingLog.getChatRoomId())
+        assertEquals("thread usage", sendingLog.getMessage())
+        assertEquals(55L, sendingLog.V0)
+        assertEquals(2, sendingLog.Z)
+    }
+
+    @Test
     fun `factory sends raw attachment through KakaoLinkSpec first`() {
         FakeTextRequestRecorder.reset()
         ShareManager.reset()

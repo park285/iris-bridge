@@ -4,6 +4,7 @@ import android.util.Log
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.BridgeHookInvocation
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.kakao.KakaoImageSendStrategy
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.util.concurrent.atomic.AtomicBoolean
@@ -44,6 +45,17 @@ internal class BridgeDiscovery(
         installMethodHook(HOOK_SEND_MULTIPLE, registry.multiSendMethod, hookInstaller) { param ->
             val uriCount = (param.args.getOrNull(0) as? List<*>)?.size ?: -1
             "uris=$uriCount type=${param.args.getOrNull(1)} shareOriginal=${param.args.getOrNull(6)} highQuality=${param.args.getOrNull(7)}"
+        }
+
+        if (registry.imageSendStrategy == KakaoImageSendStrategy.SHARE_MANAGER_INTENT) {
+            val dispatchMethod = registry.shareManagerImageDispatchMethod
+            if (dispatchMethod != null) {
+                installMethodHook(HOOK_SHARE_MANAGER_IMAGE_DISPATCH, dispatchMethod, hookInstaller) { param ->
+                    "chatRoom=${param.args.getOrNull(2)?.javaClass?.name} flag=${param.args.getOrNull(3)}"
+                }
+            } else {
+                markInstallError(HOOK_SHARE_MANAGER_IMAGE_DISPATCH, "share-manager dispatch method not discovered")
+            }
         }
     }
 

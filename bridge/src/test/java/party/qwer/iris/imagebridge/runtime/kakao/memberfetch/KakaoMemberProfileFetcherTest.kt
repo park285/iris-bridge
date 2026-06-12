@@ -30,6 +30,35 @@ class KakaoMemberProfileFetcherTest {
         assertEquals("Member 56", result[56L]?.nickName)
         assertEquals("https://example.test/member-57.png", result[57L]?.profileImageUrl)
     }
+
+    @Test
+    fun `fetchMemberProfiles prefers detailed animated profile image URL over member snapshot URL`() {
+        val fetcher =
+            KakaoMemberProfileFetcher(
+                buildFakeLatestMemberFetchAccess(),
+                ProfileDetailUpstream { _, profile ->
+                    if (profile.userId == 57L) {
+                        UpstreamProfileDetail(profileImageUrl = "https://example.test/member-57-original.gif")
+                    } else {
+                        null
+                    }
+                },
+            )
+
+        val executor = Executors.newSingleThreadExecutor()
+        val result =
+            try {
+                executor
+                    .submit<Map<Long, UpstreamMemberProfile>> {
+                        fetcher.fetchMemberProfiles(chatId = 55L, userIds = listOf(56L, 57L))
+                    }.get()
+            } finally {
+                executor.shutdownNow()
+            }
+
+        assertEquals("https://example.test/member-57-original.gif", result[57L]?.profileImageUrl)
+        assertEquals("https://example.test/member-56.png", result[56L]?.profileImageUrl)
+    }
 }
 
 internal fun buildFakeLatestMemberFetchAccess(): KakaoMemberFetchAccess {
@@ -92,6 +121,7 @@ internal class FakeMember(
     private val userId: Long,
     private val nickName: String,
     private val profileUrl: String = "https://example.test/member-$userId.png",
+    private val accessPermit: String = "access-permit-$userId",
 ) {
     fun e(): Int = 7
 
@@ -100,6 +130,8 @@ internal class FakeMember(
     fun f(): String = nickName
 
     fun j(): String = profileUrl
+
+    fun a(): String = accessPermit
 }
 
 internal class FakeOptionalProperty(

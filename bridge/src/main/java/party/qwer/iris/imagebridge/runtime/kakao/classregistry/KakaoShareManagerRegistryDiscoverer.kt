@@ -27,6 +27,7 @@ internal data class KakaoRegistryCommonParts(
     val entityLookupMethod: Method,
     val photoType: Any,
     val multiPhotoType: Any,
+    val videoType: Any,
 )
 
 internal fun discoverShareManagerClassRegistry(
@@ -72,6 +73,7 @@ internal fun discoverShareManagerClassRegistry(
         photoType = common.photoType,
         multiPhotoType = common.multiPhotoType,
         writeTypeNone = requireEnumConstant(writeType, "None"),
+        videoType = common.videoType,
         imageSendStrategy = KakaoImageSendStrategy.SHARE_MANAGER_INTENT,
         shareManagerImageIntentMethod = intentMethod,
         shareManagerImageDispatchMethod = dispatchMethod,

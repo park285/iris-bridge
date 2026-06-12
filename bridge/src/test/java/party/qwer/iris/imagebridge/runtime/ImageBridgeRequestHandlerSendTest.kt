@@ -61,6 +61,7 @@ class ImageBridgeRequestHandlerSendTest {
 
         assertEquals(123L, captured?.roomId)
         assertEquals(listOf(file.canonicalPath), captured?.imagePaths?.map { it.canonicalPath })
+        assertEquals(listOf("image/png"), captured?.contentTypes)
         assertEquals(55L, captured?.threadId)
         assertEquals(3, captured?.threadScope)
         assertEquals("req-1", captured?.requestId)
@@ -69,6 +70,50 @@ class ImageBridgeRequestHandlerSendTest {
         assertEquals(1, health.metrics?.sendSuccess)
         assertEquals("req-1", health.metrics?.lastSendRequestId)
         assertNotNull(health.metrics?.lastSendDurationMs)
+        file.delete()
+    }
+
+    @Test
+    fun `send image request preserves lease content type for mp4 media`() {
+        var captured: ImageSendRequest? = null
+        val file =
+            Files
+                .createTempFile("iris-bridge", ".mp4")
+                .toFile()
+                .apply {
+                    writeBytes(byteArrayOf(0x00, 0x00, 0x00, 0x18, 'f'.code.toByte(), 't'.code.toByte(), 'y'.code.toByte(), 'p'.code.toByte()))
+                }
+        val rootDir = file.parentFile ?: error("temp file parent missing")
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { request -> captured = request },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                pathValidator = BridgeImagePathValidator(rootDir.absolutePath),
+                leaseVerifier = BridgeImageLeaseVerifier(expectedToken = "bridge-token"),
+            )
+
+        val response =
+            handler.handle(
+                sendImageRequest(
+                    roomId = 123L,
+                    imagePaths = listOf(file.absolutePath),
+                    requestId = "req-video",
+                    imageLeases =
+                        listOf(
+                            signedImageLease(
+                                secret = "bridge-token",
+                                requestId = "req-video",
+                                roomId = 123L,
+                                canonicalPath = file.canonicalPath,
+                                contentType = "video/mp4",
+                            ),
+                        ),
+                ),
+            )
+
+        assertEquals("sent", response.status)
+        assertEquals(listOf("video/mp4"), captured?.contentTypes)
         file.delete()
     }
 

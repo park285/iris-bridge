@@ -4,6 +4,11 @@ internal data class UpstreamMemberProfile(
     val userId: Long,
     val nickName: String,
     val profileImageUrl: String?,
+    val accessPermit: String? = null,
+)
+
+internal data class UpstreamProfileDetail(
+    val profileImageUrl: String?,
 )
 
 internal fun interface MemberProfileUpstream {
@@ -11,4 +16,11 @@ internal fun interface MemberProfileUpstream {
         chatId: Long,
         userIds: Collection<Long>,
     ): Map<Long, UpstreamMemberProfile>
+}
+
+internal fun interface ProfileDetailUpstream {
+    fun fetchProfileDetail(
+        chatId: Long,
+        profile: UpstreamMemberProfile,
+    ): UpstreamProfileDetail?
 }

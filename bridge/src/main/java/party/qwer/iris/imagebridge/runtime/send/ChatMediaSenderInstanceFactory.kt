@@ -4,14 +4,13 @@ package party.qwer.iris.imagebridge.runtime.send
 
 import org.json.JSONObject
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
-import java.lang.reflect.Constructor
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
 
 internal class ChatMediaSenderInstanceFactory(
     private val registry: KakaoClassRegistry,
 ) {
-    private val senderConstructorCache = ConcurrentHashMap<Class<*>, Constructor<*>>()
+    private val senderConstructorCache = ConcurrentHashMap<Class<*>, SenderConstructorBinding>()
 
     fun newSender(
         chatRoom: Any,
@@ -44,69 +43,64 @@ internal class ChatMediaSenderInstanceFactory(
             senderConstructorCache.computeIfAbsent(chatRoom.javaClass) { chatRoomClass ->
                 resolveSenderConstructor(chatRoomClass)
             }
-        return constructor.apply { isAccessible = true }.newInstance(
-            chatRoom,
-            normalizedThreadIdArgument(constructor.parameterTypes[1], threadId),
-            sendWithThreadProxy,
-            attachmentDecoratorProxy,
-        )
+        val threadIdArgument =
+            normalizedThreadIdArgument(constructor.constructor.parameterTypes[1], threadId)
+        return when (constructor.shape) {
+            SenderConstructorShape.LegacyWithThreadFlag ->
+                constructor.constructor.apply { isAccessible = true }.newInstance(
+                    chatRoom,
+                    threadIdArgument,
+                    sendWithThreadProxy,
+                    attachmentDecoratorProxy,
+                )
+
+            SenderConstructorShape.ModernThreadId ->
+                constructor.constructor.apply { isAccessible = true }.newInstance(
+                    chatRoom,
+                    threadIdArgument,
+                    attachmentDecoratorProxy,
+                )
+        }
     }
 
-    private fun resolveSenderConstructor(chatRoomClass: Class<*>): Constructor<*> {
+    private fun resolveSenderConstructor(chatRoomClass: Class<*>): SenderConstructorBinding {
         val candidates =
-            registry.chatMediaSenderClass.declaredConstructors.filter { constructor ->
+            registry.chatMediaSenderClass.declaredConstructors.mapNotNull { constructor ->
                 val parameterTypes = constructor.parameterTypes
-                parameterTypes.size == 4 &&
+                val shape =
+                    senderConstructorShape(
+                        parameterTypes,
+                        registry.function0Class,
+                        registry.function1Class,
+                    ) ?: return@mapNotNull null
+                if (
                     parameterTypes[0].isAssignableFrom(chatRoomClass) &&
-                    isThreadIdParameterType(parameterTypes[1]) &&
-                    parameterTypes[2] == registry.function0Class &&
-                    parameterTypes[3] == registry.function1Class
+                    isThreadIdParameterType(parameterTypes[1])
+                ) {
+                    SenderConstructorBinding(constructor, shape)
+                } else {
+                    null
+                }
             }
         check(candidates.isNotEmpty()) {
             "ChatMediaSender constructor not found for chatRoom=${chatRoomClass.name}"
         }
-        val exactCandidates = candidates.filter { constructor -> constructor.parameterTypes[0] == chatRoomClass }
-        if (exactCandidates.size == 1) {
-            return exactCandidates.single()
-        }
-        if (exactCandidates.size > 1) {
-            val signatures =
-                exactCandidates.joinToString { constructor ->
-                    constructor.parameterTypes.joinToString(
-                        prefix = "${constructor.declaringClass.name}(",
-                        postfix = ")",
-                    ) { parameterType -> parameterType.name }
-                }
-            error("ChatMediaSender exact constructor is ambiguous for chatRoom=${chatRoomClass.name}: $signatures")
+        val exactCandidates = candidates.filter { candidate -> candidate.constructor.parameterTypes[0] == chatRoomClass }
+        if (exactCandidates.isNotEmpty()) {
+            return selectConstructorBinding(
+                candidates = exactCandidates,
+                ambiguousMessage = "ChatMediaSender exact constructor is ambiguous for chatRoom=${chatRoomClass.name}",
+            )
         }
 
-        val bestDistance = candidates.minOf { constructor -> typeDistance(chatRoomClass, constructor.parameterTypes[0]) }
+        val bestDistance = candidates.minOf { candidate -> typeDistance(chatRoomClass, candidate.constructor.parameterTypes[0]) }
         val bestCandidates =
-            candidates.filter { constructor ->
-                typeDistance(chatRoomClass, constructor.parameterTypes[0]) == bestDistance
+            candidates.filter { candidate ->
+                typeDistance(chatRoomClass, candidate.constructor.parameterTypes[0]) == bestDistance
             }
-        check(bestCandidates.size == 1) {
-            val signatures =
-                bestCandidates.joinToString { constructor ->
-                    constructor.parameterTypes.joinToString(
-                        prefix = "${constructor.declaringClass.name}(",
-                        postfix = ")",
-                    ) { parameterType -> parameterType.name }
-                }
-            "ChatMediaSender constructor is ambiguous for chatRoom=${chatRoomClass.name}: $signatures"
-        }
-        return bestCandidates.single()
+        return selectConstructorBinding(
+            candidates = bestCandidates,
+            ambiguousMessage = "ChatMediaSender constructor is ambiguous for chatRoom=${chatRoomClass.name}",
+        )
     }
-
-    private fun isThreadIdParameterType(parameterType: Class<*>): Boolean = parameterType == java.lang.Long::class.java || parameterType == java.lang.Long.TYPE
-
-    private fun normalizedThreadIdArgument(
-        parameterType: Class<*>,
-        threadId: Long?,
-    ): Any? =
-        if (parameterType == java.lang.Long.TYPE) {
-            threadId ?: 0L
-        } else {
-            threadId
-        }
 }

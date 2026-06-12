@@ -15,15 +15,30 @@ internal object ReplyMarkdownSendingLogAccess {
             }
         }.getOrNull()
 
-    fun readMessageText(sendingLog: Any): String? =
-        runCatching {
-            sendingLog
-                .javaClass
-                .getMethod("f0")
-                .apply { isAccessible = true }
-                .invoke(sendingLog)
-                ?.toString()
-        }.getOrNull()
+    fun readMessageText(sendingLog: Any): String? {
+        val sendingLogClass = sendingLog.javaClass
+        for (methodName in listOf("getMessage", "g0", "f0")) {
+            val value =
+                runCatching {
+                    sendingLogClass
+                        .getMethod(methodName)
+                        .apply { isAccessible = true }
+                        .invoke(sendingLog)
+                }.getOrNull()
+            if (value is CharSequence) return value.toString()
+        }
+        for (fieldName in listOf("message", "F")) {
+            val value =
+                runCatching {
+                    sendingLogClass
+                        .getDeclaredField(fieldName)
+                        .apply { isAccessible = true }
+                        .get(sendingLog)
+                }.getOrNull()
+            if (value is CharSequence) return value.toString()
+        }
+        return null
+    }
 
     fun readAttachmentSessionId(
         sendingLog: Any,

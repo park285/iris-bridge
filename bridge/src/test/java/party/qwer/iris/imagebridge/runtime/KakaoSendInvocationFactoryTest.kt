@@ -56,6 +56,30 @@ class KakaoSendInvocationFactoryTest {
     }
 
     @Test
+    fun `sendSingle uses video enum for explicit mp4 media`() {
+        FakeMediaSender.reset()
+        val factory =
+            KakaoSendInvocationFactory(
+                registry = buildFakeRegistry(),
+                pathArgumentFactory = { path -> "uri:$path" },
+            )
+
+        factory.sendSingle(
+            chatRoom = FakeChatRoom(),
+            imagePath = "/tmp/profile.mp4",
+            contentType = "video/mp4",
+            threadId = null,
+            threadScope = null,
+        )
+
+        assertEquals(listOf("/tmp/profile.mp4"), FakeMediaSender.multiSentUris)
+        assertEquals(FakeMessageType.Video, FakeMediaSender.multiType)
+        assertEquals(FakeWriteType.None, FakeMediaSender.multiWriteType)
+        assertEquals(false, FakeMediaSender.multiShareOriginal)
+        assertEquals(true, FakeMediaSender.multiHighQuality)
+    }
+
+    @Test
     fun `sendMultiple uses uri list and multi photo enum`() {
         FakeMediaSender.reset()
         val factory =
@@ -134,5 +158,55 @@ class KakaoSendInvocationFactoryTest {
         )
 
         assertEquals(listOf("/tmp/primitive-thread.png"), PrimitiveThreadParamMediaSender.sentPaths)
+    }
+
+    @Test
+    fun `sendThreaded uses 26_4_2 three argument chat media sender constructor`() {
+        ModernChatMediaSender26_4_2.reset()
+        val factory =
+            KakaoSendInvocationFactory(
+                registry = buildModernChatMediaSender26_4_2Registry(),
+                pathArgumentFactory = { path -> "uri:$path" },
+            )
+
+        factory.sendThreaded(
+            roomId = 464252100463241L,
+            chatRoom = FakeChatRoom(),
+            imagePaths = listOf("/tmp/thread-26-4-2.png"),
+            threadId = 3861127076080988161L,
+            threadScope = 2,
+        )
+
+        assertEquals(3861127076080988161L, ModernChatMediaSender26_4_2.constructorThreadId)
+        assertEquals(listOf("/tmp/thread-26-4-2.png"), ModernChatMediaSender26_4_2.sentUris)
+        assertEquals(FakeMessageType.Photo, ModernChatMediaSender26_4_2.lastType)
+        assertEquals(FakeWriteType.Connect, ModernChatMediaSender26_4_2.lastWriteType)
+        assertEquals(false, ModernChatMediaSender26_4_2.lastShareOriginal)
+        assertEquals(true, ModernChatMediaSender26_4_2.lastHighQuality)
+    }
+
+    @Test
+    fun `sendThreaded uses video enum for explicit mp4 media`() {
+        ModernChatMediaSender26_4_2.reset()
+        val factory =
+            KakaoSendInvocationFactory(
+                registry = buildModernChatMediaSender26_4_2Registry(),
+                pathArgumentFactory = { path -> "uri:$path" },
+            )
+
+        factory.sendThreaded(
+            roomId = 464252100463241L,
+            chatRoom = FakeChatRoom(),
+            imagePaths = listOf("/tmp/profile.mp4"),
+            contentTypes = listOf("video/mp4"),
+            threadId = 3861127076080988161L,
+            threadScope = 2,
+        )
+
+        assertEquals(listOf("/tmp/profile.mp4"), ModernChatMediaSender26_4_2.sentUris)
+        assertEquals(FakeMessageType.Video, ModernChatMediaSender26_4_2.lastType)
+        assertEquals(FakeWriteType.Connect, ModernChatMediaSender26_4_2.lastWriteType)
+        assertEquals(false, ModernChatMediaSender26_4_2.lastShareOriginal)
+        assertEquals(true, ModernChatMediaSender26_4_2.lastHighQuality)
     }
 }

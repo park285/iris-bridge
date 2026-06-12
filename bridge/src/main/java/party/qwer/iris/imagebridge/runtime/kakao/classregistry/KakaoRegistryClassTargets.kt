@@ -12,7 +12,7 @@ internal fun discoverMessageType(
         lastKnownNames = arrayOf("vr.c", "Op.EnumC16810c", "Op.c"),
         label = "MessageType",
     ) { clazz ->
-        clazz.isEnum && hasEnumConstants(clazz, "Photo", "MultiPhoto")
+        clazz.isEnum && hasEnumConstants(clazz, "Photo", "MultiPhoto", "Video")
     }
 
 internal fun discoverChatMediaSender(

@@ -8,6 +8,7 @@ import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.kakao.classregistry.KAKAO_CLASS_REGISTRY_TAG
 import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.KakaoMemberProfileFetcher
+import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.LazyKakaoProfileDetailFetcher
 import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.MemberProfileUpstream
 import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.discoverKakaoMemberFetchAccess
 import party.qwer.iris.imagebridge.runtime.kakao.userdb.KakaoCachedMemberProfileFetcher
@@ -44,7 +45,7 @@ internal fun buildBridgeRequestHandlerComponents(
     bridgeCore: BridgeCoreRuntime,
     kakaoClassLoader: ClassLoader = context.classLoader,
 ): BridgeRequestHandlerComponents {
-    val imageSender = registry?.let { KakaoImageSender(it, hookInstaller) }
+    val imageSender = registry?.let { KakaoImageSender(context, it, hookInstaller) }
     val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts) }
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
     val chatRoomOpener = chatRoomOpener(context, registry, chatRoomResolver)
@@ -85,8 +86,11 @@ private fun discoverMemberProfileFetcher(
     context: Context,
     kakaoClassLoader: ClassLoader,
 ): MemberProfileUpstream? {
+    val profileDetailFetcher = LazyKakaoProfileDetailFetcher(kakaoClassLoader)
     val baseFetcher =
-        discoverKakaoMemberFetchAccess(kakaoClassLoader)?.let(::KakaoMemberProfileFetcher)
+        discoverKakaoMemberFetchAccess(kakaoClassLoader)?.let { access ->
+            KakaoMemberProfileFetcher(access, profileDetailFetcher)
+        }
     val userDbReader =
         discoverKakaoUserDatabaseAccess(kakaoClassLoader, scanFallback = true, context = context)?.let(::KakaoUserDatabaseReader)
     if (userDbReader == null) {

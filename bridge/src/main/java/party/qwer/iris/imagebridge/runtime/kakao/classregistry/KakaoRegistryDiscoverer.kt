@@ -42,6 +42,7 @@ internal fun discoverKakaoClassRegistry(
             entityLookupMethod = entityLookup,
             photoType = requireEnumConstant(messageType, "Photo"),
             multiPhotoType = requireEnumConstant(messageType, "MultiPhoto"),
+            videoType = requireEnumConstant(messageType, "Video"),
         )
     return discoverLegacyMediaClassRegistry(classLoader, scanner, common)
         ?: discoverShareManagerClassRegistry(classLoader, scanner, common)

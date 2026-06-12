@@ -52,6 +52,7 @@ internal fun signedImageLease(
     expiresAtEpochMs: Long = Long.MAX_VALUE,
     sha256Hex: String = fileSha256HexOrFixture(canonicalPath),
     byteLength: Long = fileLengthOrFixture(canonicalPath),
+    contentType: String = "image/png",
     lastModifiedEpochMs: Long = fileLastModifiedOrFixture(canonicalPath),
     nonce: String = "$requestId:$imageIndex",
 ): SignedImageLease =
@@ -65,7 +66,7 @@ internal fun signedImageLease(
             canonicalPath = canonicalPath,
             sha256Hex = sha256Hex,
             byteLength = byteLength,
-            contentType = "image/png",
+            contentType = contentType,
             lastModifiedEpochMs = lastModifiedEpochMs,
             expiresAtEpochMs = expiresAtEpochMs,
             nonce = nonce,
@@ -108,6 +109,7 @@ internal fun signedTestImageLease(
     roomId: Long,
     canonicalPath: String,
     imageIndex: Int = 0,
+    contentType: String = "image/png",
 ): SignedImageLease =
     signedImageLease(
         secret = TEST_BRIDGE_TOKEN,
@@ -115,6 +117,7 @@ internal fun signedTestImageLease(
         roomId = roomId,
         canonicalPath = canonicalPath,
         imageIndex = imageIndex,
+        contentType = contentType,
     )
 
 internal fun sendTextRequest(

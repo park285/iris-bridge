@@ -4,6 +4,7 @@ package party.qwer.iris.imagebridge.runtime
 
 import org.json.JSONObject
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
+import party.qwer.iris.imagebridge.runtime.send.discoverShareManagerImageMethods
 
 internal abstract class AbstractRoomDaoContainer {
     @Suppress("FunctionName")
@@ -412,6 +413,7 @@ internal fun buildFakeRegistry(): KakaoClassRegistry {
         photoType = FakeMessageType.Photo,
         multiPhotoType = FakeMessageType.MultiPhoto,
         writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
     )
 }
 
@@ -481,6 +483,7 @@ internal fun buildPolymorphicRegistry(): KakaoClassRegistry {
         photoType = FakeMessageType.Photo,
         multiPhotoType = FakeMessageType.MultiPhoto,
         writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
     )
 }
 
@@ -550,6 +553,7 @@ internal fun buildExactPreferredRegistry(): KakaoClassRegistry {
         photoType = FakeMessageType.Photo,
         multiPhotoType = FakeMessageType.MultiPhoto,
         writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
     )
 }
 
@@ -619,6 +623,7 @@ internal fun buildPrimitiveThreadParamRegistry(): KakaoClassRegistry {
         photoType = FakeMessageType.Photo,
         multiPhotoType = FakeMessageType.MultiPhoto,
         writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
     )
 }
 
@@ -677,6 +682,7 @@ internal fun buildMultiOnlyRegistry(): KakaoClassRegistry {
         photoType = FakeMessageType.Photo,
         multiPhotoType = FakeMessageType.MultiPhoto,
         writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
     )
 }
 
@@ -746,23 +752,19 @@ internal fun buildLegacyNameSensitiveRegistry(): KakaoClassRegistry {
         photoType = FakeMessageType.Photo,
         multiPhotoType = FakeMessageType.MultiPhoto,
         writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
     )
 }
 
 internal fun buildModernEntityNameRegistry(): KakaoClassRegistry {
     val shareManagerClass = com.kakao.talk.manager.ShareManager::class.java
-    val intentMethod =
-        shareManagerClass.methods.first { method ->
-            method.name == "I" &&
-                method.parameterCount == 2 &&
-                method.returnType.name == "android.content.Intent"
-        }
-    val dispatchMethod =
-        shareManagerClass.methods.first { method ->
-            method.name == "h0" &&
-                method.parameterCount == 4 &&
-                method.parameterTypes[3] == Boolean::class.javaPrimitiveType
-        }
+    val (intentMethod, dispatchMethod) =
+        discoverShareManagerImageMethods(
+            shareManagerClass,
+            ModernEntityNameChatRoom::class.java,
+            FakeMessageType::class.java,
+            FakeListener::class.java,
+        )
     val singleSend =
         FakeMediaSender::class.java.getMethod(
             "n",
@@ -828,6 +830,7 @@ internal fun buildModernEntityNameRegistry(): KakaoClassRegistry {
         photoType = FakeMessageType.Photo,
         multiPhotoType = FakeMessageType.MultiPhoto,
         writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
         imageSendStrategy = party.qwer.iris.imagebridge.runtime.kakao.KakaoImageSendStrategy.SHARE_MANAGER_INTENT,
         shareManagerImageIntentMethod = intentMethod,
         shareManagerImageDispatchMethod = dispatchMethod,
@@ -900,5 +903,76 @@ internal fun buildRenamedThreadedRegistry(): KakaoClassRegistry {
         photoType = FakeMessageType.Photo,
         multiPhotoType = FakeMessageType.MultiPhoto,
         writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
+    )
+}
+
+internal fun buildModernChatMediaSender26_4_2Registry(): KakaoClassRegistry {
+    val singleSend =
+        ModernChatMediaSender26_4_2::class.java.getMethod(
+            "n",
+            FakeMediaItem::class.java,
+            Boolean::class.javaPrimitiveType,
+        )
+    val multiSend =
+        ModernChatMediaSender26_4_2::class.java.getMethod(
+            "p",
+            List::class.java,
+            FakeMessageType::class.java,
+            String::class.java,
+            JSONObject::class.java,
+            JSONObject::class.java,
+            FakeWriteType::class.java,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            FakeListener::class.java,
+        )
+    val mediaItemCtor =
+        FakeMediaItem::class.java.getConstructor(
+            String::class.java,
+            Long::class.javaPrimitiveType,
+        )
+    val masterDbField = FakeMasterDatabase::class.java.getDeclaredField("INSTANCE")
+    val roomDaoMethod = FakeMasterDatabase::class.java.getMethod("O")
+    val entityLookupMethod =
+        FakeRoomDao::class.java.getMethod(
+            "h",
+            Long::class.javaPrimitiveType,
+        )
+    val broadResolver =
+        FakeChatRoomManager::class.java.getMethod(
+            "e0",
+            Long::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+        )
+    val directResolver =
+        FakeChatRoomManager::class.java.getMethod(
+            "d0",
+            Long::class.javaPrimitiveType,
+        )
+    return KakaoClassRegistry(
+        mediaItemClass = FakeMediaItem::class.java,
+        function0Class = kotlin.jvm.functions.Function0::class.java,
+        function1Class = kotlin.jvm.functions.Function1::class.java,
+        masterDatabaseClass = FakeMasterDatabase::class.java,
+        writeTypeClass = FakeWriteType::class.java,
+        listenerClass = FakeListener::class.java,
+        chatMediaSenderClass = ModernChatMediaSender26_4_2::class.java,
+        messageTypeClass = FakeMessageType::class.java,
+        chatRoomManagerClass = FakeChatRoomManager::class.java,
+        chatRoomClass = FakeChatRoom::class.java,
+        singleSendMethod = singleSend,
+        multiSendMethod = multiSend,
+        mediaItemConstructor = mediaItemCtor,
+        masterDbSingletonField = masterDbField,
+        roomDaoMethod = roomDaoMethod,
+        entityLookupMethod = entityLookupMethod,
+        broadRoomResolverMethod = broadResolver,
+        directRoomResolverMethod = directResolver,
+        photoType = FakeMessageType.Photo,
+        multiPhotoType = FakeMessageType.MultiPhoto,
+        writeTypeNone = FakeWriteType.None,
+        videoType = FakeMessageType.Video,
     )
 }

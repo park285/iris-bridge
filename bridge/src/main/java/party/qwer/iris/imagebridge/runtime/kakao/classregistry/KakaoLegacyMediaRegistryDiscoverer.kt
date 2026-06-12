@@ -74,6 +74,7 @@ private fun buildLegacyMediaRegistry(
         photoType = common.photoType,
         multiPhotoType = common.multiPhotoType,
         writeTypeNone = requireEnumConstant(writeType, "None"),
+        videoType = common.videoType,
         imageSendStrategy = KakaoImageSendStrategy.LEGACY_REFLECTION,
     )
 }

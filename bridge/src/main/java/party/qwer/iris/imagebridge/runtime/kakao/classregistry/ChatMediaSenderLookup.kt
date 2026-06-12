@@ -13,14 +13,39 @@ internal fun matchesChatMediaSenderClass(
 ): Boolean =
     isConcreteClass(clazz) &&
         clazz.constructors.any { ctor ->
-            ctor.parameterTypes.size == 4 &&
-                ctor.parameterTypes[1] == java.lang.Long::class.java &&
-                ctor.parameterTypes[2] == function0Class &&
-                ctor.parameterTypes[3] == function1Class
+            isChatMediaSenderConstructor(ctor.parameterTypes, function0Class, function1Class)
         } &&
         methodsInHierarchy(clazz).any { method ->
             isMultiSendMethod(method, messageTypeClass)
         }
+
+private fun isChatMediaSenderConstructor(
+    parameterTypes: Array<Class<*>>,
+    function0Class: Class<*>,
+    function1Class: Class<*>,
+): Boolean =
+    isLegacyChatMediaSenderConstructor(parameterTypes, function0Class, function1Class) ||
+        isModernChatMediaSenderConstructor(parameterTypes, function1Class)
+
+private fun isLegacyChatMediaSenderConstructor(
+    parameterTypes: Array<Class<*>>,
+    function0Class: Class<*>,
+    function1Class: Class<*>,
+): Boolean =
+    parameterTypes.size == 4 &&
+        isThreadIdParameterType(parameterTypes[1]) &&
+        parameterTypes[2] == function0Class &&
+        parameterTypes[3] == function1Class
+
+private fun isModernChatMediaSenderConstructor(
+    parameterTypes: Array<Class<*>>,
+    function1Class: Class<*>,
+): Boolean =
+    parameterTypes.size == 3 &&
+        isThreadIdParameterType(parameterTypes[1]) &&
+        parameterTypes[2] == function1Class
+
+private fun isThreadIdParameterType(parameterType: Class<*>): Boolean = parameterType == java.lang.Long::class.java || parameterType == java.lang.Long.TYPE
 
 internal fun resolveChatMediaSendMethods(
     chatMediaSenderClass: Class<*>,

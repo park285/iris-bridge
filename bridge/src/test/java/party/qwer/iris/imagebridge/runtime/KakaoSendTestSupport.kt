@@ -17,37 +17,44 @@ internal class RecordingKakaoSendInvoker : KakaoSendInvoker {
     var threadedCalls = 0
     var lastRoomId: Long? = null
     var lastImagePaths: List<String> = emptyList()
+    var lastContentTypes: List<String> = emptyList()
     var lastThreadId: Long? = null
     var lastThreadScope: Int? = null
 
     override fun sendSingle(
         chatRoom: Any,
         imagePath: String,
+        contentType: String?,
         threadId: Long?,
         threadScope: Int?,
     ) {
         singleCalls += 1
+        lastContentTypes = listOf(contentType.orEmpty())
     }
 
     override fun sendMultiple(
         chatRoom: Any,
         imagePaths: List<String>,
+        contentTypes: List<String>,
         threadId: Long?,
         threadScope: Int?,
     ) {
         multiCalls += 1
+        lastContentTypes = contentTypes
     }
 
     override fun sendThreaded(
         roomId: Long,
         chatRoom: Any,
         imagePaths: List<String>,
+        contentTypes: List<String>,
         threadId: Long,
         threadScope: Int,
     ) {
         threadedCalls += 1
         lastRoomId = roomId
         lastImagePaths = imagePaths
+        lastContentTypes = contentTypes
         lastThreadId = threadId
         lastThreadScope = threadScope
     }
@@ -129,6 +136,7 @@ internal enum class FakeMessageType {
     Text,
     Photo,
     MultiPhoto,
+    Video,
     Leverage,
 }
 
@@ -267,7 +275,7 @@ internal class FakeChatLog(
     }
 }
 
-internal interface FakeListener
+internal interface FakeListener : com.kakao.talk.manager.send.m
 
 internal object FakeTextRequestRecorder {
     var chatRoom: Any? = null
@@ -294,6 +302,27 @@ internal class FakeTextRequestCompanion {
     fun u(
         chatRoom: FakeChatRoomModel,
         sendingLog: FakeTextSendingLog,
+        writeType: FakeWriteType?,
+        listener: FakeListener?,
+        shouldRetry: Boolean,
+    ) {
+        FakeTextRequestRecorder.chatRoom = chatRoom
+        FakeTextRequestRecorder.sendingLog = sendingLog
+        FakeTextRequestRecorder.writeType = writeType
+        FakeTextRequestRecorder.listener = listener
+        FakeTextRequestRecorder.shouldRetry = shouldRetry
+    }
+}
+
+internal class ModernTextRequestCompanion {
+    companion object {
+        @JvmField
+        val f = ModernTextRequestCompanion()
+    }
+
+    fun u(
+        chatRoom: FakeChatRoomModel,
+        sendingLog: ModernFakeTextSendingLog,
         writeType: FakeWriteType?,
         listener: FakeListener?,
         shouldRetry: Boolean,
@@ -414,6 +443,76 @@ internal class FakeTextSendingLog private constructor(
     }
 }
 
+internal class ModernFakeTextSendingLog private constructor(
+    private val roomId: Long,
+    private val message: String,
+    var messageType: FakeMessageType,
+    val originClass: Class<*>?,
+    val originTag: String?,
+) {
+    var G: String? = null
+    var Z: Int = 0
+    var V0: Long? = null
+
+    fun getChatRoomId(): Long = roomId
+
+    fun getMessage(): String = message
+
+    fun H1(threadScope: Int) {
+        Z = threadScope
+    }
+
+    fun J1(threadId: Long?) {
+        V0 = threadId
+    }
+
+    class b(
+        private val roomId: Long,
+        private val messageType: FakeMessageType,
+        @Suppress("UNUSED_PARAMETER") reserved: Int,
+        @Suppress("UNUSED_PARAMETER") messageId: Long?,
+        @Suppress("UNUSED_PARAMETER") needsUpload: Boolean,
+    ) {
+        constructor(
+            chatRoom: FakeChatRoomModel,
+            messageType: FakeMessageType,
+            reserved: Int,
+            messageId: Long?,
+        ) : this(chatRoom.roomId, messageType, reserved, messageId, false)
+
+        private var message: String = ""
+        private var originClass: Class<*>? = null
+        private var originTag: String? = null
+        private var attachment: JSONObject? = null
+
+        fun j(message: String): b {
+            this.message = message
+            return this
+        }
+
+        fun l(
+            sourceClass: Class<*>,
+            tag: String,
+        ): b {
+            originClass = sourceClass
+            originTag = tag
+            return this
+        }
+
+        fun c(attachment: JSONObject): b {
+            this.attachment = attachment
+            return this
+        }
+
+        fun b(): ModernFakeTextSendingLog {
+            check(messageType == FakeMessageType.Text || messageType == FakeMessageType.Leverage)
+            return ModernFakeTextSendingLog(roomId, message, messageType, originClass, originTag).also { log ->
+                log.G = attachment?.toString()
+            }
+        }
+    }
+}
+
 internal class RenamedThreadedEntryMediaSender(
     chatRoom: FakeChatRoom,
     private val threadId: Long?,
@@ -491,6 +590,99 @@ internal class RenamedThreadedEntryMediaSender(
         lastWriteType = writeType
         lastShareOriginal = shareOriginal
         lastHighQuality = highQuality
+        check(message.isEmpty())
+        check(attachment.optString("callingPkg") == "com.kakao.talk")
+        check(forwardExtra == null)
+        check(writeType == FakeWriteType.Connect)
+        check(!shareOriginal)
+        check(highQuality)
+        assertEquals("ok", onSuccess.invoke("ok"))
+        assertEquals(null, onFailure.invoke("ignored"))
+    }
+}
+
+internal class ModernChatMediaSender26_4_2(
+    chatRoom: FakeChatRoom,
+    private val threadId: Long?,
+    private val attachmentDecorator: (JSONObject) -> JSONObject?,
+) {
+    companion object {
+        val sentUris = mutableListOf<String>()
+        var constructorThreadId: Long? = null
+        var lastType: FakeMessageType? = null
+        var lastWriteType: FakeWriteType? = null
+        var lastShareOriginal: Boolean? = null
+        var lastHighQuality: Boolean? = null
+
+        fun reset() {
+            sentUris.clear()
+            constructorThreadId = null
+            lastType = null
+            lastWriteType = null
+            lastShareOriginal = null
+            lastHighQuality = null
+        }
+    }
+
+    init {
+        check(chatRoom.hashCode() != 0 || chatRoom.hashCode() == 0)
+        constructorThreadId = threadId
+        check(attachmentDecorator(JSONObject()) != null)
+    }
+
+    fun n(
+        mediaItem: FakeMediaItem,
+        suppressAnimation: Boolean,
+    ) {
+        check(mediaItem.path.isNotBlank())
+        check(!suppressAnimation)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun p(
+        uris: List<Any>,
+        type: FakeMessageType,
+        message: String?,
+        attachment: JSONObject?,
+        forwardExtra: JSONObject?,
+        writeType: FakeWriteType,
+        shareOriginal: Boolean,
+        highQuality: Boolean,
+        listener: FakeListener?,
+    ) {
+        sentUris += uris.map { uri -> uri.toString().removePrefix("uri:") }
+        lastType = type
+        lastWriteType = writeType
+        lastShareOriginal = shareOriginal
+        lastHighQuality = highQuality
+        check(message == null)
+        check(attachment == null)
+        check(forwardExtra == null)
+        check(writeType == FakeWriteType.None)
+        check(!shareOriginal)
+        check(highQuality)
+        check(listener == null)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun o(
+        uris: List<Any>,
+        type: FakeMessageType,
+        message: String,
+        attachment: JSONObject,
+        forwardExtra: JSONObject?,
+        writeType: FakeWriteType,
+        shareOriginal: Boolean,
+        highQuality: Boolean,
+        onSuccess: kotlin.jvm.functions.Function1<Any?, Any?>,
+        onFailure: kotlin.jvm.functions.Function1<Any?, Any?>,
+    ) {
+        sentUris += uris.map { uri -> uri.toString().removePrefix("uri:") }
+        lastType = type
+        lastWriteType = writeType
+        lastShareOriginal = shareOriginal
+        lastHighQuality = highQuality
+        check(threadId != null)
         check(message.isEmpty())
         check(attachment.optString("callingPkg") == "com.kakao.talk")
         check(forwardExtra == null)

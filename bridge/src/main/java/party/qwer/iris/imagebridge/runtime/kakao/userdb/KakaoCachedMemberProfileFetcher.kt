@@ -27,6 +27,7 @@ internal class KakaoCachedMemberProfileFetcher(
                             userId = userId,
                             nickName = nickName,
                             profileImageUrl = upstreamProfiles[userId]?.profileImageUrl,
+                            accessPermit = upstreamProfiles[userId]?.accessPermit,
                         )
                 }.toMap()
 
