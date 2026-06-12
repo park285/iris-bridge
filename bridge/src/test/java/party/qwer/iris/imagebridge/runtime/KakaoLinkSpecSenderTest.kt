@@ -23,6 +23,7 @@ import party.qwer.iris.imagebridge.runtime.send.kakaoLinkSpecSendAttachment
 import java.net.URLDecoder
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -269,6 +270,16 @@ class KakaoLinkSpecSenderTest {
             extractKakaoLinkAppKey("https://example.test/path?app_key=46e8bda79095ab1dea785ef1adad5117"),
         )
         assertEquals(null, extractKakaoLinkAppKey("app_key=46e8bda79095ab1dea785ef1adad5117"))
+    }
+
+    @Test
+    fun `kakaolink spec send attachment fails closed when bridge core builder is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                kakaoLinkSpecSendAttachment("""{"template_id":"133218"}""") { null }
+            }
+
+        assertEquals("bridge core unavailable to build KakaoLinkSpec send attachment", error.message)
     }
 
     @Test
@@ -742,6 +753,19 @@ class KakaoLinkSpecSenderTest {
     }
 
     @Test
+    fun `display patch attachment fails closed when bridge core patcher is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                kakaoLinkDisplayPatchAttachment(
+                    committedAttachment = """{"K":{"ti":"133222"}}""",
+                    rawAttachment = """{"template_id":"133218"}""",
+                ) { _, _ -> null }
+            }
+
+        assertEquals("bridge core unavailable to patch KakaoLink display attachment", error.message)
+    }
+
+    @Test
     fun `infers hololive list template args from resolved attachment`() {
         val query =
             buildKakaoLinkV4EncodedQuery(
@@ -827,6 +851,19 @@ class KakaoLinkSpecSenderTest {
         )
         assertEquals("377386", json.getJSONObject("K").getString("ai"))
         assertEquals("4.0", json.getJSONObject("K").getString("lv"))
+    }
+
+    @Test
+    fun `reply leverage attachment merge fails closed when bridge core merger is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                mergeLeverageAttachment(
+                    generatedAttachment = """{"P":{"A":{"code":"signed"}}}""",
+                    rawAttachment = """{"K":{"ti":"121065"}}""",
+                ) { _, _ -> null }
+            }
+
+        assertEquals("bridge core unavailable to merge reply leverage attachment", error.message)
     }
 
     @Test
@@ -957,9 +994,21 @@ class KakaoLinkSpecSenderTest {
 
     @Test
     fun `encrypts Kakao attachment with chat log key derivation`() {
-        val encrypted = KakaoChatLogAttachmentCrypto.encrypt(encType = 31, plaintext = "test", userId = 438562408L)
+        val encrypted =
+            KakaoChatLogAttachmentCrypto.encrypt(
+                encType = 31,
+                plaintext = "test",
+                userId = 438562408L,
+            )
 
         assertEquals("WXFmkb1MZ8akXwAOS8BeOQ==", encrypted)
-        assertEquals("test", KakaoChatLogAttachmentCrypto.decrypt(encType = 31, ciphertext = encrypted, userId = 438562408L))
+        assertEquals(
+            "test",
+            KakaoChatLogAttachmentCrypto.decrypt(
+                encType = 31,
+                ciphertext = encrypted,
+                userId = 438562408L,
+            ),
+        )
     }
 }

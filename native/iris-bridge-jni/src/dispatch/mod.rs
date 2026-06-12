@@ -30,7 +30,8 @@ pub use discovery_hooks::{
 };
 pub use handshake::{dispatch_handshake_on_client_proof, dispatch_handshake_on_hello};
 pub use kakao_link_attachment::{
-    dispatch_kakao_link_attachments_match, dispatch_kakao_link_leverage_encryption_type,
+    dispatch_kakao_chat_log_attachment_crypto, dispatch_kakao_link_attachments_match,
+    dispatch_kakao_link_leverage_encryption_type,
     dispatch_kakao_link_pending_cleanup_attachments_match,
 };
 pub use kakao_link_template::{

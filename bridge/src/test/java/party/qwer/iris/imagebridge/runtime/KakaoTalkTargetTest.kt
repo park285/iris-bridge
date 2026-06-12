@@ -48,11 +48,13 @@ class KakaoTalkTargetTest {
     }
 
     @Test
-    fun `resolve preserves Kotlin fallback when native target policy is unavailable`() {
-        val target = KakaoTalkTarget.resolve("com.kakao.talk.revanced") { null }
+    fun `resolve fails closed when native target policy is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                KakaoTalkTarget.resolve("com.kakao.talk.revanced") { null }
+            }
 
-        assertEquals("com.kakao.talk.revanced", target.packageName)
-        assertEquals("com.kakao.talk", target.dexPackage)
+        assertEquals("bridge core unavailable to resolve KakaoTalk target", error.message)
     }
 
     @Test

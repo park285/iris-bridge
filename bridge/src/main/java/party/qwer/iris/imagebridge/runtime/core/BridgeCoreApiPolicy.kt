@@ -11,12 +11,21 @@ fun BridgeCore.mentionsHashFromJson(mentionsJson: String?): String? {
         }
 }
 
-fun BridgeCore.requestRequiresRequestId(action: String): Boolean {
-    if (!bridgeCoreLoadLibraryOnce()) return true
+fun BridgeCore.requestRequiresRequestId(action: String): Boolean = requestRequiresRequestId(action, ::nativeRequestRequiresRequestId)
+
+internal fun BridgeCore.requestRequiresRequestId(
+    action: String,
+    requestIdPolicy: (String) -> Boolean?,
+): Boolean =
+    requestIdPolicy(action)
+        ?: error("bridge core unavailable to resolve request id requirement")
+
+private fun nativeRequestRequiresRequestId(action: String): Boolean? {
+    if (!bridgeCoreLoadLibraryOnce()) return null
     return runCatching { BridgeCoreJniRequest.nativeRequestRequiresRequestId(action) }
         .getOrElse { error ->
             bridgeCoreLogError("bridge-core request admission threw", error)
-            true
+            null
         }
 }
 
@@ -32,33 +41,64 @@ fun BridgeCore.requestDedupeKey(
         }
 }
 
-fun BridgeCore.isTruthyFlag(raw: String): Boolean {
-    if (!bridgeCoreLoadLibraryOnce()) return false
+fun BridgeCore.isTruthyFlag(raw: String): Boolean = isTruthyFlag(raw, ::nativeIsTruthyFlag)
+
+internal fun BridgeCore.isTruthyFlag(
+    raw: String,
+    flagPolicy: (String) -> Boolean?,
+): Boolean =
+    flagPolicy(raw)
+        ?: error("bridge core unavailable to parse bridge flag")
+
+private fun nativeIsTruthyFlag(raw: String): Boolean? {
+    if (!bridgeCoreLoadLibraryOnce()) return null
     return runCatching { BridgeCoreJniPolicy.nativeIsTruthyFlag(raw) }
         .getOrElse { error ->
             bridgeCoreLogError("bridge-core flag parsing threw", error)
-            false
+            null
         }
 }
 
-fun BridgeCore.normalizeSecurityMode(raw: String?): String {
-    if (!bridgeCoreLoadLibraryOnce()) return "production"
+fun BridgeCore.normalizeSecurityMode(raw: String?): String = normalizeSecurityMode(raw, ::nativeNormalizeSecurityMode)
+
+internal fun BridgeCore.normalizeSecurityMode(
+    raw: String?,
+    modePolicy: (String?) -> String?,
+): String =
+    modePolicy(raw)
+        ?: error("bridge core unavailable to normalize security mode")
+
+private fun nativeNormalizeSecurityMode(raw: String?): String? {
+    if (!bridgeCoreLoadLibraryOnce()) return null
     return runCatching { BridgeCoreJniPolicy.nativeNormalizeSecurityMode(raw) }
         .getOrElse { error ->
             bridgeCoreLogError("bridge-core security mode normalization threw", error)
-            "production"
+            null
         }
 }
 
 fun BridgeCore.allowedPeerUids(
     securityModeRaw: String?,
     extraUidsRaw: String?,
-): IntArray {
-    if (!bridgeCoreLoadLibraryOnce()) return intArrayOf(0)
+): IntArray = allowedPeerUids(securityModeRaw, extraUidsRaw, ::nativeAllowedPeerUids)
+
+internal fun BridgeCore.allowedPeerUids(
+    securityModeRaw: String?,
+    extraUidsRaw: String?,
+    peerUidPolicy: (String?, String?) -> IntArray?,
+): IntArray =
+    peerUidPolicy(securityModeRaw, extraUidsRaw)
+        ?: error("bridge core unavailable to resolve allowed peer uids")
+
+private fun nativeAllowedPeerUids(
+    securityModeRaw: String?,
+    extraUidsRaw: String?,
+): IntArray? {
+    if (!bridgeCoreLoadLibraryOnce()) return null
     return runCatching { BridgeCoreJniPolicy.nativeAllowedPeerUids(securityModeRaw, extraUidsRaw) }
         .getOrElse { error ->
             bridgeCoreLogError("bridge-core peer uid policy threw", error)
-            intArrayOf(0)
+            null
         }
 }
 

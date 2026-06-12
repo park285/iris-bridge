@@ -1,12 +1,19 @@
 package party.qwer.iris.imagebridge.runtime.core
 
-private const val FAILURE_METRIC_BUCKET_SEND_FAILURE = "sendFailure"
+fun BridgeCore.failureMetricBucket(errorCode: String): String = failureMetricBucket(errorCode, ::nativeFailureMetricBucket)
 
-fun BridgeCore.failureMetricBucket(errorCode: String): String {
-    if (!bridgeCoreLoadLibraryOnce()) return FAILURE_METRIC_BUCKET_SEND_FAILURE
+internal fun BridgeCore.failureMetricBucket(
+    errorCode: String,
+    bucketPolicy: (String) -> String?,
+): String =
+    bucketPolicy(errorCode)
+        ?: error("bridge core unavailable to resolve failure metric bucket")
+
+private fun nativeFailureMetricBucket(errorCode: String): String? {
+    if (!bridgeCoreLoadLibraryOnce()) return null
     return runCatching { BridgeCoreJniRequest.nativeFailureMetricBucket(errorCode) }
         .getOrElse { error ->
             bridgeCoreLogError("bridge-core failure metric bucket policy threw", error)
-            FAILURE_METRIC_BUCKET_SEND_FAILURE
+            null
         }
 }

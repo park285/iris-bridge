@@ -19,7 +19,7 @@ internal object KakaoTalkTarget {
     ): KakaoTalkTargetContext {
         nativeResolver(packageName)?.let { return it }
         require(isSupported(packageName)) { "unsupported KakaoTalk package: $packageName" }
-        return KakaoTalkTargetContext(packageName)
+        error("bridge core unavailable to resolve KakaoTalk target")
     }
 
     private fun resolveNativeTarget(packageName: String): KakaoTalkTargetContext? {

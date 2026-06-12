@@ -692,6 +692,15 @@ fn kakao_link_attachment_dispatch_matches_titles_and_rejects_bad_json() {
 }
 
 #[test]
+fn kakao_chat_log_attachment_crypto_dispatch_reports_bad_request_for_unknown_enc_type() {
+    assert_error(
+        &dispatch_kakao_chat_log_attachment_crypto(true, 30, "test", 438_562_408),
+        "BAD_REQUEST",
+        "unsupported Kakao attachment encType=30",
+    );
+}
+
+#[test]
 fn kakao_link_leverage_encryption_type_dispatch_matches_bridge_policy() {
     assert_eq!(
         dispatch_kakao_link_leverage_encryption_type(r#"{"enc":31}"#),

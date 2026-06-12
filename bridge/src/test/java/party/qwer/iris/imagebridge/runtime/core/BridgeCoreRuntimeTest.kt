@@ -22,7 +22,29 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(30, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(31, BridgeCore.EXPECTED_ABI_VERSION)
+    }
+
+    @Test
+    fun `Kakao chat log attachment crypto requires compatible bridge core ABI before native dispatch`() {
+        var nativeCalled = false
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.encryptKakaoChatLogAttachment(
+                    encType = 31,
+                    plaintext = "test",
+                    userId = 438_562_408L,
+                    loadCompatibleCore = { false },
+                    nativeEncrypt = { _, _, _ ->
+                        nativeCalled = true
+                        """{"ok":true,"attachment":"unused"}"""
+                    },
+                )
+            }
+
+        assertFalse(nativeCalled, "native crypto must not run when ABI compatibility is unavailable")
+        assertEquals("bridge core unavailable to encrypt Kakao chat log attachment", error.message)
     }
 
     @Test
@@ -227,6 +249,22 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
+    fun `request id requirement fails closed when native policy is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.requestRequiresRequestId("send_text") { null }
+            }
+
+        assertEquals("bridge core unavailable to resolve request id requirement", error.message)
+    }
+
+    @Test
+    fun `request id requirement injection preserves native policy value`() {
+        assertFalse(BridgeCore.requestRequiresRequestId("health") { false })
+        assertTrue(BridgeCore.requestRequiresRequestId("send_text") { true })
+    }
+
+    @Test
     fun `text request validation dispatch normalizes attachment and rejects invalid combinations`() {
         val runtime =
             assertNotNull(
@@ -341,6 +379,18 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
+    fun `bridge flag truthiness fails closed when native policy is unavailable`() {
+        assertTrue(BridgeCore.isTruthyFlag("true") { true })
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.isTruthyFlag("true") { null }
+            }
+
+        assertEquals("bridge core unavailable to parse bridge flag", error.message)
+    }
+
+    @Test
     fun `security mode normalization dispatch returns canonical core raw values`() {
         assertEquals("production", BridgeCore.normalizeSecurityMode(null))
         assertEquals("production", BridgeCore.normalizeSecurityMode("unknown"))
@@ -359,14 +409,162 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
-    fun `server restart delay fails closed to max delay when native policy is unavailable`() {
+    fun `security mode normalization fails closed when native policy is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.normalizeSecurityMode(raw = "development") { null }
+            }
+
+        assertEquals("bridge core unavailable to normalize security mode", error.message)
+    }
+
+    @Test
+    fun `allowed peer uid dispatch fails closed when native policy is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.allowedPeerUids(
+                    securityModeRaw = "production",
+                    extraUidsRaw = null,
+                    peerUidPolicy = { _, _ -> null },
+                )
+            }
+
+        assertEquals("bridge core unavailable to resolve allowed peer uids", error.message)
+    }
+
+    @Test
+    fun `server restart delay fails closed when native policy is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.serverRestartDelayMs(
+                    failureCount = 2,
+                    restartDelayPolicy = { null },
+                )
+            }
+
+        assertEquals("bridge core unavailable to resolve restart delay", error.message)
+    }
+
+    @Test
+    fun `KakaoLink leverage encryption type fails closed when native policy is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.kakaoLinkLeverageEncryptionType(
+                    value = """{"enc":42}""",
+                    encryptionTypePolicy = { null },
+                )
+            }
+
+        assertEquals("bridge core unavailable to resolve KakaoLink leverage encryption type", error.message)
+    }
+
+    @Test
+    fun `KakaoLink template boolean policy fails closed when native policy is unavailable`() {
+        assertTrue(BridgeCore.hasKakaoLinkExplicitTemplateArgs("""{"template_args":{}}""") { true })
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.hasKakaoLinkExplicitTemplateArgs("""{"template_args":{}}""") { null }
+            }
+
+        assertEquals("bridge core unavailable to evaluate KakaoLink explicit template args", error.message)
+    }
+
+    @Test
+    fun `KakaoLink attachment match policy fails closed when native policy is unavailable`() {
+        assertFalse(BridgeCore.matchKakaoLinkAttachments("expected", "committed") { _, _ -> false })
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.matchKakaoLinkAttachments("expected", "committed") { _, _ -> null }
+            }
+
+        assertEquals("bridge core unavailable to match KakaoLink attachments", error.message)
+    }
+
+    @Test
+    fun `server restart delay dispatch preserves backoff policy`() {
+        assertEquals(1_000L, BridgeCore.serverRestartDelayMs(0))
+        assertEquals(1_000L, BridgeCore.serverRestartDelayMs(-3))
+        assertEquals(1_000L, BridgeCore.serverRestartDelayMs(1))
+        assertEquals(2_000L, BridgeCore.serverRestartDelayMs(2))
+        assertEquals(4_000L, BridgeCore.serverRestartDelayMs(3))
+        assertEquals(30_000L, BridgeCore.serverRestartDelayMs(99))
+    }
+
+    @Test
+    fun `server restart delay injection preserves native policy value`() {
         assertEquals(
-            30_000L,
+            2_000L,
             BridgeCore.serverRestartDelayMs(
                 failureCount = 2,
-                restartDelayPolicy = { null },
+                restartDelayPolicy = { 2_000L },
             ),
         )
+    }
+
+    @Test
+    fun `failure metric bucket fails closed when native policy is unavailable`() {
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.failureMetricBucket(
+                    errorCode = ImageBridgeProtocol.ERROR_SEND_FAILED,
+                    bucketPolicy = { null },
+                )
+            }
+
+        assertEquals("bridge core unavailable to resolve failure metric bucket", error.message)
+    }
+
+    @Test
+    fun `failure metric bucket injection preserves native policy value`() {
+        assertEquals(
+            "timeout",
+            BridgeCore.failureMetricBucket(
+                errorCode = ImageBridgeProtocol.ERROR_TIMEOUT,
+                bucketPolicy = { "timeout" },
+            ),
+        )
+    }
+
+    @Test
+    fun `member role code policy distinguishes no match from unavailable core`() {
+        assertNull(BridgeCore.memberFieldParseRoleCodeFromString("guest") { -1 })
+        assertEquals(4, BridgeCore.memberFieldParseRoleCodeFromString("manager") { 4 })
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.memberFieldParseRoleCodeFromString("manager") { null }
+            }
+
+        assertEquals("bridge core unavailable to parse member role code", error.message)
+    }
+
+    @Test
+    fun `member boolean policy fails closed when native policy is unavailable`() {
+        assertTrue(BridgeCore.memberFieldLooksLikeNickname("Alice") { true })
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.memberFieldLooksLikeNickname("Alice") { null }
+            }
+
+        assertEquals("bridge core unavailable to evaluate member nickname policy", error.message)
+    }
+
+    @Test
+    fun `member score policy fails closed when native policy is unavailable`() {
+        assertEquals(
+            25,
+            BridgeCore.memberFieldPathHintScore("$.members.nickname", setOf("nickname"), emptySet()) { _, _, _ -> 25 },
+        )
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                BridgeCore.memberFieldPathHintScore("$.members.nickname", setOf("nickname"), emptySet()) { _, _, _ -> null }
+            }
+
+        assertEquals("bridge core unavailable to score member field path", error.message)
     }
 
     @Test
@@ -501,6 +699,26 @@ class BridgeCoreRuntimeTest {
         assertEquals(31, BridgeCore.kakaoLinkLeverageEncryptionType("""{"enc":"42"}"""))
         assertEquals(31, BridgeCore.kakaoLinkLeverageEncryptionType("""{"enc":-1}"""))
         assertEquals(31, BridgeCore.kakaoLinkLeverageEncryptionType("not-json"))
+    }
+
+    @Test
+    fun `Kakao chat log attachment crypto dispatch preserves legacy golden vector`() {
+        val encrypted =
+            BridgeCore.encryptKakaoChatLogAttachment(
+                encType = 31,
+                plaintext = "test",
+                userId = 438_562_408L,
+            )
+
+        assertEquals("WXFmkb1MZ8akXwAOS8BeOQ==", encrypted)
+        assertEquals(
+            "test",
+            BridgeCore.decryptKakaoChatLogAttachment(
+                encType = 31,
+                ciphertext = encrypted,
+                userId = 438_562_408L,
+            ),
+        )
     }
 
     @Test

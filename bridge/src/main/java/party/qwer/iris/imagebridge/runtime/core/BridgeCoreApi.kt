@@ -53,17 +53,22 @@ fun BridgeCore.replyHookVerify(
     }
 }
 
+internal fun bridgeCoreLoadCompatibleLibraryOnce(): Boolean {
+    if (!bridgeCoreLoadLibraryOnce()) return false
+    val abiVersion = runCatching { BridgeCoreJniContext.nativeAbiVersion() }.getOrNull()
+    if (abiVersion != BridgeCore.EXPECTED_ABI_VERSION) {
+        bridgeCoreLogError("bridge-core ABI mismatch: expected ${BridgeCore.EXPECTED_ABI_VERSION}, got $abiVersion")
+        return false
+    }
+    return true
+}
+
 fun BridgeCore.loadOrNull(
     securityMode: String?,
     bridgeToken: String,
     requireHandshakeRaw: String?,
 ): BridgeCoreRuntime? {
-    if (!bridgeCoreLoadLibraryOnce()) return null
-    val abiVersion = runCatching { BridgeCoreJniContext.nativeAbiVersion() }.getOrNull()
-    if (abiVersion != EXPECTED_ABI_VERSION) {
-        bridgeCoreLogError("bridge-core ABI mismatch: expected $EXPECTED_ABI_VERSION, got $abiVersion")
-        return null
-    }
+    if (!bridgeCoreLoadCompatibleLibraryOnce()) return null
     val handle =
         runCatching { BridgeCoreJniContext.nativeCreateContext(securityMode, bridgeToken, requireHandshakeRaw) }
             .getOrElse { error ->
@@ -75,6 +80,6 @@ fun BridgeCore.loadOrNull(
         return null
     }
     val requireHandshake = runCatching { BridgeCoreJniContext.nativeRequireHandshake(handle) }.getOrDefault(true)
-    bridgeCoreLogInfo("bridge-core abi=$abiVersion loaded")
+    bridgeCoreLogInfo("bridge-core abi=$EXPECTED_ABI_VERSION loaded")
     return BridgeCoreRuntime(handle = handle, requireHandshake = requireHandshake)
 }

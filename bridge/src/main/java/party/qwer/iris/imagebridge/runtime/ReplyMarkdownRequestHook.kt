@@ -94,7 +94,20 @@ private fun injectLeverageAttachment(
 internal fun mergeLeverageAttachment(
     generatedAttachment: String?,
     rawAttachment: String,
-): String = BridgeCore.mergeReplyLeverageAttachment(generatedAttachment, rawAttachment) ?: rawAttachment
+): String =
+    mergeLeverageAttachment(
+        generatedAttachment,
+        rawAttachment,
+        BridgeCore::mergeReplyLeverageAttachment,
+    )
+
+internal fun mergeLeverageAttachment(
+    generatedAttachment: String?,
+    rawAttachment: String,
+    mergeAttachment: (String?, String) -> String?,
+): String =
+    mergeAttachment(generatedAttachment, rawAttachment)
+        ?: error("bridge core unavailable to merge reply leverage attachment")
 
 private fun injectMentionAttachment(
     tag: String,

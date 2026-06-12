@@ -1,6 +1,37 @@
 package party.qwer.iris.imagebridge.runtime.core
 
 internal object BridgeCoreJniKakaoLink {
+    internal fun encryptKakaoChatLogAttachmentEnvelope(
+        encType: Int,
+        plaintext: String,
+        userId: Long,
+    ): String =
+        nativeKakaoChatLogAttachmentCrypto(
+            encrypt = true,
+            encType = encType,
+            payload = plaintext,
+            userId = userId,
+        )
+
+    internal fun decryptKakaoChatLogAttachmentEnvelope(
+        encType: Int,
+        ciphertext: String,
+        userId: Long,
+    ): String =
+        nativeKakaoChatLogAttachmentCrypto(
+            encrypt = false,
+            encType = encType,
+            payload = ciphertext,
+            userId = userId,
+        )
+
+    private external fun nativeKakaoChatLogAttachmentCrypto(
+        encrypt: Boolean,
+        encType: Int,
+        payload: String,
+        userId: Long,
+    ): String
+
     external fun nativeKakaoLinkAttachmentsMatch(
         expectedRawAttachment: String,
         committedRawAttachment: String,
