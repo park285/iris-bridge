@@ -90,3 +90,4 @@ docs/closeout-*.tar.gz
 
 # Generated bridge jniLibs
 /bridge/src/main/jniLibs/
+artifacts/perf/
