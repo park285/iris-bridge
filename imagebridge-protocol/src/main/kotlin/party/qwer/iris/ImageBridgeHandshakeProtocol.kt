@@ -21,6 +21,7 @@ object ImageBridgeHandshakeProtocol {
     private const val CLIENT_DOMAIN = "iris-bridge-client"
     private const val HMAC_SHA256 = "HmacSHA256"
     private const val NONCE_BYTES = 32
+    private const val FIXTURE_ONLY_DEPRECATION = "Fixture only; production handshake proof policy is owned by iris-bridge-core."
     private val secureRandom = SecureRandom()
     private val json =
         Json {
@@ -42,6 +43,8 @@ object ImageBridgeHandshakeProtocol {
             timestampMs = timestampMs,
         )
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
+    @Suppress("DEPRECATION_ERROR")
     fun buildServerProof(
         bridgeToken: String,
         clientNonce: String,
@@ -55,6 +58,8 @@ object ImageBridgeHandshakeProtocol {
             proof = serverProof(bridgeToken, clientNonce, serverNonce, socketName),
         )
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
+    @Suppress("DEPRECATION_ERROR")
     fun buildClientProof(
         bridgeToken: String,
         clientNonce: String,
@@ -66,12 +71,14 @@ object ImageBridgeHandshakeProtocol {
             proof = clientProof(bridgeToken, clientNonce, serverNonce),
         )
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
     fun newNonce(): String {
         val bytes = ByteArray(NONCE_BYTES)
         secureRandom.nextBytes(bytes)
         return bytes.toHex()
     }
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
     fun serverProof(
         bridgeToken: String,
         clientNonce: String,
@@ -79,12 +86,14 @@ object ImageBridgeHandshakeProtocol {
         socketName: String,
     ): String = hmacHex(bridgeToken, SERVER_DOMAIN, clientNonce, serverNonce, socketName)
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
     fun clientProof(
         bridgeToken: String,
         clientNonce: String,
         serverNonce: String,
     ): String = hmacHex(bridgeToken, CLIENT_DOMAIN, clientNonce, serverNonce)
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
     fun proofMatches(
         actual: String?,
         expected: String,

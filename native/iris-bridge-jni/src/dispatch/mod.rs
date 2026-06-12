@@ -10,6 +10,7 @@ mod kakao_target;
 mod lease;
 mod member_field_checks;
 mod mentions_hash;
+mod protocol_contract;
 mod reply_attachment_text;
 mod reply_hook;
 mod reply_leverage_attachment;
@@ -72,6 +73,7 @@ pub use envelope::DispatchResult;
 use envelope::bad_request;
 pub use envelope::{invalid_handle_envelope, json_catch_unwind};
 pub use mentions_hash::{dispatch_mentions_hash_from_attachment, dispatch_mentions_hash_from_json};
+pub use protocol_contract::dispatch_bridge_protocol_contract_json;
 pub use reply_mention_attachment::{
     dispatch_merge_reply_mention_attachment, dispatch_reply_mention_attachment_or_null,
 };

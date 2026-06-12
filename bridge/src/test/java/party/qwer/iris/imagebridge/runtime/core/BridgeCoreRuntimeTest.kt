@@ -3,11 +3,12 @@
 package party.qwer.iris.imagebridge.runtime.core
 
 import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.BridgeHandshakeTestFixtures
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.assertEquals
@@ -21,7 +22,17 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(29, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(30, BridgeCore.EXPECTED_ABI_VERSION)
+    }
+
+    @Test
+    fun `protocol contract dispatch returns Rust contract JSON`() {
+        val contractJson = assertNotNull(BridgeCore.protocolContractJson())
+        val contract = JSONObject(contractJson)
+
+        assertEquals(ImageBridgeProtocol.PROTOCOL_VERSION, contract.getInt("protocolVersion"))
+        assertEquals(ImageBridgeProtocol.MAX_FRAME_SIZE, contract.getInt("maxFrameSize"))
+        assertEquals(ImageBridgeProtocol.ACTION_SEND_TEXT, contract.getJSONArray("actions").getJSONObject(1).getString("wireName"))
     }
 
     @Test
@@ -539,7 +550,7 @@ class BridgeCoreRuntimeTest {
             val serverFrameJson = assertNotNull(helloEnvelope.string("frameJson"))
             val serverNonce = assertNotNull(BridgeCoreEnvelope.parse(serverFrameJson).string("serverNonce"))
             val proof =
-                ImageBridgeHandshakeProtocol.clientProof(
+                BridgeHandshakeTestFixtures.clientProof(
                     bridgeToken = "bridge-token",
                     clientNonce = "client-nonce",
                     serverNonce = serverNonce,

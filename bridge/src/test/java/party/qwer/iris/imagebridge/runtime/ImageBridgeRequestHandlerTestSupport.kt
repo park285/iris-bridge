@@ -56,7 +56,7 @@ internal fun signedImageLease(
     lastModifiedEpochMs: Long = fileLastModifiedOrFixture(canonicalPath),
     nonce: String = "$requestId:$imageIndex",
 ): SignedImageLease =
-    ImageLease.issue(
+    BridgeImageLeaseTestFixtures.issue(
         secret,
         ImageLeasePayload(
             version = ImageLease.VERSION,

@@ -25,16 +25,14 @@ data class SignedImageLease(
     val signature: String,
 )
 
-// Lease verification/expiry는 iris-bridge-core(server/lease_verdict.rs)가 단일 소스다.
-// 여기 남은 sign/issue/canonicalJson은 bridge 테스트가 verifier 입력으로 쓸 유효 서명
-// lease를 만들기 위한 fixture 경로 — bridge에는 lease 서명용 native 진입점이 없고
-// (JNI export는 verify만), 알고리즘 parity는 native/iris-bridge-core/src/lease.rs가 보증한다.
 object ImageLease {
     const val VERSION = 1
 
     private const val HMAC_SHA256 = "HmacSHA256"
+    private const val FIXTURE_ONLY_DEPRECATION = "Fixture only; production lease policy is owned by iris-bridge-core."
     private val HEX_DIGITS = "0123456789abcdef".toCharArray()
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
     fun canonicalJson(payload: ImageLeasePayload): String {
         val out = StringBuilder()
         out.append('{')
@@ -53,6 +51,8 @@ object ImageLease {
         return out.toString()
     }
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
+    @Suppress("DEPRECATION_ERROR")
     fun sign(
         secret: String,
         payload: ImageLeasePayload,
@@ -62,6 +62,8 @@ object ImageLease {
         return mac.doFinal(canonicalJson(payload).toByteArray(Charsets.UTF_8)).toHex()
     }
 
+    @Deprecated(FIXTURE_ONLY_DEPRECATION, level = DeprecationLevel.ERROR)
+    @Suppress("DEPRECATION_ERROR")
     fun issue(
         secret: String,
         payload: ImageLeasePayload,

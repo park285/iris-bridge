@@ -32,22 +32,22 @@ class ImageBridgeProtocolTest {
     @Test
     fun `handshake proof uses separate server and client domains`() {
         val serverProof =
-            ImageBridgeHandshakeProtocol.serverProof(
+            HandshakeProofTestFixtures.serverProof(
                 bridgeToken = "bridge-token",
                 clientNonce = "client-nonce",
                 serverNonce = "server-nonce",
                 socketName = "iris-image-bridge-mux",
             )
         val clientProof =
-            ImageBridgeHandshakeProtocol.clientProof(
+            HandshakeProofTestFixtures.clientProof(
                 bridgeToken = "bridge-token",
                 clientNonce = "client-nonce",
                 serverNonce = "server-nonce",
             )
 
         assertNotEquals(serverProof, clientProof)
-        assertTrue(ImageBridgeHandshakeProtocol.proofMatches(serverProof, serverProof))
-        assertFalse(ImageBridgeHandshakeProtocol.proofMatches(clientProof, serverProof))
+        assertTrue(HandshakeProofTestFixtures.proofMatches(serverProof, serverProof))
+        assertFalse(HandshakeProofTestFixtures.proofMatches(clientProof, serverProof))
     }
 
     @Test

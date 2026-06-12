@@ -46,6 +46,18 @@ fn assert_error(raw: &str, error_code: &str, error: &str) {
     assert_eq!(envelope["error"], error);
 }
 
+#[test]
+fn protocol_contract_dispatch_returns_core_contract_json() {
+    let envelope = assert_ok(&dispatch_bridge_protocol_contract_json());
+    let contract_json = envelope["contractJson"]
+        .as_str()
+        .expect("contractJson string");
+    assert_eq!(
+        contract_json,
+        iris_bridge_core::protocol::bridge_protocol_contract_json()
+    );
+}
+
 fn lease_payload(expires_at_epoch_ms: i64) -> ImageLeasePayload {
     ImageLeasePayload {
         version: 1,

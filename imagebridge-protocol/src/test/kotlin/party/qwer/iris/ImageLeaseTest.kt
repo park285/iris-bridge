@@ -49,13 +49,13 @@ class ImageLeaseTest {
 
     @Test
     fun `canonical json matches the cross-language golden`() {
-        assertEquals(goldenCanonicalJson, ImageLease.canonicalJson(goldenPayload()))
+        assertEquals(goldenCanonicalJson, ImageLeaseTestFixtures.canonicalJson(goldenPayload()))
     }
 
     @Test
     fun `canonical json escapes strings with json rules`() {
         val payload = goldenPayload().copy(canonicalPath = "/a/\"b\"\\c\n\t")
-        val canonical = ImageLease.canonicalJson(payload)
+        val canonical = ImageLeaseTestFixtures.canonicalJson(payload)
         assertTrue(
             canonical.contains("\"canonicalPath\":\"/a/\\\"b\\\"\\\\c\\n\\t\""),
             "string fields must use standard JSON escaping: $canonical",
@@ -64,12 +64,12 @@ class ImageLeaseTest {
 
     @Test
     fun `signature matches the cross-language golden`() {
-        assertEquals(goldenSignature, ImageLease.sign(secret, goldenPayload()))
+        assertEquals(goldenSignature, ImageLeaseTestFixtures.sign(secret, goldenPayload()))
     }
 
     @Test
     fun `issued lease binds the canonical signature`() {
-        val lease = ImageLease.issue(secret, goldenPayload())
+        val lease = ImageLeaseTestFixtures.issue(secret, goldenPayload())
         assertEquals(goldenPayload(), lease.payload)
         assertEquals(goldenSignature, lease.signature)
     }
@@ -78,6 +78,6 @@ class ImageLeaseTest {
     fun `distinct nonces produce distinct signatures`() {
         val first = goldenPayload().copy(nonce = "nonce-1")
         val second = goldenPayload().copy(nonce = "nonce-2")
-        assertFalse(ImageLease.sign(secret, first) == ImageLease.sign(secret, second))
+        assertFalse(ImageLeaseTestFixtures.sign(secret, first) == ImageLeaseTestFixtures.sign(secret, second))
     }
 }

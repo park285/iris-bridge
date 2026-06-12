@@ -130,7 +130,7 @@ class BridgeSecurityTest {
             val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
             val outcome =
                 driveHandshake(authenticator, clientNonce = "client-nonce") { serverNonce ->
-                    ImageBridgeHandshakeProtocol.buildClientProof(
+                    BridgeHandshakeTestFixtures.buildClientProof(
                         bridgeToken = "bridge-token",
                         clientNonce = "client-nonce",
                         serverNonce = serverNonce,
@@ -154,7 +154,7 @@ class BridgeSecurityTest {
             val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
             val outcome =
                 driveHandshake(authenticator, clientNonce = "client-nonce") { serverNonce ->
-                    ImageBridgeHandshakeProtocol.buildClientProof(
+                    BridgeHandshakeTestFixtures.buildClientProof(
                         bridgeToken = "bridge-token",
                         clientNonce = "client-nonce",
                         serverNonce = serverNonce,
@@ -165,7 +165,7 @@ class BridgeSecurityTest {
             val serverProofFrame = assertNotNull(outcome.serverProofFrame)
             val serverNonce = assertNotNull(serverProofFrame.serverNonce)
             assertEquals(
-                ImageBridgeHandshakeProtocol.serverProof(
+                BridgeHandshakeTestFixtures.serverProof(
                     bridgeToken = "bridge-token",
                     clientNonce = "client-nonce",
                     serverNonce = serverNonce,
@@ -186,7 +186,7 @@ class BridgeSecurityTest {
             val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
             val outcome =
                 driveHandshake(authenticator, clientNonce = "client-nonce") { serverNonce ->
-                    ImageBridgeHandshakeProtocol.buildClientProof(
+                    BridgeHandshakeTestFixtures.buildClientProof(
                         bridgeToken = "wrong-token",
                         clientNonce = "client-nonce",
                         serverNonce = serverNonce,
