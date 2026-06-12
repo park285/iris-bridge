@@ -38,7 +38,7 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJ
     })
 }
 
-fn read_crypto_direction(value: jboolean) -> Option<bool> {
+const fn read_crypto_direction(value: jboolean) -> Option<bool> {
     match value {
         0 => Some(false),
         1 => Some(true),
