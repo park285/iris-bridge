@@ -522,6 +522,44 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
+    fun `reply pending context dispatch returns null for native rejection envelopes`() {
+        val rejection = """{"ok":false,"errorCode":"BAD_REQUEST","error":"reply pending context snapshot missing"}"""
+
+        assertNull(
+            BridgeCore.replyMarkdownPendingContextJson(
+                requestJson = "{}",
+                loadCompatibleCore = { true },
+                nativePendingContext = { rejection },
+            ),
+        )
+        assertNull(
+            BridgeCore.replyMentionPendingContextJson(
+                requestJson = "{}",
+                loadCompatibleCore = { true },
+                nativePendingContext = { rejection },
+            ),
+        )
+    }
+
+    @Test
+    fun `reply pending context dispatch returns null for malformed native envelopes`() {
+        assertNull(
+            BridgeCore.replyMarkdownPendingContextJson(
+                requestJson = "{}",
+                loadCompatibleCore = { true },
+                nativePendingContext = { "not-json" },
+            ),
+        )
+        assertNull(
+            BridgeCore.replyMentionPendingContextJson(
+                requestJson = "{}",
+                loadCompatibleCore = { true },
+                nativePendingContext = { "not-json" },
+            ),
+        )
+    }
+
+    @Test
     fun `image path validation dispatch rejects static path policy violations`() {
         val runtime =
             assertNotNull(

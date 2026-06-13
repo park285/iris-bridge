@@ -30,10 +30,11 @@ private fun replyPendingContextJson(
             return null
         }
     if (!envelope.optBoolean("ok", false)) {
-        throw IllegalArgumentException(
+        val message =
             envelope.optString("error").takeIf { it.isNotEmpty() }
-                ?: "bridge core rejected reply pending context request",
-        )
+                ?: "bridge core rejected reply pending context request"
+        bridgeCoreLogError("bridge-core reply pending context policy rejected: $message")
+        return null
     }
     return envelope.optJSONObject("context")
 }
