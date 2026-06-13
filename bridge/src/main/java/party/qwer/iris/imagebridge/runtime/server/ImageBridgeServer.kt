@@ -41,6 +41,7 @@ internal class ImageBridgeServer(
         newBridgeMuxClientDispatcher(
             { clientExecutor },
             { requestHandler },
+            { bridgeCore },
             { running.get() },
             peerIdentityValidator,
             bridgeMetrics,

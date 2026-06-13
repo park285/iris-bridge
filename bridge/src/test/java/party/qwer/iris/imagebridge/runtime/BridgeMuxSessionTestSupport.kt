@@ -4,6 +4,11 @@ package party.qwer.iris.imagebridge.runtime
 
 import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreMuxSession
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
+import party.qwer.iris.imagebridge.runtime.server.BRIDGE_MUX_DEFAULT_MAX_IN_FLIGHT
 import party.qwer.iris.imagebridge.runtime.server.BridgeMuxSocket
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -19,6 +24,36 @@ internal fun muxFrames(vararg frames: ImageBridgeMuxFrame): ByteArray =
         .also { output ->
             frames.forEach { frame -> ImageBridgeMuxProtocol.writeFrame(output, frame) }
         }.toByteArray()
+
+internal class TestBridgeCoreMuxSession(
+    val session: BridgeCoreMuxSession,
+    private val runtime: BridgeCoreRuntime,
+) : AutoCloseable {
+    override fun close() {
+        session.close()
+        runtime.close()
+    }
+}
+
+internal fun bridgeTestCoreRuntime(): BridgeCoreRuntime =
+    checkNotNull(
+        BridgeCore.loadOrNull(
+            securityMode = "development",
+            bridgeToken = "bridge-token",
+            requireHandshakeRaw = "false",
+        ),
+    ) {
+        "bridge-core host runtime unavailable"
+    }
+
+internal fun bridgeTestMuxSession(maxInFlight: Int = BRIDGE_MUX_DEFAULT_MAX_IN_FLIGHT): TestBridgeCoreMuxSession {
+    val runtime = bridgeTestCoreRuntime()
+    val session =
+        checkNotNull(runtime.createMuxSession(maxInFlight)) {
+            "bridge-core mux session unavailable"
+        }
+    return TestBridgeCoreMuxSession(session, runtime)
+}
 
 internal class FakeBridgeMuxSocket(
     input: ByteArray,
@@ -188,4 +223,6 @@ internal class QueuedExecutorService : AbstractExecutorService() {
     fun runNext() {
         tasks.removeFirst().run()
     }
+
+    fun hasPendingTasks(): Boolean = tasks.isNotEmpty()
 }

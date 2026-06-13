@@ -2,12 +2,15 @@
 
 package party.qwer.iris.imagebridge.runtime
 
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import party.qwer.iris.imagebridge.runtime.server.BoundedBridgeSessionAdmission
 import party.qwer.iris.imagebridge.runtime.server.BridgeMetrics
 import party.qwer.iris.imagebridge.runtime.server.BridgeMuxClientDispatcher
@@ -27,6 +30,18 @@ import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 class BridgeMuxClientDispatcherAdmissionTest {
+    private lateinit var bridgeCore: BridgeCoreRuntime
+
+    @Before
+    fun setUpBridgeCore() {
+        bridgeCore = bridgeTestCoreRuntime()
+    }
+
+    @After
+    fun closeBridgeCore() {
+        bridgeCore.close()
+    }
+
     @Test
     fun `bounded admission accepts within cap and rejects beyond cap`() {
         val cap = 2
@@ -145,6 +160,7 @@ class BridgeMuxClientDispatcherAdmissionTest {
                     handshakeValidator = developmentHandshakeValidator(),
                 )
             },
+            bridgeCoreProvider = { bridgeCore },
             isRunning = { true },
             peerIdentityValidator = BridgePeerIdentityValidator(allowedUids = setOf(0)),
             metrics = metrics,

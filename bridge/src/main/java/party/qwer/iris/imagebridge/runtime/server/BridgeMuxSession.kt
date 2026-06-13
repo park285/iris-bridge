@@ -6,23 +6,26 @@ import party.qwer.iris.FrameReadTimeoutException
 import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreMuxCommand
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreMuxSession
+import party.qwer.iris.imagebridge.runtime.core.muxCommand
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
+
+internal const val BRIDGE_MUX_DEFAULT_MAX_IN_FLIGHT = 4
 
 internal class BridgeMuxSession(
     private val client: BridgeMuxSocket,
+    private val muxSession: BridgeCoreMuxSession,
     private val executor: ExecutorService,
     private val handler: ImageBridgeRequestHandler,
     private val isRunning: () -> Boolean,
     private val metrics: BridgeMetrics,
-    private val maxInFlight: Int = DEFAULT_MAX_IN_FLIGHT,
     private val logError: (String, String, Throwable) -> Unit = { tag, message, error -> Log.e(tag, message, error) },
 ) {
     private val closed = AtomicBoolean(false)
-    private val inFlight = AtomicInteger(0)
     private val activeRequests = ConcurrentHashMap<String, ActiveMuxRequest>()
     private val writeLock = Any()
     private val writer = BridgeMuxSessionWriter(client, writeLock, ::close, metrics)
@@ -32,18 +35,8 @@ internal class BridgeMuxSession(
         try {
             while (isRunning() && !closed.get()) {
                 val frame = ImageBridgeMuxProtocol.readFrame(client.inputStream)
-                when (frame.type) {
-                    ImageBridgeMuxProtocol.TYPE_REQUEST -> dispatchRequest(frame)
-                    ImageBridgeMuxProtocol.TYPE_PING ->
-                        writer.writeFrame(
-                            ImageBridgeMuxFrame(
-                                type = ImageBridgeMuxProtocol.TYPE_PONG,
-                                correlationId = frame.correlationId,
-                            ),
-                        )
-                    ImageBridgeMuxProtocol.TYPE_CANCEL -> handleCancel(frame.correlationId)
-                    else -> writer.writeProtocolFailure(frame.correlationId, "unsupported mux frame type: ${frame.type}")
-                }
+                val command = muxSession.onFrame(frame.muxSummaryJson()).muxCommand()
+                handleMuxCommand(frame, command)
             }
         } catch (error: Exception) {
             if (!closed.get() && isRunning() && !error.isMuxIdleTimeout()) {
@@ -55,44 +48,49 @@ internal class BridgeMuxSession(
         }
     }
 
-    private fun dispatchRequest(frame: ImageBridgeMuxFrame) {
-        val correlationId = frame.correlationId
-        val request = frame.request
-        if (correlationId.isNullOrBlank() || request == null) {
-            writer.writeProtocolFailure(correlationId, "malformed mux request frame")
-            return
+    private fun handleMuxCommand(
+        frame: ImageBridgeMuxFrame,
+        command: BridgeCoreMuxCommand?,
+    ) {
+        when (command) {
+            is BridgeCoreMuxCommand.Dispatch -> dispatchRequest(frame, command.correlationId)
+            is BridgeCoreMuxCommand.WritePong ->
+                writer.writeFrame(
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_PONG,
+                        correlationId = command.correlationId,
+                    ),
+                )
+            is BridgeCoreMuxCommand.WriteBadRequest -> writer.writeProtocolFailure(command.correlationId, command.message)
+            is BridgeCoreMuxCommand.WriteBusy -> writeBusyResponse(command.correlationId, frame.request?.requestId)
+            is BridgeCoreMuxCommand.MarkCancelled -> handleCancel(command.correlationId)
+            BridgeCoreMuxCommand.Close -> close()
+            BridgeCoreMuxCommand.Ignore -> Unit
+            null -> closeForMuxStateMismatch("bridge mux core returned invalid command")
         }
-        if (inFlight.incrementAndGet() > maxInFlight) {
-            inFlight.decrementAndGet()
-            metrics.recordBridgeBusy()
-            writer.writeResponse(
-                correlationId,
-                bridgeFailureResponse(
-                    error = "bridge busy",
-                    errorCode = ImageBridgeProtocol.ERROR_BRIDGE_BUSY,
-                    requestId = request.requestId,
-                ),
-            )
+    }
+
+    private fun dispatchRequest(
+        frame: ImageBridgeMuxFrame,
+        correlationId: String,
+    ) {
+        val request = frame.request
+        if (request == null || frame.correlationId != correlationId) {
+            closeForMuxStateMismatch("bridge mux request state diverged")
             return
         }
         val active = ActiveMuxRequest(correlationId, request)
-        activeRequests[correlationId] = active
+        if (activeRequests.putIfAbsent(correlationId, active) != null) {
+            closeForMuxStateMismatch("bridge mux duplicate active request escaped core")
+            return
+        }
         try {
             executor.execute {
                 handleAcceptedRequest(active)
             }
         } catch (error: RejectedExecutionException) {
-            inFlight.decrementAndGet()
             activeRequests.remove(correlationId)
-            metrics.recordBridgeBusy()
-            writer.writeResponse(
-                correlationId,
-                bridgeFailureResponse(
-                    error = "bridge busy",
-                    errorCode = ImageBridgeProtocol.ERROR_BRIDGE_BUSY,
-                    requestId = request.requestId,
-                ),
-            )
+            handleExecutorRejected(correlationId, request.requestId)
         }
     }
 
@@ -104,16 +102,46 @@ internal class BridgeMuxSession(
             }
             writeResponseOrClose(active, handleRequestSafely(active.request))
         } finally {
+            val completed = muxSession.onRequestCompleted(active.correlationId)
+            if (!completed.isOk && !closed.get()) {
+                closeForMuxStateMismatch("bridge mux completion rejected by core")
+            }
             activeRequests.remove(active.correlationId)
-            inFlight.decrementAndGet()
         }
     }
 
-    private fun handleCancel(correlationId: String?) {
-        if (correlationId.isNullOrBlank()) return
-        val active = activeRequests[correlationId] ?: return
+    private fun handleCancel(correlationId: String) {
+        val active =
+            activeRequests[correlationId]
+                ?: return closeForMuxStateMismatch("bridge mux cancel state diverged")
         active.cancelled.set(true)
         metrics.recordMuxRequestCancelled()
+    }
+
+    private fun handleExecutorRejected(
+        correlationId: String,
+        requestId: String?,
+    ) {
+        when (val command = muxSession.onExecutorRejected(correlationId).muxCommand()) {
+            is BridgeCoreMuxCommand.WriteBusy -> writeBusyResponse(command.correlationId, requestId)
+            BridgeCoreMuxCommand.Ignore -> Unit
+            else -> closeForMuxStateMismatch("bridge mux executor rejection diverged")
+        }
+    }
+
+    private fun writeBusyResponse(
+        correlationId: String,
+        requestId: String?,
+    ) {
+        metrics.recordBridgeBusy()
+        writer.writeResponse(
+            correlationId,
+            bridgeFailureResponse(
+                error = "bridge busy",
+                errorCode = ImageBridgeProtocol.ERROR_BRIDGE_BUSY,
+                requestId = requestId,
+            ),
+        )
     }
 
     private fun handleRequestSafely(
@@ -149,14 +177,21 @@ internal class BridgeMuxSession(
 
     fun close() {
         if (!closed.compareAndSet(false, true)) return
+        runCatching { muxSession.close() }
         runCatching { client.close() }
+    }
+
+    private fun closeForMuxStateMismatch(message: String) {
+        if (!closed.get() && isRunning()) {
+            logError(TAG, message, IllegalStateException(message))
+        }
+        close()
     }
 
     private fun Throwable.isMuxIdleTimeout(): Boolean = this is FrameReadTimeoutException && stage == FrameReadStage.LENGTH && bytesRead == 0
 
     private companion object {
         private const val TAG = "IrisBridge"
-        private const val DEFAULT_MAX_IN_FLIGHT = 4
     }
 }
 

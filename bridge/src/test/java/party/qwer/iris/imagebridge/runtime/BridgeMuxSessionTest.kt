@@ -5,11 +5,14 @@ package party.qwer.iris.imagebridge.runtime
 import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.imagebridge.runtime.server.BRIDGE_MUX_DEFAULT_MAX_IN_FLIGHT
 import party.qwer.iris.imagebridge.runtime.server.BridgeMetrics
 import party.qwer.iris.imagebridge.runtime.server.BridgeMuxSession
+import party.qwer.iris.imagebridge.runtime.server.BridgeMuxSocket
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.util.concurrent.ExecutorService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -36,14 +39,14 @@ class BridgeMuxSessionTest {
             )
         val metrics = BridgeMetrics()
 
-        BridgeMuxSession(
+        runBridgeMuxSession(
             client = socket,
             executor = DirectExecutorService(),
             handler = handler,
             isRunning = { true },
             metrics = metrics,
             logError = { _, _, _ -> },
-        ).run()
+        )
 
         val response = ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(socket.outputStream.toByteArray()))
         assertEquals(ImageBridgeMuxProtocol.TYPE_RESPONSE, response.type)
@@ -71,14 +74,14 @@ class BridgeMuxSessionTest {
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
-        BridgeMuxSession(
+        runBridgeMuxSession(
             client = socket,
             executor = DirectExecutorService(),
             handler = handler,
             isRunning = { true },
             metrics = BridgeMetrics(),
             logError = { _, _, _ -> },
-        ).run()
+        )
 
         val response = ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(socket.outputStream.toByteArray()))
         assertEquals(ImageBridgeMuxProtocol.TYPE_PONG, response.type)
@@ -105,7 +108,7 @@ class BridgeMuxSessionTest {
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
-        BridgeMuxSession(
+        runBridgeMuxSession(
             client = socket,
             executor = DirectExecutorService(),
             handler = handler,
@@ -113,7 +116,7 @@ class BridgeMuxSessionTest {
             metrics = metrics,
             maxInFlight = 0,
             logError = { _, _, _ -> },
-        ).run()
+        )
 
         val response = ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(socket.outputStream.toByteArray()))
         assertEquals(ImageBridgeMuxProtocol.TYPE_RESPONSE, response.type)
@@ -121,6 +124,53 @@ class BridgeMuxSessionTest {
         assertEquals(ImageBridgeProtocol.ERROR_BRIDGE_BUSY, response.response?.errorCode)
         assertEquals(1, metrics.snapshot().bridgeBusy)
         assertEquals(1, metrics.muxSessionSnapshot().busyCount)
+    }
+
+    @Test
+    fun `mux duplicate active correlation id writes bad request without dispatching duplicate`() {
+        var sendCount = 0
+        val executor = QueuedExecutorService()
+        val socket =
+            FakeBridgeMuxSocket(
+                muxFrames(
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_REQUEST,
+                        correlationId = "dup-1",
+                        request = sendTextRequest(roomId = 123L, message = "first", requestId = "dup-req-1"),
+                    ),
+                    ImageBridgeMuxFrame(
+                        type = ImageBridgeMuxProtocol.TYPE_REQUEST,
+                        correlationId = "dup-1",
+                        request = sendTextRequest(roomId = 123L, message = "second", requestId = "dup-req-2"),
+                    ),
+                ),
+            )
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                textSender = { sendCount += 1 },
+                healthProvider = { readyTextHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        runBridgeMuxSession(
+            client = socket,
+            executor = executor,
+            handler = handler,
+            isRunning = { socket.inputStream.available() > 0 },
+            metrics = BridgeMetrics(),
+            logError = { _, _, _ -> },
+        )
+
+        val response = ImageBridgeMuxProtocol.readFrame(ByteArrayInputStream(socket.outputStream.toByteArray()))
+        assertEquals(ImageBridgeMuxProtocol.TYPE_RESPONSE, response.type)
+        assertEquals("dup-1", response.correlationId)
+        assertEquals(ImageBridgeProtocol.ERROR_BAD_REQUEST, response.response?.errorCode)
+        assertEquals("duplicate mux correlation id", response.response?.error)
+
+        executor.runNext()
+        assertEquals(1, sendCount)
+        assertFalse(executor.hasPendingTasks())
     }
 
     @Test
@@ -150,14 +200,14 @@ class BridgeMuxSessionTest {
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
-        BridgeMuxSession(
+        runBridgeMuxSession(
             client = socket,
             executor = executor,
             handler = handler,
             isRunning = { socket.inputStream.available() > 0 },
             metrics = metrics,
             logError = { _, _, _ -> },
-        ).run()
+        )
         executor.runNext()
 
         assertEquals(0, sendCount)
@@ -187,14 +237,14 @@ class BridgeMuxSessionTest {
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
-        BridgeMuxSession(
+        runBridgeMuxSession(
             client = socket,
             executor = DirectExecutorService(),
             handler = handler,
             isRunning = { true },
             metrics = BridgeMetrics(),
             logError = { _, message, _ -> loggedMessage = message },
-        ).run()
+        )
 
         assertEquals("bridge mux response write failed", loggedMessage)
         assertTrue(socket.closed)
@@ -211,14 +261,14 @@ class BridgeMuxSessionTest {
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
-        BridgeMuxSession(
+        runBridgeMuxSession(
             client = socket,
             executor = DirectExecutorService(),
             handler = handler,
             isRunning = { true },
             metrics = BridgeMetrics(),
             logError = { _, _, _ -> logged = true },
-        ).run()
+        )
 
         assertFalse(logged)
         assertTrue(socket.closed)
@@ -235,14 +285,14 @@ class BridgeMuxSessionTest {
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
-        BridgeMuxSession(
+        runBridgeMuxSession(
             client = socket,
             executor = DirectExecutorService(),
             handler = handler,
             isRunning = { true },
             metrics = BridgeMetrics(),
             logError = { _, _, _ -> logged = true },
-        ).run()
+        )
 
         assertTrue(logged)
         assertTrue(socket.closed)
@@ -259,14 +309,14 @@ class BridgeMuxSessionTest {
                 handshakeValidator = developmentHandshakeValidator(),
             )
 
-        BridgeMuxSession(
+        runBridgeMuxSession(
             client = socket,
             executor = DirectExecutorService(),
             handler = handler,
             isRunning = { true },
             metrics = BridgeMetrics(),
             logError = { _, _, _ -> logged = true },
-        ).run()
+        )
 
         assertTrue(logged)
         assertTrue(socket.closed)
@@ -295,4 +345,29 @@ class BridgeMuxSessionTest {
         moduleRelative: String,
         rootRelative: String,
     ): File = listOf(File(moduleRelative), File(rootRelative)).first { it.exists() }
+
+    private fun runBridgeMuxSession(
+        client: BridgeMuxSocket,
+        executor: ExecutorService,
+        handler: ImageBridgeRequestHandler,
+        isRunning: () -> Boolean,
+        metrics: BridgeMetrics,
+        maxInFlight: Int = BRIDGE_MUX_DEFAULT_MAX_IN_FLIGHT,
+        logError: (String, String, Throwable) -> Unit,
+    ) {
+        val muxCore = bridgeTestMuxSession(maxInFlight)
+        try {
+            BridgeMuxSession(
+                client = client,
+                muxSession = muxCore.session,
+                executor = executor,
+                handler = handler,
+                isRunning = isRunning,
+                metrics = metrics,
+                logError = logError,
+            ).run()
+        } finally {
+            muxCore.close()
+        }
+    }
 }

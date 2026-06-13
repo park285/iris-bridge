@@ -7,11 +7,13 @@ import party.qwer.iris.ImageBridgeMuxFrame
 import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.IrisRuntimePathPolicy
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreRuntime
 import java.util.concurrent.ExecutorService
 
 internal class BridgeMuxClientDispatcher(
     private val executorProvider: () -> ExecutorService?,
     private val handlerProvider: () -> ImageBridgeRequestHandler?,
+    private val bridgeCoreProvider: () -> BridgeCoreRuntime?,
     private val isRunning: () -> Boolean,
     private val peerIdentityValidator: BridgePeerIdentityValidator,
     private val metrics: BridgeMetrics,
@@ -44,8 +46,14 @@ internal class BridgeMuxClientDispatcher(
             )
             return
         }
+        val bridgeCore = bridgeCoreProvider()
+        if (bridgeCore == null) {
+            metrics.recordBridgeShuttingDown()
+            writeGoaway(client, "bridge shutting down", ImageBridgeProtocol.ERROR_BRIDGE_SHUTTING_DOWN)
+            return
+        }
         client.setReadTimeout(CLIENT_READ_TIMEOUT_MS)
-        val admitted = sessionAdmission.tryExecute { runSession(client, executor, handler) }
+        val admitted = sessionAdmission.tryExecute { runSession(client, executor, handler, bridgeCore) }
         if (!admitted) {
             metrics.recordBridgeBusy()
             writeGoaway(client, "bridge busy", ImageBridgeProtocol.ERROR_BRIDGE_BUSY)
@@ -56,6 +64,7 @@ internal class BridgeMuxClientDispatcher(
         client: BridgeMuxSocket,
         executor: ExecutorService,
         handler: ImageBridgeRequestHandler,
+        bridgeCore: BridgeCoreRuntime,
     ) {
         val authenticated =
             try {
@@ -71,8 +80,14 @@ internal class BridgeMuxClientDispatcher(
                 false
             }
         if (authenticated) {
+            val muxSession = bridgeCore.createMuxSession(BRIDGE_MUX_DEFAULT_MAX_IN_FLIGHT)
+            if (muxSession == null) {
+                writeGoaway(client, "bridge core unavailable", ImageBridgeProtocol.ERROR_INTERNAL)
+                return
+            }
             BridgeMuxSession(
                 client = client,
+                muxSession = muxSession,
                 executor = executor,
                 handler = handler,
                 isRunning = isRunning,
