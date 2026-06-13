@@ -8,7 +8,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import party.qwer.iris.ImageBridgeProtocol
+import party.qwer.iris.ImageLeasePayload
+import party.qwer.iris.SignedImageLease
 import party.qwer.iris.imagebridge.runtime.BridgeHandshakeTestFixtures
+import party.qwer.iris.imagebridge.runtime.kakao.memberfetch.UpstreamMemberProfile
 import party.qwer.iris.imagebridge.runtime.room.memberextract.ElementView
 import party.qwer.iris.imagebridge.runtime.room.memberextract.PrimitiveValue
 import java.io.File
@@ -24,7 +27,7 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(35, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(38, BridgeCore.EXPECTED_ABI_VERSION)
     }
 
     private fun muxRequestFrame(correlationId: String): String =
@@ -397,6 +400,21 @@ class BridgeCoreRuntimeTest {
     }
 
     @Test
+    fun `media content policy dispatch normalizes lease content types by image index`() {
+        val normalized =
+            BridgeCore.mediaContentTypesFromLeases(
+                imageCount = 3,
+                imageLeases =
+                    listOf(
+                        signedImageLeaseForMediaPolicy(imageIndex = 2, contentType = " IMAGE/JPEG "),
+                        signedImageLeaseForMediaPolicy(imageIndex = 0, contentType = " Video/MP4 ; charset=utf-8 "),
+                    ),
+            )
+
+        assertEquals(listOf("video/mp4", "", "image/jpeg"), normalized)
+    }
+
+    @Test
     fun `image path validation dispatch rejects static path policy violations`() {
         val runtime =
             assertNotNull(
@@ -445,6 +463,28 @@ class BridgeCoreRuntimeTest {
             runtime.close()
         }
     }
+
+    private fun signedImageLeaseForMediaPolicy(
+        imageIndex: Int,
+        contentType: String,
+    ): SignedImageLease =
+        SignedImageLease(
+            payload =
+                ImageLeasePayload(
+                    version = 1,
+                    requestId = "req-1",
+                    roomId = 123L,
+                    imageIndex = imageIndex,
+                    canonicalPath = "/data/iris-tmp/reply-images/req-1/image-$imageIndex.png",
+                    sha256Hex = "00",
+                    byteLength = 1L,
+                    contentType = contentType,
+                    lastModifiedEpochMs = 1L,
+                    expiresAtEpochMs = 2L,
+                    nonce = "nonce-$imageIndex",
+                ),
+            signature = "unused",
+        )
 
     @Test
     fun `error classification dispatch returns bridge protocol error codes`() {
@@ -742,6 +782,39 @@ class BridgeCoreRuntimeTest {
             }
 
         assertEquals("unknown containerType: set", rejection.message)
+    }
+
+    @Test
+    fun `member profile user ids dispatch normalizes ids in Rust`() {
+        val userIds =
+            BridgeCore.memberProfileUserIds(
+                memberIds = listOf(90_001L, 0L, 90_002L, 90_001L),
+                memberHints =
+                    listOf(
+                        ImageBridgeProtocol.ChatRoomMemberHint(userId = 7L),
+                        ImageBridgeProtocol.ChatRoomMemberHint(userId = 8L),
+                    ),
+            )
+
+        assertEquals(listOf(90_001L, 90_002L), userIds)
+    }
+
+    @Test
+    fun `member profile payload dispatch builds sorted JSON in Rust`() {
+        val payload =
+            BridgeCore.memberProfilePayloadJson(
+                listOf(
+                    UpstreamMemberProfile(90_002L, "Member Beta", "https://example.test/p.png"),
+                    UpstreamMemberProfile(90_001L, "Member Alpha", null),
+                ),
+            )
+        val members = JSONObject(payload).getJSONArray("members")
+
+        assertEquals(90_001L, members.getJSONObject(0).getLong("userId"))
+        assertEquals("Member Alpha", members.getJSONObject(0).getString("nickname"))
+        assertFalse(members.getJSONObject(0).has("profileImageUrl"))
+        assertEquals(90_002L, members.getJSONObject(1).getLong("userId"))
+        assertEquals("https://example.test/p.png", members.getJSONObject(1).getString("profileImageUrl"))
     }
 
     @Test

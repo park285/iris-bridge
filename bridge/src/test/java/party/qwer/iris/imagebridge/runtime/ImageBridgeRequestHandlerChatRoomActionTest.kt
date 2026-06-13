@@ -197,7 +197,7 @@ class ImageBridgeRequestHandlerChatRoomActionTest {
             handler.handle(
                 fetchMemberProfilesRequest(
                     roomId = 55L,
-                    memberIds = listOf(90_001L, 90_002L, 90_001L),
+                    memberIds = listOf(90_001L, 0L, 90_002L, 90_001L),
                 ),
             )
 

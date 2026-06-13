@@ -1,6 +1,8 @@
 package party.qwer.iris.imagebridge.runtime.core
 
 import org.json.JSONArray
+import org.json.JSONObject
+import party.qwer.iris.SignedImageLease
 
 internal enum class BridgeCoreMediaMessageKind {
     Photo,
@@ -21,6 +23,21 @@ internal fun BridgeCore.normalizeMediaContentTypes(
     requireMediaOk(envelope, "media content type normalization rejected")
     return envelope.stringList("normalizedContentTypes")
         ?: error("bridge core returned malformed media content type normalization")
+}
+
+internal fun BridgeCore.mediaContentTypesFromLeases(
+    imageCount: Int,
+    imageLeases: List<SignedImageLease>,
+): List<String> {
+    val envelope =
+        nativeMediaEnvelope(
+            "normalize lease media content types",
+        ) {
+            BridgeCoreJniMedia.nativeNormalizeMediaContentTypesFromLeases(imageCount, leaseContentTypesJson(imageLeases))
+        }
+    requireMediaOk(envelope, "lease media content type normalization rejected")
+    return envelope.stringList("normalizedContentTypes")
+        ?: error("bridge core returned malformed lease media content type normalization")
 }
 
 internal fun BridgeCore.mediaMessageKind(
@@ -79,4 +96,16 @@ private fun contentTypesJson(contentTypes: List<String>): String =
     JSONArray()
         .apply {
             contentTypes.forEach { contentType -> put(contentType) }
+        }.toString()
+
+private fun leaseContentTypesJson(imageLeases: List<SignedImageLease>): String =
+    JSONArray()
+        .apply {
+            imageLeases.forEach { lease ->
+                put(
+                    JSONObject()
+                        .put("imageIndex", lease.payload.imageIndex)
+                        .put("contentType", lease.payload.contentType),
+                )
+            }
         }.toString()

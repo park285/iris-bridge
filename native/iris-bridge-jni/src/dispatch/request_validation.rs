@@ -2,9 +2,8 @@ use iris_bridge_core::server::Rejection;
 use iris_bridge_core::server::bridge_flags::is_truthy_flag;
 use iris_bridge_core::server::error_classification::{classify_error_code, failure_metric_bucket};
 use iris_bridge_core::server::image_path::{
-    MaterializedImagePath, MediaMessageKind, image_path_under_allowed_root, materialize_image_path,
-    normalize_media_content_types, revalidate_image_path_snapshot, select_media_message_kind,
-    validate_image_paths, validate_share_manager_image_media,
+    MaterializedImagePath, image_path_under_allowed_root, materialize_image_path,
+    revalidate_image_path_snapshot, validate_image_paths,
 };
 use iris_bridge_core::server::peer_identity::allowed_peer_uids;
 use iris_bridge_core::server::text_request::{TextRequestInput, validate_text_request};
@@ -12,6 +11,14 @@ use iris_bridge_core::server::token::{SecurityMode, canonical_security_mode_raw}
 use serde_json::json;
 
 use super::envelope::{bad_request, json_catch_unwind};
+
+mod media_content;
+
+pub use media_content::{
+    dispatch_media_message_kind, dispatch_normalize_media_content_types,
+    dispatch_normalize_media_content_types_from_leases,
+    dispatch_validate_share_manager_image_media,
+};
 
 pub fn dispatch_request_admission(action: &str, request_id: Option<&str>) -> String {
     json_catch_unwind(|| {
@@ -79,35 +86,6 @@ pub fn dispatch_validate_image_paths(
     })
 }
 
-pub fn dispatch_normalize_media_content_types(
-    image_count: i32,
-    content_types_json: &str,
-) -> String {
-    json_catch_unwind(|| {
-        let image_count = image_count_usize(image_count)?;
-        let content_types = decode_content_types(content_types_json)?;
-        let normalized = normalize_media_content_types(image_count, &content_types)?;
-        Ok(json!({ "normalizedContentTypes": normalized }))
-    })
-}
-
-pub fn dispatch_media_message_kind(image_count: i32, content_types_json: &str) -> String {
-    json_catch_unwind(|| {
-        let image_count = image_count_usize(image_count)?;
-        let content_types = decode_content_types(content_types_json)?;
-        let kind = select_media_message_kind(image_count, &content_types)?;
-        Ok(json!({ "messageKind": media_message_kind_wire_name(kind) }))
-    })
-}
-
-pub fn dispatch_validate_share_manager_image_media(content_types_json: &str) -> String {
-    json_catch_unwind(|| {
-        let content_types = decode_content_types(content_types_json)?;
-        validate_share_manager_image_media(&content_types)?;
-        Ok(json!({}))
-    })
-}
-
 pub fn dispatch_materialize_image_path(path: &str, allowed_roots_json: &str) -> String {
     json_catch_unwind(|| {
         let allowed_roots = decode_allowed_roots(allowed_roots_json)?;
@@ -155,22 +133,6 @@ pub fn dispatch_failure_metric_bucket(error_code: &str) -> &'static str {
 
 fn decode_allowed_roots(allowed_roots_json: &str) -> Result<Vec<String>, Rejection> {
     serde_json::from_str(allowed_roots_json).map_err(|_| bad_request("allowed roots JSON invalid"))
-}
-
-fn image_count_usize(image_count: i32) -> Result<usize, Rejection> {
-    usize::try_from(image_count).map_err(|_| bad_request("image count must be non-negative"))
-}
-
-fn decode_content_types(content_types_json: &str) -> Result<Vec<String>, Rejection> {
-    serde_json::from_str(content_types_json).map_err(|_| bad_request("content types JSON invalid"))
-}
-
-const fn media_message_kind_wire_name(kind: MediaMessageKind) -> &'static str {
-    match kind {
-        MediaMessageKind::Photo => "photo",
-        MediaMessageKind::MultiPhoto => "multiPhoto",
-        MediaMessageKind::Video => "video",
-    }
 }
 
 fn materialized_image_path_json(materialized: &MaterializedImagePath) -> serde_json::Value {

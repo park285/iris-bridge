@@ -1,5 +1,6 @@
 use iris_bridge_core::server::member_extraction::{
     enrich_merge_request, enrich_missing_nicknames_request, evaluate_request,
+    member_profile_payload_request, member_profile_user_ids_request,
 };
 use iris_bridge_core::server::{ERROR_BAD_REQUEST, Rejection};
 
@@ -22,6 +23,20 @@ pub fn dispatch_member_enrichment_missing_nicknames(request_json: &str) -> Strin
 pub fn dispatch_member_enrichment_merge(request_json: &str) -> String {
     json_catch_unwind(|| {
         enrich_merge_request(request_json)
+            .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error.to_string()))
+    })
+}
+
+pub fn dispatch_member_profile_user_ids(request_json: &str) -> String {
+    json_catch_unwind(|| {
+        member_profile_user_ids_request(request_json)
+            .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error.to_string()))
+    })
+}
+
+pub fn dispatch_member_profile_payload(request_json: &str) -> String {
+    json_catch_unwind(|| {
+        member_profile_payload_request(request_json)
             .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error.to_string()))
     })
 }

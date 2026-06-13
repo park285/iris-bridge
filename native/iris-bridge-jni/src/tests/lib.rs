@@ -250,6 +250,22 @@ fn media_content_dispatch_normalizes_and_selects_message_kind() {
 }
 
 #[test]
+fn media_content_dispatch_normalizes_lease_content_types_by_index() {
+    let normalized = assert_ok(&dispatch_normalize_media_content_types_from_leases(
+        3,
+        r#"[
+            {"imageIndex":2,"contentType":" IMAGE/JPEG "},
+            {"imageIndex":0,"contentType":" Video/MP4 ; charset=utf-8 "}
+        ]"#,
+    ));
+
+    assert_eq!(
+        normalized["normalizedContentTypes"],
+        json!(["video/mp4", "", "image/jpeg"])
+    );
+}
+
+#[test]
 fn media_content_dispatch_preserves_kotlin_rejection_messages() {
     assert_error(
         &dispatch_normalize_media_content_types(2, r#"["image/png"]"#),
@@ -265,6 +281,51 @@ fn media_content_dispatch_preserves_kotlin_rejection_messages() {
         &dispatch_validate_share_manager_image_media(r#"["video/mp4"]"#),
         "BAD_REQUEST",
         "video media send is not supported on ShareManager image path",
+    );
+}
+
+#[test]
+fn member_profile_user_ids_dispatch_filters_and_deduplicates_ids() {
+    let outcome = assert_ok(&dispatch_member_profile_user_ids(
+        r#"{
+            "memberIds":[90001,0,90002,90001],
+            "memberHints":[{"userId":7},{"userId":8}]
+        }"#,
+    ));
+
+    assert_eq!(outcome["userIds"], json!([90001, 90002]));
+}
+
+#[test]
+fn member_profile_user_ids_dispatch_uses_hints_when_ids_are_empty() {
+    let outcome = assert_ok(&dispatch_member_profile_user_ids(
+        r#"{
+            "memberIds":[],
+            "memberHints":[{"userId":7},{"userId":-1},{"userId":9},{"userId":7}]
+        }"#,
+    ));
+
+    assert_eq!(outcome["userIds"], json!([7, 9]));
+}
+
+#[test]
+fn member_profile_payload_dispatch_builds_sorted_payload_json() {
+    let outcome = assert_ok(&dispatch_member_profile_payload(
+        r#"{
+            "profiles":[
+                {"userId":90002,"nickname":"Member Beta","profileImageUrl":"https://example.test/p.png"},
+                {"userId":90001,"nickname":"Member Alpha"}
+            ]
+        }"#,
+    ));
+    let payload: Value =
+        serde_json::from_str(outcome["payloadJson"].as_str().expect("payloadJson"))
+            .expect("payload JSON");
+
+    assert_eq!(payload["members"][0]["userId"], json!(90001));
+    assert_eq!(
+        payload["members"][1]["profileImageUrl"],
+        json!("https://example.test/p.png")
     );
 }
 

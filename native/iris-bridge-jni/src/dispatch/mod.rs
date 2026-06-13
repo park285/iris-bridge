@@ -47,7 +47,8 @@ pub use lease::{
 };
 pub use member_extraction::{
     dispatch_member_enrichment_merge, dispatch_member_enrichment_missing_nicknames,
-    dispatch_member_extraction_evaluate,
+    dispatch_member_extraction_evaluate, dispatch_member_profile_payload,
+    dispatch_member_profile_user_ids,
 };
 pub use mux_session::{
     dispatch_mux_session_create, dispatch_mux_session_destroy, dispatch_mux_session_is_cancelled,
@@ -63,10 +64,11 @@ pub use request_validation::{
     dispatch_allowed_peer_uids, dispatch_classify_error_code, dispatch_failure_metric_bucket,
     dispatch_image_path_under_allowed_root, dispatch_is_truthy_flag,
     dispatch_materialize_image_path, dispatch_media_message_kind,
-    dispatch_normalize_media_content_types, dispatch_normalize_security_mode,
-    dispatch_request_admission, dispatch_request_dedupe_key, dispatch_request_requires_request_id,
-    dispatch_revalidate_image_path_snapshot, dispatch_validate_image_paths,
-    dispatch_validate_share_manager_image_media, dispatch_validate_text_request,
+    dispatch_normalize_media_content_types, dispatch_normalize_media_content_types_from_leases,
+    dispatch_normalize_security_mode, dispatch_request_admission, dispatch_request_dedupe_key,
+    dispatch_request_requires_request_id, dispatch_revalidate_image_path_snapshot,
+    dispatch_validate_image_paths, dispatch_validate_share_manager_image_media,
+    dispatch_validate_text_request,
 };
 pub use restart_policy::dispatch_restart_delay_ms;
 

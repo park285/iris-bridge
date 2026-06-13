@@ -6,4 +6,8 @@ internal object BridgeCoreJniMemberField {
     external fun nativeMemberEnrichmentMissingNicknames(requestJson: String): String
 
     external fun nativeMemberEnrichmentMerge(requestJson: String): String
+
+    external fun nativeMemberProfileUserIds(requestJson: String): String
+
+    external fun nativeMemberProfilePayload(requestJson: String): String
 }
