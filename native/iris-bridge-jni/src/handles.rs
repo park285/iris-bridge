@@ -121,6 +121,10 @@ fn registry() -> &'static RwLock<HashMap<i64, Arc<BridgeCoreContext>>> {
 
 static NEXT_HANDLE: AtomicI64 = AtomicI64::new(1);
 
+pub fn allocate_handle() -> i64 {
+    NEXT_HANDLE.fetch_add(1, Ordering::Relaxed)
+}
+
 fn read_registry() -> std::sync::RwLockReadGuard<'static, HashMap<i64, Arc<BridgeCoreContext>>> {
     registry()
         .read()
@@ -135,7 +139,7 @@ fn write_registry() -> std::sync::RwLockWriteGuard<'static, HashMap<i64, Arc<Bri
 
 #[must_use]
 pub fn into_handle(context: BridgeCoreContext) -> i64 {
-    let handle = NEXT_HANDLE.fetch_add(1, Ordering::Relaxed);
+    let handle = allocate_handle();
     write_registry().insert(handle, Arc::new(context));
     handle
 }

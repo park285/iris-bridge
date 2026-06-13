@@ -100,6 +100,11 @@ class BridgeCoreRuntime internal constructor(
         }
     }
 
+    internal fun createMuxSession(maxInFlight: Int): BridgeCoreMuxSession? {
+        val envelope = dispatch { BridgeCoreJniMuxSession.nativeCreateMuxSession(maxInFlight) }.takeIf { it.isOk } ?: return null
+        return envelope.long("handle")?.takeIf { it != 0L }?.let(::BridgeCoreMuxSession)
+    }
+
     private inline fun dispatch(native: () -> String): BridgeCoreEnvelope =
         lifecycle.read {
             if (destroyed.get()) {

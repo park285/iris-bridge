@@ -130,6 +130,113 @@ fn handle_dispatch_rejects_zero_handle() {
     );
 }
 
+fn mux_request_frame(correlation_id: &str) -> String {
+    json!({
+        "type": "request",
+        "muxVersion": 2,
+        "correlationId": correlation_id,
+        "request": {},
+    })
+    .to_string()
+}
+
+#[test]
+fn mux_session_dispatch_exposes_commands_and_duplicate_fail_closed_rule() {
+    let handle = assert_ok(&dispatch_mux_session_create(1))["handle"]
+        .as_i64()
+        .expect("mux session handle");
+
+    let first = assert_ok(&dispatch_mux_session_on_frame(
+        handle,
+        &mux_request_frame("same"),
+    ));
+    assert_eq!(first["command"], "dispatch");
+    assert_eq!(first["correlationId"], "same");
+
+    let duplicate = assert_ok(&dispatch_mux_session_on_frame(
+        handle,
+        &mux_request_frame("same"),
+    ));
+    assert_eq!(duplicate["command"], "writeBadRequest");
+    assert_eq!(duplicate["correlationId"], "same");
+    assert_eq!(duplicate["message"], "duplicate mux correlation id");
+
+    let busy = assert_ok(&dispatch_mux_session_on_frame(
+        handle,
+        &mux_request_frame("other"),
+    ));
+    assert_eq!(busy["command"], "writeBusy");
+    assert_eq!(busy["correlationId"], "other");
+
+    assert_ok(&dispatch_mux_session_on_request_completed(handle, "same"));
+
+    let after_completion = assert_ok(&dispatch_mux_session_on_frame(
+        handle,
+        &mux_request_frame("other"),
+    ));
+    assert_eq!(after_completion["command"], "dispatch");
+    assert_eq!(after_completion["correlationId"], "other");
+
+    assert_ok(&dispatch_mux_session_destroy(handle));
+}
+
+#[test]
+fn mux_session_dispatch_tracks_cancel_and_executor_rejection() {
+    let handle = assert_ok(&dispatch_mux_session_create(2))["handle"]
+        .as_i64()
+        .expect("mux session handle");
+
+    assert_eq!(
+        assert_ok(&dispatch_mux_session_on_frame(
+            handle,
+            &mux_request_frame("c1")
+        ))["command"],
+        "dispatch"
+    );
+    let cancel = assert_ok(&dispatch_mux_session_on_frame(
+        handle,
+        r#"{"type":"cancel","muxVersion":2,"correlationId":"c1"}"#,
+    ));
+    assert_eq!(cancel["command"], "markCancelled");
+    assert_eq!(
+        assert_ok(&dispatch_mux_session_is_cancelled(handle, "c1"))["cancelled"],
+        true
+    );
+
+    let rejected = assert_ok(&dispatch_mux_session_on_executor_rejected(handle, "c1"));
+    assert_eq!(rejected["command"], "writeBusy");
+    assert_eq!(rejected["correlationId"], "c1");
+    assert_eq!(
+        assert_ok(&dispatch_mux_session_is_cancelled(handle, "c1"))["cancelled"],
+        false
+    );
+
+    assert_ok(&dispatch_mux_session_destroy(handle));
+}
+
+#[test]
+fn mux_session_dispatch_rejects_invalid_inputs_and_handles() {
+    assert_error(
+        &dispatch_mux_session_create(-1),
+        "BAD_REQUEST",
+        "maxInFlight must be non-negative",
+    );
+    assert_error(
+        &dispatch_mux_session_on_frame(0, &mux_request_frame("c1")),
+        "INVALID_HANDLE",
+        "invalid MuxSessionCore handle",
+    );
+    let handle = assert_ok(&dispatch_mux_session_create(1))["handle"]
+        .as_i64()
+        .expect("mux session handle");
+    assert_error(
+        &dispatch_mux_session_on_frame(handle, "not-json"),
+        "BAD_REQUEST",
+        "invalid mux frame json",
+    );
+    assert_ok(&dispatch_mux_session_destroy(handle));
+}
+
 #[test]
 fn verify_leases_accepts_valid_payload() {
     let (leases_json, facts_json) = lease_fixture();

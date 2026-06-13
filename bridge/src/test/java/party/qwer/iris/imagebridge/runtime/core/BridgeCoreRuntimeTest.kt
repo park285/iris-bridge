@@ -24,8 +24,16 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(33, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(34, BridgeCore.EXPECTED_ABI_VERSION)
     }
+
+    private fun muxRequestFrame(correlationId: String): String =
+        JSONObject()
+            .put("type", "request")
+            .put("muxVersion", 2)
+            .put("correlationId", correlationId)
+            .put("request", JSONObject())
+            .toString()
 
     @Test
     fun `Kakao chat log attachment crypto requires compatible bridge core ABI before native dispatch`() {
@@ -121,6 +129,75 @@ class BridgeCoreRuntimeTest {
         val cached = BridgeCoreEnvelope.parse("""{"ok":true,"state":"cached","responseJson":"{\"status\":\"sent\"}"}""").dedupeState()
         assertTrue(cached is DedupeState.Cached)
         assertEquals("""{"status":"sent"}""", cached.responseJson)
+    }
+
+    @Test
+    fun `mux session adapter exposes core commands and duplicate fail closed rule`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "development", bridgeToken = "bridge-token", requireHandshakeRaw = null),
+            )
+        val session = assertNotNull(runtime.createMuxSession(maxInFlight = 1))
+        try {
+            assertEquals(
+                BridgeCoreMuxCommand.Dispatch("same"),
+                session.onFrame(muxRequestFrame("same")).muxCommand(),
+            )
+
+            assertEquals(
+                BridgeCoreMuxCommand.WriteBadRequest(
+                    correlationId = "same",
+                    message = "duplicate mux correlation id",
+                ),
+                session.onFrame(muxRequestFrame("same")).muxCommand(),
+            )
+
+            assertEquals(
+                BridgeCoreMuxCommand.WriteBusy("other"),
+                session.onFrame(muxRequestFrame("other")).muxCommand(),
+            )
+
+            assertTrue(session.onRequestCompleted("same").isOk)
+            assertEquals(
+                BridgeCoreMuxCommand.Dispatch("other"),
+                session.onFrame(muxRequestFrame("other")).muxCommand(),
+            )
+        } finally {
+            session.close()
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `mux session adapter tracks cancel rejection and closed state`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "development", bridgeToken = "bridge-token", requireHandshakeRaw = null),
+            )
+        val session = assertNotNull(runtime.createMuxSession(maxInFlight = 2))
+        try {
+            assertEquals(BridgeCoreMuxCommand.Dispatch("c1"), session.onFrame(muxRequestFrame("c1")).muxCommand())
+            assertEquals(
+                BridgeCoreMuxCommand.MarkCancelled("c1"),
+                session.onFrame("""{"type":"cancel","muxVersion":2,"correlationId":"c1"}""").muxCommand(),
+            )
+            assertEquals(true, session.isCancelled("c1").strictBool("cancelled"))
+
+            assertEquals(
+                BridgeCoreMuxCommand.WriteBusy("c1"),
+                session.onExecutorRejected("c1").muxCommand(),
+            )
+            assertEquals(false, session.isCancelled("c1").strictBool("cancelled"))
+
+            session.close()
+            val afterClose = session.onFrame(muxRequestFrame("after-close"))
+            assertFalse(afterClose.isOk)
+            assertEquals(BRIDGE_CORE_CLOSED_CODE, afterClose.errorCode)
+            assertNull(afterClose.muxCommand())
+        } finally {
+            session.close()
+            runtime.close()
+        }
     }
 
     @Test

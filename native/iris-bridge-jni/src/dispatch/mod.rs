@@ -10,6 +10,7 @@ mod kakao_target;
 mod lease;
 mod member_extraction;
 mod mentions_hash;
+mod mux_session;
 mod protocol_contract;
 mod reply_attachment_text;
 mod reply_hook;
@@ -47,6 +48,11 @@ pub use lease::{
 pub use member_extraction::{
     dispatch_member_enrichment_merge, dispatch_member_enrichment_missing_nicknames,
     dispatch_member_extraction_evaluate,
+};
+pub use mux_session::{
+    dispatch_mux_session_create, dispatch_mux_session_destroy, dispatch_mux_session_is_cancelled,
+    dispatch_mux_session_on_executor_rejected, dispatch_mux_session_on_frame,
+    dispatch_mux_session_on_request_completed,
 };
 pub use reply_attachment_text::{
     dispatch_reply_attachment_session_id, dispatch_reply_attachment_text_looks_like,
