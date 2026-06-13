@@ -257,10 +257,38 @@ fn send_block_reason_snapshot_dispatch_matches_core_discovery_policy() {
 }
 
 #[test]
-fn member_field_dispatch_matches_core_trusted_nickname_policy() {
-    assert!(dispatch_member_nickname_is_trusted_for_display(7, "홍길동"));
-    assert!(!dispatch_member_nickname_is_trusted_for_display(7, "7"));
-    assert!(!dispatch_member_nickname_is_trusted_for_display(7, " "));
+fn member_enrichment_dispatch_collects_missing_ids_and_merges_profiles() {
+    let missing = dispatch_member_enrichment_missing_nicknames(
+        &serde_json::json!({
+            "hints": [{ "userId": 7, "nickname": "creatorUserId" }],
+            "members": [{ "userId": 5, "nickname": "홍길동" }],
+        })
+        .to_string(),
+    );
+    let missing_value: Value = serde_json::from_str(&missing).expect("missing envelope");
+    assert_eq!(missing_value["ok"], true);
+    assert_eq!(missing_value["missingUserIds"], serde_json::json!([7]));
+
+    let merged = dispatch_member_enrichment_merge(
+        &serde_json::json!({
+            "sourcePath": "$.members",
+            "confidence": "LOW",
+            "confidenceScore": 1,
+            "members": [{ "userId": 7, "nickname": "creatorUserId" }],
+            "upstreamProfiles": [{ "userId": 7, "nickname": "Alice", "profileImageUrl": null }],
+        })
+        .to_string(),
+    );
+    let merged_value: Value = serde_json::from_str(&merged).expect("merge envelope");
+    assert_eq!(merged_value["ok"], true);
+    assert_eq!(merged_value["confidence"], "MEDIUM");
+    assert_eq!(merged_value["sourcePath"], "$.members+upstream:member");
+    assert_eq!(merged_value["members"][0]["nickname"], "Alice");
+
+    let invalid = dispatch_member_enrichment_merge("not-json");
+    let invalid_value: Value = serde_json::from_str(&invalid).expect("error envelope");
+    assert_eq!(invalid_value["ok"], false);
+    assert_eq!(invalid_value["errorCode"], "BAD_REQUEST");
 }
 
 #[test]

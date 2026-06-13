@@ -9,7 +9,6 @@ mod kakao_link_template;
 mod kakao_target;
 mod lease;
 mod member_extraction;
-mod member_field_checks;
 mod mentions_hash;
 mod protocol_contract;
 mod reply_attachment_text;
@@ -45,8 +44,10 @@ pub use lease::{
     dispatch_image_lease_facts_json, dispatch_image_lease_rejection_is_state_error,
     dispatch_verify_leases,
 };
-pub use member_extraction::dispatch_member_extraction_evaluate;
-pub use member_field_checks::dispatch_member_nickname_is_trusted_for_display;
+pub use member_extraction::{
+    dispatch_member_enrichment_merge, dispatch_member_enrichment_missing_nicknames,
+    dispatch_member_extraction_evaluate,
+};
 pub use reply_attachment_text::{
     dispatch_reply_attachment_session_id, dispatch_reply_attachment_text_looks_like,
 };

@@ -9,7 +9,7 @@ mod image_path;
 mod kakao_link_attachment;
 mod kakao_link_template;
 mod kakao_target;
-mod member_field_checks;
+mod member_extraction;
 mod peer_identity;
 mod protocol;
 mod reply_attachment_text;

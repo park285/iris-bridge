@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(32, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(33, BridgeCore.EXPECTED_ABI_VERSION)
     }
 
     @Test
@@ -646,6 +646,75 @@ class BridgeCoreRuntimeTest {
             }
 
         assertEquals("unknown containerType: set", rejection.message)
+    }
+
+    @Test
+    fun `member enrichment missing nicknames skips native dispatch when no inputs exist`() {
+        var loadCalled = false
+        var nativeCalled = false
+
+        val missing =
+            BridgeCore.memberEnrichmentMissingNicknames(
+                members = emptyList(),
+                expectedMemberHints = emptyList(),
+                loadCompatibleCore = {
+                    loadCalled = true
+                    false
+                },
+                nativeMissingNicknames = {
+                    nativeCalled = true
+                    """{"ok":true,"missingUserIds":[]}"""
+                },
+            )
+
+        assertEquals(emptyList(), missing)
+        assertFalse(loadCalled)
+        assertFalse(nativeCalled)
+    }
+
+    @Test
+    fun `member enrichment merge skips native dispatch when upstream profiles are empty`() {
+        var loadCalled = false
+        var nativeCalled = false
+        val snapshot =
+            ImageBridgeProtocol.ChatRoomMembersSnapshot(
+                roomId = 55L,
+                scannedAtEpochMs = 1L,
+                sourcePath = "$.members",
+                members =
+                    listOf(
+                        ImageBridgeProtocol.ChatRoomMemberSnapshot(
+                            userId = 7L,
+                            nickname = "Alice",
+                            roleCode = 4,
+                            profileImageUrl = "https://example.com/a.png",
+                            mentionUserId = "text-ping-7",
+                        ),
+                    ),
+                confidence = ImageBridgeProtocol.ChatRoomSnapshotConfidence.HIGH,
+                confidenceScore = 42,
+            )
+
+        val merged =
+            BridgeCore.memberEnrichmentMerge(
+                snapshot = snapshot,
+                upstreamProfiles = emptyList(),
+                loadCompatibleCore = {
+                    loadCalled = true
+                    false
+                },
+                nativeMerge = {
+                    nativeCalled = true
+                    """{"ok":true,"members":[],"sourcePath":null,"confidence":"LOW","confidenceScore":0}"""
+                },
+            )
+
+        assertEquals(snapshot.members, merged.members)
+        assertEquals(snapshot.sourcePath, merged.sourcePath)
+        assertEquals(snapshot.confidence, merged.confidence)
+        assertEquals(snapshot.confidenceScore, merged.confidenceScore)
+        assertFalse(loadCalled)
+        assertFalse(nativeCalled)
     }
 
     @Test

@@ -135,7 +135,7 @@ private fun memberExtractionEvaluation(snapshot: JSONObject): MemberExtractionEv
         candidateGap = if (snapshot.isNull("candidateGap")) null else snapshot.getInt("candidateGap"),
     )
 
-private fun memberSnapshots(members: JSONArray): List<ImageBridgeProtocol.ChatRoomMemberSnapshot> =
+internal fun memberSnapshots(members: JSONArray): List<ImageBridgeProtocol.ChatRoomMemberSnapshot> =
     (0 until members.length()).map { index ->
         val member = members.getJSONObject(index)
         ImageBridgeProtocol.ChatRoomMemberSnapshot(
@@ -159,7 +159,7 @@ private fun extractionPlan(plan: JSONObject): ImageBridgeProtocol.ChatRoomMember
         fingerprint = plan.getString("fingerprint"),
     )
 
-private fun snapshotConfidence(label: String): ImageBridgeProtocol.ChatRoomSnapshotConfidence =
+internal fun snapshotConfidence(label: String): ImageBridgeProtocol.ChatRoomSnapshotConfidence =
     when (label) {
         "HIGH" -> ImageBridgeProtocol.ChatRoomSnapshotConfidence.HIGH
         "MEDIUM" -> ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM
@@ -167,4 +167,4 @@ private fun snapshotConfidence(label: String): ImageBridgeProtocol.ChatRoomSnaps
         else -> error("bridge core returned unknown member extraction confidence: $label")
     }
 
-private fun JSONObject.stringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
+internal fun JSONObject.stringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
