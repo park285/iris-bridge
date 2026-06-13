@@ -1,9 +1,9 @@
 package party.qwer.iris.imagebridge.runtime.reply
 
 import android.content.Intent
+import org.json.JSONObject
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
-import party.qwer.iris.imagebridge.runtime.core.mentionsHashFromAttachment
-import party.qwer.iris.imagebridge.runtime.core.replyHookVerify
+import party.qwer.iris.imagebridge.runtime.core.replyMentionPendingContextJson
 import party.qwer.iris.resolveBridgeToken
 
 internal object ReplyMentionBridgeExtras {
@@ -49,35 +49,48 @@ internal object ReplyMentionBridgeExtras {
         nowEpochMs: Long = System.currentTimeMillis(),
         bridgeToken: String = resolveBridgeToken(),
     ): ReplyMentionPendingContext? {
-        val roomId = snapshot.roomIdRaw?.toLongOrNull() ?: snapshot.fallbackRoomId ?: return null
-        val sessionId = snapshot.sessionId?.takeIf { it.isNotBlank() } ?: return null
-        val messageText = snapshot.messageText ?: snapshot.nestedMessageText ?: return null
-        if (messageText.isBlank()) return null
-        val attachmentText =
-            listOfNotNull(snapshot.attachmentText, snapshot.nestedAttachmentText)
-                .firstNotNullOfOrNull(ReplyMentionSendingLogAccess::mentionAttachmentOrNull)
-                ?: return null
-        val mentionsHash = BridgeCore.mentionsHashFromAttachment(attachmentText) ?: return null
-        if (
-            !BridgeCore.replyHookVerify(
-                bridgeToken = bridgeToken,
-                roomId = roomId,
-                messageText = messageText,
-                sessionId = sessionId,
-                createdAtEpochMs = snapshot.createdAtEpochMs,
-                mentionsHash = mentionsHash,
-                signature = snapshot.signature,
-                nowEpochMs = nowEpochMs,
-            )
-        ) {
-            return null
-        }
+        val context =
+            BridgeCore.replyMentionPendingContextJson(
+                pendingContextRequestJson(snapshot, nowEpochMs, bridgeToken),
+            ) ?: return null
         return ReplyMentionPendingContext(
-            roomId = roomId,
-            messageText = messageText,
-            attachmentText = attachmentText,
-            sessionId = sessionId,
-            createdAtEpochMs = snapshot.createdAtEpochMs ?: nowEpochMs,
+            roomId = context.getLong("roomId"),
+            messageText = context.getString("messageText"),
+            attachmentText = context.getString("attachmentText"),
+            sessionId = context.stringOrNull("sessionId"),
+            createdAtEpochMs = context.getLong("createdAtEpochMs"),
         )
     }
+
+    private fun pendingContextRequestJson(
+        snapshot: Snapshot,
+        nowEpochMs: Long,
+        bridgeToken: String,
+    ): String =
+        JSONObject()
+            .put("bridgeToken", bridgeToken)
+            .put("nowEpochMs", nowEpochMs)
+            .put(
+                "snapshot",
+                JSONObject()
+                    .putIfNotNull("sessionId", snapshot.sessionId)
+                    .putIfNotNull("roomIdRaw", snapshot.roomIdRaw)
+                    .putIfNotNull("fallbackRoomId", snapshot.fallbackRoomId)
+                    .putIfNotNull("createdAtEpochMs", snapshot.createdAtEpochMs)
+                    .putIfNotNull("signature", snapshot.signature)
+                    .putIfNotNull("messageText", snapshot.messageText)
+                    .putIfNotNull("nestedMessageText", snapshot.nestedMessageText)
+                    .putIfNotNull("attachmentText", snapshot.attachmentText)
+                    .putIfNotNull("nestedAttachmentText", snapshot.nestedAttachmentText),
+            ).toString()
 }
+
+private fun JSONObject.putIfNotNull(
+    key: String,
+    value: Any?,
+): JSONObject =
+    apply {
+        if (value != null) put(key, value)
+    }
+
+private fun JSONObject.stringOrNull(key: String): String? = if (has(key) && !isNull(key)) optString(key) else null

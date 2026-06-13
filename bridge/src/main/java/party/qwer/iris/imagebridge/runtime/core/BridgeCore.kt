@@ -1,5 +1,5 @@
 package party.qwer.iris.imagebridge.runtime.core
 
 object BridgeCore {
-    const val EXPECTED_ABI_VERSION: Int = 38
+    const val EXPECTED_ABI_VERSION: Int = 39
 }

@@ -1194,6 +1194,64 @@ fn reply_hook_sign_and_verify_match_core_golden() {
 }
 
 #[test]
+fn reply_pending_context_dispatch_returns_verified_markdown_context() {
+    let signature =
+        dispatch_reply_hook_sign(TOKEN, 42, "markdown body", "req-md", CREATED_AT, None)
+            .expect("signable");
+    let envelope = assert_ok(&dispatch_reply_markdown_pending_context(
+        &json!({
+            "bridgeToken": TOKEN,
+            "nowEpochMs": CREATED_AT + 1,
+            "snapshot": {
+                "sessionId": "req-md",
+                "roomIdRaw": "42",
+                "threadIdRaw": "777",
+                "threadScope": 3,
+                "createdAtEpochMs": CREATED_AT,
+                "signature": signature,
+                "messageText": "markdown body"
+            }
+        })
+        .to_string(),
+    ));
+
+    assert_eq!(envelope["context"]["roomId"], 42);
+    assert_eq!(envelope["context"]["threadId"], 777);
+    assert_eq!(envelope["context"]["threadScope"], 3);
+    assert_eq!(envelope["context"]["messageText"], "markdown body");
+}
+
+#[test]
+fn reply_pending_context_dispatch_returns_null_context_for_unverified_request() {
+    let attachment_text = json!({
+        "mentions": [{"userId": 7}]
+    })
+    .to_string();
+    let envelope = assert_ok(&dispatch_reply_mention_pending_context(
+        &json!({
+            "bridgeToken": TOKEN,
+            "nowEpochMs": CREATED_AT + 1,
+            "snapshot": {
+                "sessionId": "req-mention",
+                "roomIdRaw": "42",
+                "createdAtEpochMs": CREATED_AT,
+                "signature": "bad",
+                "messageText": "hi @A",
+                "attachmentText": attachment_text
+            }
+        })
+        .to_string(),
+    ));
+
+    assert_eq!(envelope["context"], Value::Null);
+    assert_error(
+        &dispatch_reply_markdown_pending_context("not-json"),
+        "BAD_REQUEST",
+        "reply pending context JSON invalid",
+    );
+}
+
+#[test]
 fn mentions_hash_exports_match_core_golden() {
     assert_eq!(
         dispatch_mentions_hash_from_json(Some(GOLDEN_MENTIONS_JSON)).as_deref(),

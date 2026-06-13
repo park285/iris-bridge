@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(38, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(39, BridgeCore.EXPECTED_ABI_VERSION)
     }
 
     private fun muxRequestFrame(correlationId: String): String =
@@ -412,6 +412,113 @@ class BridgeCoreRuntimeTest {
             )
 
         assertEquals(listOf("video/mp4", "", "image/jpeg"), normalized)
+    }
+
+    @Test
+    fun `reply pending context dispatch returns verified markdown context`() {
+        val signature =
+            assertNotNull(
+                BridgeCore.replyHookSign(
+                    bridgeToken = "bridge-token",
+                    roomId = 42L,
+                    messageText = "markdown body",
+                    sessionId = "req-md",
+                    createdAtEpochMs = 1_000L,
+                    mentionsHash = null,
+                ),
+            )
+        val context =
+            assertNotNull(
+                BridgeCore.replyMarkdownPendingContextJson(
+                    JSONObject()
+                        .put("bridgeToken", "bridge-token")
+                        .put("nowEpochMs", 1_001L)
+                        .put(
+                            "snapshot",
+                            JSONObject()
+                                .put("sessionId", "req-md")
+                                .put("roomIdRaw", "42")
+                                .put("threadIdRaw", "777")
+                                .put("threadScope", 3)
+                                .put("createdAtEpochMs", 1_000L)
+                                .put("signature", signature)
+                                .put("messageText", "markdown body"),
+                        ).toString(),
+                ),
+            )
+
+        assertEquals(42L, context.getLong("roomId"))
+        assertEquals("markdown body", context.getString("messageText"))
+        assertEquals(777L, context.getLong("threadId"))
+        assertEquals(3, context.getInt("threadScope"))
+        assertEquals("req-md", context.getString("sessionId"))
+    }
+
+    @Test
+    fun `reply pending context dispatch returns verified mention context`() {
+        val attachment = """{"mentions":[{"userId":7,"nickname":"A"}]}"""
+        val mentionsHash = assertNotNull(BridgeCore.mentionsHashFromAttachment(attachment))
+        val signature =
+            assertNotNull(
+                BridgeCore.replyHookSign(
+                    bridgeToken = "bridge-token",
+                    roomId = 42L,
+                    messageText = "hi @A",
+                    sessionId = "req-mention",
+                    createdAtEpochMs = 2_000L,
+                    mentionsHash = mentionsHash,
+                ),
+            )
+        val context =
+            assertNotNull(
+                BridgeCore.replyMentionPendingContextJson(
+                    JSONObject()
+                        .put("bridgeToken", "bridge-token")
+                        .put("nowEpochMs", 2_001L)
+                        .put(
+                            "snapshot",
+                            JSONObject()
+                                .put("sessionId", "req-mention")
+                                .put("roomIdRaw", "42")
+                                .put("createdAtEpochMs", 2_000L)
+                                .put("signature", signature)
+                                .put("messageText", "hi @A")
+                                .put("attachmentText", attachment),
+                        ).toString(),
+                ),
+            )
+
+        assertEquals(42L, context.getLong("roomId"))
+        assertEquals("hi @A", context.getString("messageText"))
+        assertEquals("req-mention", context.getString("sessionId"))
+        assertEquals(7L, JSONObject(context.getString("attachmentText")).getJSONArray("mentions").getJSONObject(0).getLong("userId"))
+    }
+
+    @Test
+    fun `reply pending context dispatch returns null when compatible core is unavailable`() {
+        var nativeCalled = false
+
+        assertNull(
+            BridgeCore.replyMarkdownPendingContextJson(
+                requestJson = "{}",
+                loadCompatibleCore = { false },
+                nativePendingContext = {
+                    nativeCalled = true
+                    """{"ok":true,"context":{}}"""
+                },
+            ),
+        )
+        assertNull(
+            BridgeCore.replyMentionPendingContextJson(
+                requestJson = "{}",
+                loadCompatibleCore = { false },
+                nativePendingContext = {
+                    nativeCalled = true
+                    """{"ok":true,"context":{}}"""
+                },
+            ),
+        )
+        assertFalse(nativeCalled)
     }
 
     @Test

@@ -1,9 +1,10 @@
 package party.qwer.iris.imagebridge.runtime.reply
 
 import android.content.Intent
+import org.json.JSONObject
 import party.qwer.iris.ReplyHookSignatureProtocol
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
-import party.qwer.iris.imagebridge.runtime.core.replyHookVerify
+import party.qwer.iris.imagebridge.runtime.core.replyMarkdownPendingContextJson
 import party.qwer.iris.resolveBridgeToken
 
 internal object ReplyMarkdownBridgeExtras {
@@ -55,33 +56,49 @@ internal object ReplyMarkdownBridgeExtras {
         nowEpochMs: Long = System.currentTimeMillis(),
         bridgeToken: String = resolveBridgeToken(),
     ): ReplyMarkdownPendingContext? {
-        val threadId = snapshot.threadIdRaw?.toLongOrNull() ?: return null
-        val threadScope = snapshot.threadScope ?: 2
-        if (threadScope <= 0) return null
-        val roomId = snapshot.roomIdRaw?.toLongOrNull() ?: snapshot.fallbackRoomId ?: return null
-        val messageText = snapshot.messageText ?: snapshot.nestedMessageText ?: return null
-        if (messageText.isBlank()) return null
-        if (
-            !BridgeCore.replyHookVerify(
-                bridgeToken = bridgeToken,
-                roomId = roomId,
-                messageText = messageText,
-                sessionId = snapshot.sessionId,
-                createdAtEpochMs = snapshot.createdAtEpochMs,
-                mentionsHash = null,
-                signature = snapshot.signature,
-                nowEpochMs = nowEpochMs,
-            )
-        ) {
-            return null
-        }
+        val context =
+            BridgeCore.replyMarkdownPendingContextJson(
+                pendingContextRequestJson(snapshot, nowEpochMs, bridgeToken),
+            ) ?: return null
         return ReplyMarkdownPendingContext(
-            roomId = roomId,
-            messageText = messageText,
-            threadId = threadId,
-            threadScope = threadScope,
-            sessionId = snapshot.sessionId,
-            createdAtEpochMs = snapshot.createdAtEpochMs ?: nowEpochMs,
+            roomId = context.getLong("roomId"),
+            messageText = context.getString("messageText"),
+            threadId = context.getLong("threadId"),
+            threadScope = context.getInt("threadScope"),
+            sessionId = context.stringOrNull("sessionId"),
+            createdAtEpochMs = context.getLong("createdAtEpochMs"),
         )
     }
+
+    private fun pendingContextRequestJson(
+        snapshot: Snapshot,
+        nowEpochMs: Long,
+        bridgeToken: String,
+    ): String =
+        JSONObject()
+            .put("bridgeToken", bridgeToken)
+            .put("nowEpochMs", nowEpochMs)
+            .put(
+                "snapshot",
+                JSONObject()
+                    .putIfNotNull("sessionId", snapshot.sessionId)
+                    .putIfNotNull("roomIdRaw", snapshot.roomIdRaw)
+                    .putIfNotNull("fallbackRoomId", snapshot.fallbackRoomId)
+                    .putIfNotNull("threadIdRaw", snapshot.threadIdRaw)
+                    .putIfNotNull("threadScope", snapshot.threadScope)
+                    .putIfNotNull("createdAtEpochMs", snapshot.createdAtEpochMs)
+                    .putIfNotNull("signature", snapshot.signature)
+                    .putIfNotNull("messageText", snapshot.messageText)
+                    .putIfNotNull("nestedMessageText", snapshot.nestedMessageText),
+            ).toString()
 }
+
+private fun JSONObject.putIfNotNull(
+    key: String,
+    value: Any?,
+): JSONObject =
+    apply {
+        if (value != null) put(key, value)
+    }
+
+private fun JSONObject.stringOrNull(key: String): String? = if (has(key) && !isNull(key)) optString(key) else null

@@ -1,6 +1,11 @@
 use iris_bridge_core::server::reply_hook::{
-    REPLY_HOOK_TTL_MS, sign_prepared, verify as reply_verify,
+    REPLY_HOOK_TTL_MS, markdown_pending_context_request, mention_pending_context_request,
+    sign_prepared, verify as reply_verify,
 };
+use iris_bridge_core::server::{ERROR_BAD_REQUEST, Rejection};
+use serde_json::{Value, json};
+
+use super::envelope::json_catch_unwind;
 
 #[allow(
     clippy::too_many_arguments,
@@ -49,4 +54,20 @@ pub fn dispatch_reply_hook_verify(
         now_epoch_ms,
         REPLY_HOOK_TTL_MS,
     )
+}
+
+pub fn dispatch_reply_markdown_pending_context(request_json: &str) -> String {
+    json_catch_unwind(|| {
+        let context = markdown_pending_context_request(request_json)
+            .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error))?;
+        Ok(context.unwrap_or_else(|| json!({ "context": Value::Null })))
+    })
+}
+
+pub fn dispatch_reply_mention_pending_context(request_json: &str) -> String {
+    json_catch_unwind(|| {
+        let context = mention_pending_context_request(request_json)
+            .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error))?;
+        Ok(context.unwrap_or_else(|| json!({ "context": Value::Null })))
+    })
 }

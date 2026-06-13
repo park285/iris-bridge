@@ -58,7 +58,10 @@ pub use mux_session::{
 pub use reply_attachment_text::{
     dispatch_reply_attachment_session_id, dispatch_reply_attachment_text_looks_like,
 };
-pub use reply_hook::{dispatch_reply_hook_sign, dispatch_reply_hook_verify};
+pub use reply_hook::{
+    dispatch_reply_hook_sign, dispatch_reply_hook_verify, dispatch_reply_markdown_pending_context,
+    dispatch_reply_mention_pending_context,
+};
 pub use reply_leverage_attachment::dispatch_merge_reply_leverage_attachment;
 pub use request_validation::{
     dispatch_allowed_peer_uids, dispatch_classify_error_code, dispatch_failure_metric_bucket,

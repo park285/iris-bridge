@@ -6,9 +6,12 @@ use jni::sys::{jboolean, jlong};
 
 use crate::dispatch::{
     dispatch_mentions_hash_from_attachment, dispatch_mentions_hash_from_json,
-    dispatch_reply_hook_sign, dispatch_reply_hook_verify,
+    dispatch_reply_hook_sign, dispatch_reply_hook_verify, dispatch_reply_markdown_pending_context,
+    dispatch_reply_mention_pending_context,
 };
-use crate::marshal::{catch_jstring, read_optional_string, read_string, return_optional_string};
+use crate::marshal::{
+    catch_jstring, read_optional_string, read_string, return_optional_string, return_string,
+};
 
 #[unsafe(no_mangle)]
 #[allow(
@@ -111,5 +114,33 @@ pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJ
             env,
             dispatch_mentions_hash_from_attachment(attachment.as_deref()),
         )
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniReply_nativeReplyMarkdownPendingContext<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    request_json: JString<'local>,
+) -> jni::sys::jstring {
+    catch_jstring(&mut env, |env| {
+        let request = read_string(env, &request_json);
+        return_string(env, &dispatch_reply_markdown_pending_context(&request))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_party_qwer_iris_imagebridge_runtime_core_BridgeCoreJniReply_nativeReplyMentionPendingContext<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    request_json: JString<'local>,
+) -> jni::sys::jstring {
+    catch_jstring(&mut env, |env| {
+        let request = read_string(env, &request_json);
+        return_string(env, &dispatch_reply_mention_pending_context(&request))
     })
 }

@@ -40,4 +40,8 @@ internal object BridgeCoreJniReply {
     external fun nativeReplyAttachmentTextLooksLike(value: String): Boolean
 
     external fun nativeReplyAttachmentSessionId(attachmentText: String): String?
+
+    external fun nativeReplyMarkdownPendingContext(requestJson: String): String
+
+    external fun nativeReplyMentionPendingContext(requestJson: String): String
 }
