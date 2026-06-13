@@ -32,6 +32,11 @@ class BridgeCoreEnvelope private constructor(
 
     fun long(key: String): Long? = if (json.has(key) && !json.isNull(key)) json.optLong(key) else null
 
+    fun stringList(key: String): List<String>? {
+        val array = if (json.has(key) && !json.isNull(key)) json.optJSONArray(key) else null
+        return array?.let { values -> List(values.length()) { index -> values.optString(index) } }
+    }
+
     fun dedupeState(): DedupeState? =
         when (string("state")) {
             "fresh" -> DedupeState.Fresh

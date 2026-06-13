@@ -6,6 +6,8 @@ import android.content.Context
 import android.net.Uri
 import party.qwer.iris.imagebridge.runtime.BridgeHookInstaller
 import party.qwer.iris.imagebridge.runtime.NoopBridgeHookInstaller
+import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.validateShareManagerImageMedia
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoImageSendStrategy
 import java.io.File
@@ -80,9 +82,7 @@ internal class KakaoSendInvocationFactory(
             if (threadId != null || threadScope != null) {
                 error("threaded image send is not supported on ShareManager image path")
             }
-            require(normalizedContentTypes.none { it == CONTENT_TYPE_VIDEO_MP4 }) {
-                "video media send is not supported on ShareManager image path"
-            }
+            BridgeCore.validateShareManagerImageMedia(normalizedContentTypes)
             shareManagerImageSender.send(chatRoom, imagePaths, pathArgumentFactory)
             return
         }

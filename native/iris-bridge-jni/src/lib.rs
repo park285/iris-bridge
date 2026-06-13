@@ -13,7 +13,7 @@ use crate::dispatch::*;
 #[cfg(test)]
 use crate::handles::{BridgeCoreContext, drop_handle, into_handle, with_context};
 
-pub const ABI_VERSION: jint = 34;
+pub const ABI_VERSION: jint = 35;
 
 #[cfg(test)]
 #[path = "tests/lib.rs"]

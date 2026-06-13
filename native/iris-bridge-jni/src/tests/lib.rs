@@ -238,6 +238,37 @@ fn mux_session_dispatch_rejects_invalid_inputs_and_handles() {
 }
 
 #[test]
+fn media_content_dispatch_normalizes_and_selects_message_kind() {
+    let normalized = assert_ok(&dispatch_normalize_media_content_types(
+        1,
+        r#"[" Video/MP4 ; charset=utf-8 "]"#,
+    ));
+    assert_eq!(normalized["normalizedContentTypes"], json!(["video/mp4"]));
+
+    let kind = assert_ok(&dispatch_media_message_kind(1, r#"["video/mp4"]"#));
+    assert_eq!(kind["messageKind"], "video");
+}
+
+#[test]
+fn media_content_dispatch_preserves_kotlin_rejection_messages() {
+    assert_error(
+        &dispatch_normalize_media_content_types(2, r#"["image/png"]"#),
+        "BAD_REQUEST",
+        "media content type count 1 does not match image count 2",
+    );
+    assert_error(
+        &dispatch_media_message_kind(2, r#"["video/mp4","image/png"]"#),
+        "BAD_REQUEST",
+        "multiple video media send is not supported",
+    );
+    assert_error(
+        &dispatch_validate_share_manager_image_media(r#"["video/mp4"]"#),
+        "BAD_REQUEST",
+        "video media send is not supported on ShareManager image path",
+    );
+}
+
+#[test]
 fn verify_leases_accepts_valid_payload() {
     let (leases_json, facts_json) = lease_fixture();
     assert_ok(&dispatch_verify_leases(

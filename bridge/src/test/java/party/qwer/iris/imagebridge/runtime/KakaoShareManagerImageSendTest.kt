@@ -43,6 +43,31 @@ class KakaoShareManagerImageSendTest {
     }
 
     @Test
+    fun `sendSingle rejects share manager video media policy`() {
+        ShareManager.reset()
+        val factory =
+            KakaoSendInvocationFactory(
+                registry = buildModernEntityNameRegistry(),
+                context = RuntimeEnvironment.getApplication(),
+                pathArgumentFactory = { path -> Uri.parse("uri:$path") },
+            )
+
+        val error =
+            assertFailsWith<IllegalArgumentException> {
+                factory.sendSingle(
+                    chatRoom = FakeChatRoom(),
+                    imagePath = "/tmp/share-manager.mp4",
+                    contentType = "video/mp4",
+                    threadId = null,
+                    threadScope = null,
+                )
+            }
+
+        assertEquals("video media send is not supported on ShareManager image path", error.message)
+        assertEquals(0, ShareManager.imageIntentPaths.size)
+    }
+
+    @Test
     fun `sendMultiple rejects threaded share manager image path`() {
         ShareManager.reset()
         val factory =

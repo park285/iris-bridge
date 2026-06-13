@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(34, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(35, BridgeCore.EXPECTED_ABI_VERSION)
     }
 
     private fun muxRequestFrame(correlationId: String): String =
@@ -375,6 +375,25 @@ class BridgeCoreRuntimeTest {
         } finally {
             runtime.close()
         }
+    }
+
+    @Test
+    fun `media content policy dispatch normalizes kinds and share manager rejection`() {
+        val normalized = BridgeCore.normalizeMediaContentTypes(1, listOf(" Video/MP4 ; charset=utf-8 "))
+        assertEquals(listOf("video/mp4"), normalized)
+        assertEquals(BridgeCoreMediaMessageKind.Video, BridgeCore.mediaMessageKind(1, normalized))
+
+        val shareManagerError =
+            assertFailsWith<IllegalArgumentException> {
+                BridgeCore.validateShareManagerImageMedia(normalized)
+            }
+        assertEquals("video media send is not supported on ShareManager image path", shareManagerError.message)
+
+        val multiVideoError =
+            assertFailsWith<IllegalArgumentException> {
+                BridgeCore.mediaMessageKind(2, listOf("video/mp4", "image/png"))
+            }
+        assertEquals("multiple video media send is not supported", multiVideoError.message)
     }
 
     @Test
