@@ -1,5 +1,6 @@
 package party.qwer.iris
 
+import party.qwer.iris.generated.GeneratedBridgeProtocolContract
 import java.io.DataOutputStream
 import java.io.EOFException
 import java.io.IOException
@@ -20,7 +21,7 @@ class FrameReadTimeoutException(
 ) : IOException("frame read timed out while reading ${stage.name.lowercase()}", cause)
 
 object LengthPrefixedFrameCodec {
-    const val MAX_FRAME_SIZE = 1_048_576
+    const val MAX_FRAME_SIZE = GeneratedBridgeProtocolContract.MAX_FRAME_SIZE
 
     fun writePayload(
         output: OutputStream,

@@ -4,18 +4,19 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import party.qwer.iris.generated.GeneratedBridgeProtocolContract
 import java.io.InputStream
 import java.io.OutputStream
 
 object ImageBridgeMuxProtocol {
-    const val MUX_VERSION = 2
-    const val DEFAULT_SOCKET_NAME = IrisRuntimePathPolicy.DEFAULT_IMAGE_BRIDGE_MUX_SOCKET_NAME
-    const val TYPE_REQUEST = "request"
-    const val TYPE_RESPONSE = "response"
-    const val TYPE_PING = "ping"
-    const val TYPE_PONG = "pong"
-    const val TYPE_CANCEL = "cancel"
-    const val TYPE_GOAWAY = "goaway"
+    const val MUX_VERSION = GeneratedBridgeProtocolContract.MUX_VERSION
+    const val DEFAULT_SOCKET_NAME = GeneratedBridgeProtocolContract.DEFAULT_IMAGE_BRIDGE_MUX_SOCKET_NAME
+    const val TYPE_REQUEST = GeneratedBridgeProtocolContract.MUX_FRAME_TYPE_REQUEST
+    const val TYPE_RESPONSE = GeneratedBridgeProtocolContract.MUX_FRAME_TYPE_RESPONSE
+    const val TYPE_PING = GeneratedBridgeProtocolContract.MUX_FRAME_TYPE_PING
+    const val TYPE_PONG = GeneratedBridgeProtocolContract.MUX_FRAME_TYPE_PONG
+    const val TYPE_CANCEL = GeneratedBridgeProtocolContract.MUX_FRAME_TYPE_CANCEL
+    const val TYPE_GOAWAY = GeneratedBridgeProtocolContract.MUX_FRAME_TYPE_GOAWAY
 
     private val json =
         Json {

@@ -1,5 +1,7 @@
 package party.qwer.iris
 
+import party.qwer.iris.generated.GeneratedBridgeProtocolContract
+
 data class IrisRuntimePaths(
     val dataDir: String,
     val configPath: String,
@@ -13,7 +15,7 @@ object IrisRuntimePathPolicy {
     private const val DEFAULT_CONFIG_FILENAME = "config.json"
     private const val DEFAULT_LOG_DIR = "logs"
     private const val DEFAULT_REPLY_IMAGE_DIR = "/data/iris-tmp/reply-images"
-    const val DEFAULT_IMAGE_BRIDGE_MUX_SOCKET_NAME = "iris-image-bridge-mux"
+    const val DEFAULT_IMAGE_BRIDGE_MUX_SOCKET_NAME = GeneratedBridgeProtocolContract.DEFAULT_IMAGE_BRIDGE_MUX_SOCKET_NAME
 
     fun resolve(env: Map<String, String> = System.getenv()): IrisRuntimePaths {
         val dataDir = env.nonBlank("IRIS_DATA_DIR") ?: DEFAULT_DATA_DIR

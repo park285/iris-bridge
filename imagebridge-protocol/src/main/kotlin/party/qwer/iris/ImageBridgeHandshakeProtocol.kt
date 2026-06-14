@@ -4,13 +4,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import party.qwer.iris.generated.GeneratedBridgeProtocolContract
 import java.io.InputStream
 import java.io.OutputStream
 
 object ImageBridgeHandshakeProtocol {
-    const val TYPE_HELLO = "hello"
-    const val TYPE_SERVER_PROOF = "server_proof"
-    const val TYPE_CLIENT_PROOF = "client_proof"
+    const val TYPE_HELLO = GeneratedBridgeProtocolContract.HANDSHAKE_FRAME_TYPE_HELLO
+    const val TYPE_SERVER_PROOF = GeneratedBridgeProtocolContract.HANDSHAKE_FRAME_TYPE_SERVER_PROOF
+    const val TYPE_CLIENT_PROOF = GeneratedBridgeProtocolContract.HANDSHAKE_FRAME_TYPE_CLIENT_PROOF
     const val AUTHENTICATION_FAILED = "bridge authentication failed"
 
     private val json =

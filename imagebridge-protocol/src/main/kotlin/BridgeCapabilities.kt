@@ -1,5 +1,7 @@
 package party.qwer.iris
 
+import party.qwer.iris.generated.GeneratedBridgeProtocolContract
+
 /*
  * 권한(capability) 단위로 본 bridge 위협 모델 schema.
  *
@@ -26,59 +28,59 @@ enum class BridgeCapability(
     val threats: Set<BridgeThreat>,
 ) {
     SEND_IMAGE_REPLY(
-        "send-image-reply",
+        GeneratedBridgeProtocolContract.CAPABILITY_SEND_IMAGE_REPLY,
         "지정한 방에 이미지 첨부 메시지를 송신한다.",
-        hasSideEffect = true,
-        requiresAuthToken = true,
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_SEND_IMAGE_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_SEND_IMAGE_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.UNSOLICITED_MESSAGE, BridgeThreat.PATH_TRAVERSAL),
     ),
     SEND_TEXT_REPLY(
-        "send-text-reply",
+        GeneratedBridgeProtocolContract.CAPABILITY_SEND_TEXT_REPLY,
         "지정한 방에 평문 텍스트 메시지를 송신한다.",
-        hasSideEffect = true,
-        requiresAuthToken = true,
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_SEND_TEXT_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_SEND_TEXT_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.UNSOLICITED_MESSAGE),
     ),
     SEND_MARKDOWN_REPLY(
-        "send-markdown-reply",
+        GeneratedBridgeProtocolContract.CAPABILITY_SEND_MARKDOWN_REPLY,
         "지정한 방에 마크다운 렌더링 메시지를 송신한다.",
-        hasSideEffect = true,
-        requiresAuthToken = true,
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_SEND_MARKDOWN_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_SEND_MARKDOWN_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.UNSOLICITED_MESSAGE, BridgeThreat.CONTENT_SPOOFING),
     ),
     OPEN_CHATROOM(
-        "open-chatroom",
+        GeneratedBridgeProtocolContract.CAPABILITY_OPEN_CHATROOM,
         "KakaoTalk UI를 지정한 방으로 전환한다.",
-        hasSideEffect = true,
-        requiresAuthToken = true,
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_OPEN_CHATROOM_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_OPEN_CHATROOM_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.NAVIGATION_HIJACK),
     ),
     INSPECT_CHATROOM(
-        "inspect-chatroom",
+        GeneratedBridgeProtocolContract.CAPABILITY_INSPECT_CHATROOM,
         "방 식별·상태 메타데이터를 조회한다.",
-        hasSideEffect = false,
-        requiresAuthToken = true,
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_INSPECT_CHATROOM_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_INSPECT_CHATROOM_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.ROOM_METADATA_EXPOSURE),
     ),
     SNAPSHOT_CHATROOM_MEMBERS(
-        "snapshot-chatroom-members",
+        GeneratedBridgeProtocolContract.CAPABILITY_SNAPSHOT_CHATROOM_MEMBERS,
         "방 멤버 스냅샷(식별자/닉네임)을 조회한다.",
-        hasSideEffect = false,
-        requiresAuthToken = true,
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_SNAPSHOT_CHATROOM_MEMBERS_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_SNAPSHOT_CHATROOM_MEMBERS_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.MEMBER_DATA_EXPOSURE),
     ),
     FETCH_MEMBER_PROFILES(
-        "fetch-member-profiles",
+        GeneratedBridgeProtocolContract.CAPABILITY_FETCH_MEMBER_PROFILES,
         "지정한 방의 멤버 프로필(식별자/닉네임)을 조회한다.",
-        hasSideEffect = false,
-        requiresAuthToken = true,
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_FETCH_MEMBER_PROFILES_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_FETCH_MEMBER_PROFILES_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.MEMBER_DATA_EXPOSURE),
     ),
     REPORT_HEALTH(
-        "report-health",
+        GeneratedBridgeProtocolContract.CAPABILITY_REPORT_HEALTH,
         "bridge readiness와 hook 진단을 보고한다.",
-        hasSideEffect = false,
-        requiresAuthToken = false,
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_HEALTH_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_HEALTH_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.HEALTH_INFO_DISCLOSURE, BridgeThreat.RESOURCE_EXHAUSTION),
     ),
 }
