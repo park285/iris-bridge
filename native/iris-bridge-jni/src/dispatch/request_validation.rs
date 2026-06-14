@@ -23,7 +23,13 @@ pub use media_content::{
 pub fn dispatch_request_admission(action: &str, request_id: Option<&str>) -> String {
     json_catch_unwind(|| {
         iris_bridge_core::server::admission::validate_request_id(action, request_id)?;
-        Ok(json!({}))
+        let requires_request_id = iris_bridge_core::server::admission::requires_request_id(action);
+        let dedupe_key =
+            iris_bridge_core::server::admission::request_dedupe_key(action, request_id);
+        Ok(json!({
+            "requiresRequestId": requires_request_id,
+            "dedupeKey": dedupe_key,
+        }))
     })
 }
 

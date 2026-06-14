@@ -2,6 +2,7 @@
 
 package party.qwer.iris.imagebridge.runtime.server
 
+import org.json.JSONObject
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -17,6 +18,69 @@ import kotlin.test.fail
 
 @RunWith(RobolectricTestRunner::class)
 class BridgeRequestDeduperTest {
+    @Test
+    fun `completed response is stored in the core ledger for cached replay`() {
+        val runtime =
+            BridgeCore.loadOrNull(
+                securityMode = "development",
+                bridgeToken = "bridge-token",
+                requireHandshakeRaw = null,
+            )
+        assertNotNull(runtime, "host .so must load via java.library.path in unit tests")
+        runtime.use { core ->
+            val deduper = BridgeRequestDeduper(bridgeCore = core, nowMs = { 1_000L })
+            val key = "send_text:req-store-response"
+
+            val response =
+                deduper.execute(key, requestId = "req-store-response") {
+                    ImageBridgeProtocol.ImageBridgeResponse(
+                        status = ImageBridgeProtocol.STATUS_OK,
+                        requestId = "req-store-response",
+                    )
+                }
+            assertEquals(ImageBridgeProtocol.STATUS_OK, response.status)
+
+            val state = core.dedupeAdmit(key, 1_001L).dedupeState()
+            assertTrue(state is DedupeState.Cached, "completed request must become cached, got $state")
+            val responseJson = JSONObject(state.responseJson ?: fail("cached responseJson missing"))
+            assertEquals(ImageBridgeProtocol.STATUS_OK, responseJson.getString("status"))
+            assertEquals("req-store-response", responseJson.getString("requestId"))
+        }
+    }
+
+    @Test
+    fun `cached core dedupe verdict replays stored response without running block`() {
+        val runtime =
+            BridgeCore.loadOrNull(
+                securityMode = "development",
+                bridgeToken = "bridge-token",
+                requireHandshakeRaw = null,
+            )
+        assertNotNull(runtime, "host .so must load via java.library.path in unit tests")
+        runtime.use { core ->
+            val deduper = BridgeRequestDeduper(bridgeCore = core, nowMs = { 2_000L })
+            val key = "send_text:req-replay"
+            assertTrue(core.dedupeAdmit(key, 1_000L).dedupeState() is DedupeState.Fresh)
+            core.dedupeComplete(
+                key,
+                """{"status":"ok","requestId":"req-replay","payloadJson":"{\"sent\":true}"}""",
+                1_001L,
+            )
+
+            var executed = false
+            val response =
+                deduper.execute(key, requestId = "req-replay") {
+                    executed = true
+                    fail("block must not run")
+                }
+
+            assertFalse(executed, "cached Rust dedupe verdict must stop duplicate side effects")
+            assertEquals(ImageBridgeProtocol.STATUS_OK, response.status)
+            assertEquals("req-replay", response.requestId)
+            assertEquals("""{"sent":true}""", response.payloadJson)
+        }
+    }
+
     @Test
     fun `failed execution also records completion in the core ledger`() {
         val runtime =

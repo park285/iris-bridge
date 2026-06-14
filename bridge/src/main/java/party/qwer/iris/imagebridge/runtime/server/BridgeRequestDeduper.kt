@@ -56,7 +56,7 @@ internal class BridgeRequestDeduper private constructor(
             return existing.response.get(DEDUPE_WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         }
 
-        when (core.dedupeAdmit(key, nowMs()).dedupeState()) {
+        when (val state = core.dedupeAdmit(key, nowMs()).dedupeState()) {
             DedupeState.Fresh -> Unit
             DedupeState.InFlight -> {
                 onDedupeHit(key)
@@ -64,6 +64,7 @@ internal class BridgeRequestDeduper private constructor(
             }
             is DedupeState.Cached -> {
                 onDedupeHit(key)
+                decodeDedupeResponse(state.responseJson)?.let { return it }
                 return dedupeFailure("duplicate request", ImageBridgeProtocol.ERROR_DUPLICATE_REQUEST, requestId)
             }
             null -> return dedupeFailure("request dedupe admission failed", ImageBridgeProtocol.ERROR_INTERNAL, requestId)
@@ -79,7 +80,7 @@ internal class BridgeRequestDeduper private constructor(
         return try {
             val response = block()
             future.complete(response)
-            core.dedupeComplete(key, COMPLETED_MARKER_JSON, nowMs())
+            core.dedupeComplete(key, encodeDedupeResponse(response), nowMs())
             response
         } catch (error: Throwable) {
             val response =
@@ -88,7 +89,7 @@ internal class BridgeRequestDeduper private constructor(
                     errorCode = ImageBridgeProtocol.ERROR_INTERNAL,
                 )
             future.complete(response)
-            core.dedupeComplete(key, COMPLETED_MARKER_JSON, nowMs())
+            core.dedupeComplete(key, encodeDedupeResponse(response), nowMs())
             throw error
         } finally {
             pruneOversize()
@@ -125,7 +126,6 @@ internal class BridgeRequestDeduper private constructor(
         private const val DEFAULT_TTL_MS = 10 * 60 * 1000L
         private const val DEFAULT_MAX_ENTRIES = 4096
         private const val DEDUPE_WAIT_TIMEOUT_MS = 30_000L
-        private const val COMPLETED_MARKER_JSON = "{}"
     }
 }
 
@@ -139,3 +139,10 @@ private fun defaultBridgeCoreProvider(): () -> BridgeCoreRuntime? {
     }
     return { runtime }
 }
+
+private fun encodeDedupeResponse(response: ImageBridgeProtocol.ImageBridgeResponse): String = ImageBridgeProtocol.encodeResponseJson(response)
+
+private fun decodeDedupeResponse(responseJson: String?): ImageBridgeProtocol.ImageBridgeResponse? =
+    responseJson?.let { raw ->
+        runCatching { ImageBridgeProtocol.decodeResponseJson(raw) }.getOrNull()
+    }

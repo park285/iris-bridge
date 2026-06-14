@@ -672,6 +672,29 @@ fn request_admission_reports_missing_request_id_for_side_effects() {
     );
     assert_ok(&dispatch_request_admission("send_text", Some("req-1")));
     assert_ok(&dispatch_request_admission("health", None));
+
+    let long_request_id = "x".repeat(257);
+    assert_error(
+        &dispatch_request_admission("send_text", Some(&long_request_id)),
+        "BAD_REQUEST",
+        "requestId too long",
+    );
+    assert_error(
+        &dispatch_request_admission("health", Some(&long_request_id)),
+        "BAD_REQUEST",
+        "requestId too long",
+    );
+}
+
+#[test]
+fn request_admission_envelope_reports_request_id_policy() {
+    let send_text = assert_ok(&dispatch_request_admission("send_text", Some("req-1")));
+    assert_eq!(send_text["requiresRequestId"], true);
+    assert_eq!(send_text["dedupeKey"], "send_text:req-1");
+
+    let health = assert_ok(&dispatch_request_admission("health", Some("req-1")));
+    assert_eq!(health["requiresRequestId"], false);
+    assert!(health["dedupeKey"].is_null());
 }
 
 #[test]

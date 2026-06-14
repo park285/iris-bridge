@@ -27,6 +27,10 @@ interface ImageBridgeProtocolFrameIo {
     fun readRequestFrame(input: InputStream): ImageBridgeRequest = imageBridgeProtocolJson.decodeFromString(readFramePayload(input))
 
     fun readResponseFrame(input: InputStream): ImageBridgeResponse = imageBridgeProtocolJson.decodeFromString(readFramePayload(input))
+
+    fun encodeResponseJson(response: ImageBridgeResponse): String = imageBridgeProtocolJson.encodeToString(response)
+
+    fun decodeResponseJson(payload: String): ImageBridgeResponse = imageBridgeProtocolJson.decodeFromString(payload)
 }
 
 private fun writeFramePayload(
