@@ -3,11 +3,6 @@ package party.qwer.iris.imagebridge.runtime.send
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-internal data class RoomThreadKey(
-    val roomId: Long,
-    val threadId: Long?,
-)
-
 internal class RoomThreadSerialExecutor(
     stripeCount: Int = DEFAULT_STRIPE_COUNT,
 ) {

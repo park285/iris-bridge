@@ -35,11 +35,6 @@ fun resolveBridgeReplyImageDir(
     fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
 ): String = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).replyImageDir
 
-fun resolveBridgeMuxServerEnabled(
-    env: Map<String, String> = System.getenv(),
-    fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
-): Boolean = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).bridgeMuxServerEnabled
-
 fun resolveBridgeTextSendTextEnabled(
     env: Map<String, String> = System.getenv(),
     fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
@@ -49,9 +44,3 @@ fun resolveBridgeTextSendMarkdownEnabled(
     env: Map<String, String> = System.getenv(),
     fileReader: (String) -> String? = ::readBridgeRuntimeConfigFile,
 ): Boolean = BridgeBootstrapConfigResolver.resolve(env = env, fileReader = fileReader).textBridgeSendMarkdownEnabled
-
-internal fun decodeBridgeToken(rawConfig: String): String =
-    decodeBridgeRuntimeConfig(rawConfig)
-        ?.bridgeToken
-        ?.trim()
-        .orEmpty()

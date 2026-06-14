@@ -111,19 +111,6 @@ private fun writeTypeConnect(registry: KakaoClassRegistry): Any =
         (constant as Enum<*>).name == "Connect"
     } ?: registry.writeTypeNone
 
-internal fun selectThreadedChatMediaEntryMethodForTest(
-    chatMediaSenderClass: Class<*>,
-    messageTypeClass: Class<*>,
-    writeTypeClass: Class<*>,
-    function1Class: Class<*>,
-): Method =
-    selectThreadedChatMediaEntryMethod(
-        chatMediaSenderClass = chatMediaSenderClass,
-        messageTypeClass = messageTypeClass,
-        writeTypeClass = writeTypeClass,
-        function1Class = function1Class,
-    )
-
 private fun selectThreadedChatMediaEntryMethod(
     chatMediaSenderClass: Class<*>,
     messageTypeClass: Class<*>,

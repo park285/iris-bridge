@@ -25,12 +25,6 @@ internal class MemberCandidateCollector(
                 }
         }
 
-    fun typeScore(container: ContainerCandidate): Int =
-        when (container) {
-            is ContainerCandidate.CollectionContainer -> 120
-            is ContainerCandidate.MapContainer -> -120
-        }
-
     fun typeLabel(container: ContainerCandidate): String =
         when (container) {
             is ContainerCandidate.CollectionContainer -> CONTAINER_TYPE_COLLECTION

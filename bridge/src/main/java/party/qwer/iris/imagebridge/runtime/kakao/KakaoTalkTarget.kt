@@ -53,6 +53,4 @@ internal data class KakaoTalkTargetContext(
     fun dexClassName(suffix: String): String = "$dexPackage.$suffix"
 
     fun dataPath(suffix: String): String = "/data/data/$packageName/$suffix"
-
-    fun externalDataPath(suffix: String): String = "/sdcard/Android/data/$packageName/$suffix"
 }

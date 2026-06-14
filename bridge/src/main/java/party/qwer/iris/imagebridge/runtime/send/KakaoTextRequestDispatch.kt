@@ -4,11 +4,6 @@ import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
-internal fun selectTextRequestMethodForTest(
-    companionClass: Class<*>,
-    registry: KakaoClassRegistry,
-): Method = selectTextRequestMethod(companionClass, registry)
-
 internal fun selectTextRequestMethod(
     companionClass: Class<*>,
     registry: KakaoClassRegistry,
