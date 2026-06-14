@@ -36,6 +36,34 @@ val generateBridgeProtocolContract =
         )
     }
 
+val checkBridgeProtocolContractGeneration =
+    tasks.register<Exec>("checkBridgeProtocolContractGeneration") {
+        dependsOn(generateBridgeProtocolContract)
+
+        val generator = rootProject.layout.projectDirectory.file("scripts/generate-bridge-kotlin-contract.py")
+        val constants = rootProject.layout.projectDirectory.file("native/iris-bridge-core/src/protocol/constants.rs")
+        val actions = rootProject.layout.projectDirectory.file("native/iris-bridge-core/src/protocol/actions.rs")
+
+        inputs.file(generator).withPropertyName("generator")
+        inputs.file(constants).withPropertyName("bridgeProtocolConstants")
+        inputs.file(actions).withPropertyName("bridgeProtocolActions")
+        inputs.file(generatedBridgeProtocolFile).withPropertyName("generatedBridgeProtocolContract")
+
+        commandLine(
+            "python3",
+            generator.asFile.absolutePath,
+            "--repo-root",
+            rootProject.layout.projectDirectory.asFile.absolutePath,
+            "--output",
+            generatedBridgeProtocolFile.get().asFile.absolutePath,
+            "--check",
+        )
+    }
+
+tasks.named("check") {
+    dependsOn(checkBridgeProtocolContractGeneration)
+}
+
 kotlin {
     jvmToolchain(17)
     compilerOptions {
@@ -70,6 +98,11 @@ tasks.test {
 ktlint {
     outputToConsole.set(true)
     ignoreFailures.set(false)
+    filter {
+        exclude { entry ->
+            entry.file.path.contains("${File.separator}build${File.separator}generated${File.separator}source${File.separator}bridgeProtocolContract${File.separator}")
+        }
+    }
 }
 
 dependencies {

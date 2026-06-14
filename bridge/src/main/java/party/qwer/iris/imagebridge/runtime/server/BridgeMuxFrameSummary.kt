@@ -4,12 +4,20 @@ import org.json.JSONObject
 import party.qwer.iris.ImageBridgeMuxFrame
 
 internal fun ImageBridgeMuxFrame.muxSummaryJson(): String =
-    JSONObject()
-        .apply {
-            put("type", type)
-            put("muxVersion", muxVersion)
-            correlationId?.let { put("correlationId", it) }
-            if (request != null) put("request", JSONObject())
-            if (response != null) put("response", JSONObject())
-            errorCode?.let { put("errorCode", it) }
-        }.toString()
+    buildString {
+        append("{\"type\":")
+        append(JSONObject.quote(type))
+        append(",\"muxVersion\":")
+        append(muxVersion)
+        correlationId?.let { value ->
+            append(",\"correlationId\":")
+            append(JSONObject.quote(value))
+        }
+        if (request != null) append(",\"request\":{}")
+        if (response != null) append(",\"response\":{}")
+        errorCode?.let { value ->
+            append(",\"errorCode\":")
+            append(JSONObject.quote(value))
+        }
+        append('}')
+    }

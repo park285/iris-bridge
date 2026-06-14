@@ -22,6 +22,7 @@ internal class BridgeHandshakeValidator private constructor(
             core.validateRequestToken(
                 JSONObject()
                     .put("protocolVersion", request.protocolVersion ?: JSONObject.NULL)
+                    .put("action", request.action)
                     .put("token", request.token ?: JSONObject.NULL)
                     .toString(),
             )

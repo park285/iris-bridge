@@ -46,20 +46,34 @@ internal class BridgeRequestDeduper private constructor(
 
     fun execute(
         key: String,
+        requestId: String? = null,
         block: () -> ImageBridgeProtocol.ImageBridgeResponse,
     ): ImageBridgeProtocol.ImageBridgeResponse {
         val core = bridgeCoreProvider() ?: error("bridge core unavailable for request dedupe")
         pruneExpired()
+        entries[key]?.let { existing ->
+            onDedupeHit(key)
+            return existing.response.get(DEDUPE_WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        }
+
+        when (core.dedupeAdmit(key, nowMs()).dedupeState()) {
+            DedupeState.Fresh -> Unit
+            DedupeState.InFlight -> {
+                onDedupeHit(key)
+                return dedupeFailure("duplicate request in flight", ImageBridgeProtocol.ERROR_BRIDGE_BUSY, requestId)
+            }
+            is DedupeState.Cached -> {
+                onDedupeHit(key)
+                return dedupeFailure("duplicate request", ImageBridgeProtocol.ERROR_DUPLICATE_REQUEST, requestId)
+            }
+            null -> return dedupeFailure("request dedupe admission failed", ImageBridgeProtocol.ERROR_INTERNAL, requestId)
+        }
+
         val future = CompletableFuture<ImageBridgeProtocol.ImageBridgeResponse>()
         val existing = entries.putIfAbsent(key, Entry(createdAtMs = nowMs(), response = future))
         if (existing != null) {
             onDedupeHit(key)
             return existing.response.get(DEDUPE_WAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        }
-
-        val admission = core.dedupeAdmit(key, nowMs()).dedupeState()
-        if (admission is DedupeState.Cached) {
-            onDedupeHit(key)
         }
 
         return try {
@@ -95,6 +109,17 @@ internal class BridgeRequestDeduper private constructor(
                 .map { it.key }
         victims.forEach(entries::remove)
     }
+
+    private fun dedupeFailure(
+        error: String,
+        errorCode: String,
+        requestId: String?,
+    ): ImageBridgeProtocol.ImageBridgeResponse =
+        bridgeFailureResponse(
+            error = error,
+            errorCode = errorCode,
+            requestId = requestId,
+        )
 
     private companion object {
         private const val DEFAULT_TTL_MS = 10 * 60 * 1000L

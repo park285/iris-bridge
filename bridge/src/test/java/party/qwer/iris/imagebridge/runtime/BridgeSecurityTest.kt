@@ -54,7 +54,7 @@ class BridgeSecurityTest {
     }
 
     @Test
-    fun `production mode requires configured token`() {
+    fun `production mode requires configured token for authenticated actions`() {
         val validator =
             BridgeHandshakeValidator(
                 expectedToken = "",
@@ -63,14 +63,26 @@ class BridgeSecurityTest {
 
         val error =
             assertFailsWith<IllegalArgumentException> {
-                validator.validate(healthRequest(token = ""))
+                validator.validate(sendTextRequest(roomId = 1L, message = "hello", token = ""))
             }
 
         assertEquals("bridge token must be configured in production mode", error.message)
     }
 
     @Test
-    fun `production mode rejects mismatched token`() {
+    fun `production mode accepts token exempt health without configured token`() {
+        val validator =
+            BridgeHandshakeValidator(
+                expectedToken = "",
+                securityMode = BridgeSecurityMode.PRODUCTION,
+            )
+
+        validator.validate(healthRequest(token = null))
+        validator.validate(healthRequest(token = "wrong"))
+    }
+
+    @Test
+    fun `production mode rejects mismatched token for authenticated actions`() {
         val validator =
             BridgeHandshakeValidator(
                 expectedToken = "secret",
@@ -79,7 +91,7 @@ class BridgeSecurityTest {
 
         val error =
             assertFailsWith<IllegalArgumentException> {
-                validator.validate(healthRequest(token = "wrong"))
+                validator.validate(sendTextRequest(roomId = 1L, message = "hello", token = "wrong"))
             }
 
         assertEquals("unauthorized bridge token", error.message)
@@ -93,7 +105,7 @@ class BridgeSecurityTest {
                 securityMode = BridgeSecurityMode.PRODUCTION,
             )
 
-        validator.validate(healthRequest(token = "secret"))
+        validator.validate(sendTextRequest(roomId = 1L, message = "hello", token = "secret"))
     }
 
     @Test
@@ -117,7 +129,7 @@ class BridgeSecurityTest {
 
         val error =
             assertFailsWith<IllegalArgumentException> {
-                validator.validate(healthRequest(token = "wrong"))
+                validator.validate(sendTextRequest(roomId = 1L, message = "hello", token = "wrong"))
             }
 
         assertEquals("unauthorized bridge token", error.message)

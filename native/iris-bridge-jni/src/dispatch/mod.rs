@@ -92,12 +92,12 @@ pub fn dispatch_validate_request_token(context: &BridgeCoreContext, request_json
     json_catch_unwind(|| {
         let request: TokenRequest =
             serde_json::from_str(request_json).map_err(|_| bad_request("request JSON invalid"))?;
-        let _ = request.action;
         validate_request(
             context.security_mode,
             &context.bridge_token,
             request.token.as_deref(),
             request.protocol_version.unwrap_or_default(),
+            request.action.as_deref(),
         )?;
         Ok(json!({}))
     })

@@ -44,7 +44,7 @@ class ImageBridgeRequestHandlerProtocolAuthTest {
 
         val response =
             handler.handle(
-                healthRequest(token = "wrong-token"),
+                sendTextRequest(roomId = 1L, message = "hello", token = "wrong-token"),
             )
 
         assertEquals("failed", response.status)

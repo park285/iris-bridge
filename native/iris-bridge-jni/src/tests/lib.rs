@@ -92,7 +92,16 @@ fn lease_fixture() -> (String, String) {
 fn validate_request_token_returns_success_envelope() {
     let envelope = assert_ok(&dispatch_validate_request_token(
         &context(),
-        r#"{"action":"health","protocolVersion":1,"token":"bridge-token"}"#,
+        r#"{"action":"send_text","protocolVersion":1,"token":"bridge-token"}"#,
+    ));
+    assert_eq!(envelope.as_object().expect("object").len(), 1);
+}
+
+#[test]
+fn validate_request_token_allows_token_exempt_health_without_token() {
+    let envelope = assert_ok(&dispatch_validate_request_token(
+        &context(),
+        r#"{"action":"health","protocolVersion":1}"#,
     ));
     assert_eq!(envelope.as_object().expect("object").len(), 1);
 }
@@ -102,7 +111,19 @@ fn validate_request_token_serializes_core_rejection_without_rewriting() {
     assert_error(
         &dispatch_validate_request_token(
             &context(),
-            r#"{"action":"health","protocolVersion":1,"token":"wrong"}"#,
+            r#"{"action":"send_text","protocolVersion":1,"token":"wrong"}"#,
+        ),
+        "UNAUTHORIZED",
+        "unauthorized bridge token",
+    );
+}
+
+#[test]
+fn validate_request_token_requires_token_for_unknown_actions() {
+    assert_error(
+        &dispatch_validate_request_token(
+            &context(),
+            r#"{"action":"future_side_effect","protocolVersion":1}"#,
         ),
         "UNAUTHORIZED",
         "unauthorized bridge token",
