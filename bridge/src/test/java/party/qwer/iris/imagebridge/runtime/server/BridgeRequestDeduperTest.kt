@@ -82,6 +82,45 @@ class BridgeRequestDeduperTest {
     }
 
     @Test
+    fun `oversized completed response is compacted before core replay`() {
+        val runtime =
+            BridgeCore.loadOrNull(
+                securityMode = "development",
+                bridgeToken = "bridge-token",
+                requireHandshakeRaw = null,
+            )
+        assertNotNull(runtime, "host .so must load via java.library.path in unit tests")
+        runtime.use { core ->
+            val deduper = BridgeRequestDeduper(bridgeCore = core, nowMs = { 3_000L })
+            val key = "send_text:req-large-response"
+
+            val response =
+                deduper.execute(key, requestId = "req-large-response") {
+                    ImageBridgeProtocol.ImageBridgeResponse(
+                        status = ImageBridgeProtocol.STATUS_OK,
+                        requestId = "req-large-response",
+                        payloadJson = "x".repeat(32 * 1024),
+                    )
+                }
+            assertEquals(ImageBridgeProtocol.STATUS_OK, response.status)
+
+            val state = core.dedupeAdmit(key, 3_001L).dedupeState()
+            assertTrue(state is DedupeState.Cached, "completed request must become cached, got $state")
+            val responseJson = state.responseJson ?: fail("cached responseJson missing")
+            assertTrue(
+                responseJson.toByteArray(Charsets.UTF_8).size < 1024,
+                "oversized response should be compacted before storing in Rust ledger",
+            )
+
+            val cached = ImageBridgeProtocol.decodeResponseJson(responseJson)
+            assertEquals(ImageBridgeProtocol.STATUS_FAILED, cached.status)
+            assertEquals(ImageBridgeProtocol.ERROR_DUPLICATE_REQUEST, cached.errorCode)
+            assertEquals("dedupe replay response too large", cached.error)
+            assertEquals("req-large-response", cached.requestId)
+        }
+    }
+
+    @Test
     fun `failed execution also records completion in the core ledger`() {
         val runtime =
             BridgeCore.loadOrNull(

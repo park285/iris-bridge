@@ -140,9 +140,29 @@ private fun defaultBridgeCoreProvider(): () -> BridgeCoreRuntime? {
     return { runtime }
 }
 
-private fun encodeDedupeResponse(response: ImageBridgeProtocol.ImageBridgeResponse): String = ImageBridgeProtocol.encodeResponseJson(response)
+private fun encodeDedupeResponse(response: ImageBridgeProtocol.ImageBridgeResponse): String {
+    val encoded = ImageBridgeProtocol.encodeResponseJson(response)
+    if (encoded.utf8Size() <= MAX_DEDUPE_RESPONSE_JSON_BYTES) {
+        return encoded
+    }
+    return ImageBridgeProtocol.encodeResponseJson(
+        bridgeFailureResponse(
+            error = "dedupe replay response too large",
+            errorCode = ImageBridgeProtocol.ERROR_DUPLICATE_REQUEST,
+            requestId = response.requestId,
+        ),
+    )
+}
 
 private fun decodeDedupeResponse(responseJson: String?): ImageBridgeProtocol.ImageBridgeResponse? =
     responseJson?.let { raw ->
-        runCatching { ImageBridgeProtocol.decodeResponseJson(raw) }.getOrNull()
+        if (raw.utf8Size() > MAX_DEDUPE_RESPONSE_JSON_BYTES) {
+            null
+        } else {
+            runCatching { ImageBridgeProtocol.decodeResponseJson(raw) }.getOrNull()
+        }
     }
+
+private const val MAX_DEDUPE_RESPONSE_JSON_BYTES = 16 * 1024
+
+private fun String.utf8Size(): Int = toByteArray(Charsets.UTF_8).size
