@@ -241,6 +241,7 @@ internal fun readyTextHealthSnapshot(): ImageBridgeHealthSnapshot =
     readyHealthSnapshot().copy(
         capabilities =
             ImageBridgeCapabilitiesSnapshot(
+                markChatRoomRead = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
                 sendText = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
                 sendMarkdown = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
             ),

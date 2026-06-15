@@ -67,12 +67,7 @@ interface ImageBridgeRequestFactory {
             markdown = true,
         )
 
-    fun buildHealthRequest(token: String? = null): ImageBridgeRequest =
-        ImageBridgeRequest(
-            action = ImageBridgeProtocol.ACTION_HEALTH,
-            protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
-            token = token,
-        )
+    fun buildHealthRequest(token: String? = null): ImageBridgeRequest = ImageBridgeRequest(action = ImageBridgeProtocol.ACTION_HEALTH, protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION, token = token)
 
     fun buildInspectChatRoomRequest(
         roomId: Long,
@@ -84,6 +79,12 @@ interface ImageBridgeRequestFactory {
         requestId: String? = null,
         token: String? = null,
     ): ImageBridgeRequest = roomRequest(ImageBridgeProtocol.ACTION_OPEN_CHATROOM, roomId, token, requestId)
+
+    fun buildMarkChatRoomReadRequest(
+        roomId: Long,
+        requestId: String? = null,
+        token: String? = null,
+    ): ImageBridgeRequest = roomRequest(ImageBridgeProtocol.ACTION_MARK_CHATROOM_READ, roomId, token, requestId)
 
     fun buildSnapshotChatRoomMembersRequest(
         roomId: Long,

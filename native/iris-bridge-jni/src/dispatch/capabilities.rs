@@ -15,6 +15,7 @@ pub fn dispatch_current_bridge_capabilities(
     registry_available: bool,
     registry_error: Option<&str>,
     spec_ready: bool,
+    notification_action_supported: bool,
     text_supported: bool,
     text_ready: bool,
     text_reason: Option<&str>,
@@ -28,6 +29,7 @@ pub fn dispatch_current_bridge_capabilities(
                 registry_error: registry_error.map(str::to_owned),
                 spec_ready,
             },
+            notification_action_supported,
             text_send_capability: Some(TextCapability {
                 supported: text_supported,
                 ready: text_ready,
@@ -45,6 +47,11 @@ pub fn dispatch_current_bridge_capabilities(
             &capabilities.inspect_chat_room,
         );
         insert_capability_fields(&mut fields, "openChatRoom", &capabilities.open_chat_room);
+        insert_capability_fields(
+            &mut fields,
+            "markChatRoomRead",
+            &capabilities.mark_chat_room_read,
+        );
         insert_capability_fields(
             &mut fields,
             "snapshotChatRoomMembers",

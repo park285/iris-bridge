@@ -41,6 +41,7 @@ private fun ImageBridgeCapabilitiesSnapshot.toProtocol(): ImageBridgeProtocol.Im
     ImageBridgeProtocol.ImageBridgeCapabilities(
         inspectChatRoom = inspectChatRoom.toProtocol(),
         openChatRoom = openChatRoom.toProtocol(),
+        markChatRoomRead = markChatRoomRead.toProtocol(),
         snapshotChatRoomMembers = snapshotChatRoomMembers.toProtocol(),
         sendText = sendText.toProtocol(),
         sendMarkdown = sendMarkdown.toProtocol(),

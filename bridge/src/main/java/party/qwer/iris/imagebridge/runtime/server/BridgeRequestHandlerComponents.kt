@@ -16,10 +16,8 @@ import party.qwer.iris.imagebridge.runtime.kakao.userdb.KakaoUserDatabaseReader
 import party.qwer.iris.imagebridge.runtime.kakao.userdb.discoverKakaoUserDatabaseAccess
 import party.qwer.iris.imagebridge.runtime.reply.ReplyLeveragePendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
-import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntentMetadataResolver
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberExtractor
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomMemberSnapshotEnricher
-import party.qwer.iris.imagebridge.runtime.room.ChatRoomOpener
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 import party.qwer.iris.imagebridge.runtime.room.defaultChatRoomIntrospector
 import party.qwer.iris.imagebridge.runtime.send.KakaoImageSender
@@ -48,7 +46,8 @@ internal fun buildBridgeRequestHandlerComponents(
     val imageSender = registry?.let { KakaoImageSender(context, it, hookInstaller) }
     val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts) }
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
-    val chatRoomOpener = chatRoomOpener(context, registry, chatRoomResolver)
+    val chatRoomOpener = buildChatRoomOpener(context, registry, chatRoomResolver)
+    val notificationActionStarter = buildNotificationActionStarter(context, registry)
     val memberProfileFetcher = discoverMemberProfileFetcher(context, kakaoClassLoader)
     val memberExtractor = ChatRoomMemberExtractor()
     val memberSnapshotEnricher =
@@ -64,6 +63,7 @@ internal fun buildBridgeRequestHandlerComponents(
                 healthProvider = healthProvider,
                 chatRoomInspector = { roomId -> inspectChatRoom(chatRoomResolver, registryError, roomId) },
                 chatRoomOpener = chatRoomOpener::open,
+                chatRoomReadMarker = notificationActionStarter::markChatRoomRead,
                 chatRoomMemberSnapshotProvider = { roomId, expectedMemberHints, preferredPlan ->
                     val room = resolveFreshChatRoom(chatRoomResolver, registryError, roomId)
                     val snapshot = memberExtractor.snapshot(roomId, room, expectedMemberHints, preferredPlan)
@@ -115,22 +115,6 @@ private fun buildMemberProfileFetcher(
         baseFetcher != null -> baseFetcher
         else -> null
     }
-
-private fun chatRoomOpener(
-    context: Context,
-    registry: KakaoClassRegistry?,
-    chatRoomResolver: ChatRoomResolver?,
-): ChatRoomOpener {
-    val metadataResolver =
-        ChatRoomIntentMetadataResolver { roomId ->
-            chatRoomResolver?.resolve(roomId)
-        }
-    return ChatRoomOpener(
-        context,
-        kakaoPackage = registry?.target?.packageName ?: party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget.OFFICIAL_PACKAGE,
-        chatRoomTypeResolver = metadataResolver::resolveChatRoomType,
-    )
-}
 
 private fun inspectChatRoom(
     chatRoomResolver: ChatRoomResolver?,

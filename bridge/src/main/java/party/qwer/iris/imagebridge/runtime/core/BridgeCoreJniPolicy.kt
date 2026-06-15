@@ -25,6 +25,7 @@ internal object BridgeCoreJniPolicy {
         registryAvailable: Boolean,
         registryError: String?,
         specReady: Boolean,
+        notificationActionSupported: Boolean,
         textSupported: Boolean,
         textReady: Boolean,
         textReason: String?,

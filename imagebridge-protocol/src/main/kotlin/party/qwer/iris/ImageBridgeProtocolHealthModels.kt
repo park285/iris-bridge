@@ -13,6 +13,7 @@ data class ImageBridgeCapability(
 data class ImageBridgeCapabilities(
     val inspectChatRoom: ImageBridgeCapability = ImageBridgeCapability(),
     val openChatRoom: ImageBridgeCapability = ImageBridgeCapability(),
+    val markChatRoomRead: ImageBridgeCapability = ImageBridgeCapability(),
     val snapshotChatRoomMembers: ImageBridgeCapability = ImageBridgeCapability(),
     val sendText: ImageBridgeCapability = ImageBridgeCapability(),
     val sendMarkdown: ImageBridgeCapability = ImageBridgeCapability(),

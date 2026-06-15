@@ -14,16 +14,18 @@ class BridgeCapabilitiesTest {
                 registryAvailable = true,
                 registryError = null,
                 specReady = true,
+                notificationActionSupported = true,
                 textSendCapability = KakaoTextSendCapability(supported = true, ready = true),
                 sendTextEnabled = true,
                 sendMarkdownEnabled = true,
-                nativeCapabilities = { _, _, _, _, _, _, _, _ -> null },
+                nativeCapabilities = { _, _, _, _, _, _, _, _, _ -> null },
             )
 
         val expectedReason = "bridge core unavailable to evaluate bridge capabilities"
         listOf(
             capabilities.inspectChatRoom,
             capabilities.openChatRoom,
+            capabilities.markChatRoomRead,
             capabilities.snapshotChatRoomMembers,
             capabilities.sendText,
             capabilities.sendMarkdown,
@@ -41,8 +43,9 @@ class BridgeCapabilitiesTest {
                 registryAvailable = true,
                 registryError = null,
                 specReady = true,
+                notificationActionSupported = true,
                 textSendCapability = KakaoTextSendCapability(supported = true, ready = true),
-                nativeCapabilities = { _, _, _, _, _, _, _, _ ->
+                nativeCapabilities = { _, _, _, _, _, _, _, _, _ ->
                     BridgeCoreEnvelope.parse(
                         """
                         {
@@ -51,6 +54,8 @@ class BridgeCapabilitiesTest {
                           "inspectChatRoomReady": "yes",
                           "openChatRoomSupported": "yes",
                           "openChatRoomReady": "yes",
+                          "markChatRoomReadSupported": "yes",
+                          "markChatRoomReadReady": "yes",
                           "snapshotChatRoomMembersSupported": "yes",
                           "snapshotChatRoomMembersReady": "yes",
                           "sendTextSupported": "yes",

@@ -621,11 +621,13 @@ fn reply_attachment_text_dispatch_matches_core_policy() {
 #[test]
 fn current_bridge_capabilities_dispatch_reports_rollout_and_readiness_reasons() {
     let envelope = assert_ok(&dispatch_current_bridge_capabilities(
-        true, None, true, true, true, None, false, true,
+        true, None, true, true, true, true, None, false, true,
     ));
 
     assert_eq!(envelope["inspectChatRoomSupported"], true);
     assert_eq!(envelope["inspectChatRoomReady"], true);
+    assert_eq!(envelope["markChatRoomReadSupported"], true);
+    assert_eq!(envelope["markChatRoomReadReady"], true);
     assert_eq!(envelope["sendTextSupported"], true);
     assert_eq!(envelope["sendTextReady"], false);
     assert_eq!(envelope["sendTextReason"], "text bridge send_text disabled");
@@ -638,6 +640,7 @@ fn current_bridge_capabilities_dispatch_reports_rollout_and_readiness_reasons() 
         true,
         true,
         true,
+        true,
         None,
         true,
         true,
@@ -646,6 +649,16 @@ fn current_bridge_capabilities_dispatch_reports_rollout_and_readiness_reasons() 
     assert_eq!(unavailable["inspectChatRoomSupported"], false);
     assert_eq!(unavailable["inspectChatRoomReason"], "registry unavailable");
     assert_eq!(unavailable["sendTextReason"], "registry unavailable");
+
+    let notification_unavailable = assert_ok(&dispatch_current_bridge_capabilities(
+        true, None, true, false, true, true, None, true, true,
+    ));
+    assert_eq!(notification_unavailable["markChatRoomReadSupported"], false);
+    assert_eq!(notification_unavailable["markChatRoomReadReady"], false);
+    assert_eq!(
+        notification_unavailable["markChatRoomReadReason"],
+        "Kakao notification action service unavailable"
+    );
 }
 
 #[test]

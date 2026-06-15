@@ -845,6 +845,7 @@ class KakaoTextSendInvocationFactoryTest {
                 registryAvailable = true,
                 registryError = null,
                 specReady = true,
+                notificationActionSupported = true,
                 textSendCapability = KakaoTextSendCapability(supported = true, ready = true),
                 sendTextEnabled = true,
                 sendMarkdownEnabled = true,
@@ -861,6 +862,7 @@ class KakaoTextSendInvocationFactoryTest {
                 registryAvailable = true,
                 registryError = null,
                 specReady = true,
+                notificationActionSupported = true,
                 textSendCapability = KakaoTextSendCapability(supported = true, ready = true),
             )
 

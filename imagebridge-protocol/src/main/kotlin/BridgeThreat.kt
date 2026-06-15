@@ -23,6 +23,10 @@ enum class BridgeThreat(
         GeneratedBridgeProtocolContract.THREAT_NAVIGATION_HIJACK,
         "방 열기 조작이 KakaoTalk UI를 공격자가 고른 방으로 강제 전환시킬 수 있다.",
     ),
+    NOTIFICATION_ACTION(
+        GeneratedBridgeProtocolContract.THREAT_NOTIFICATION_ACTION,
+        "알림 action 조작이 KakaoTalk 읽음 상태 같은 사용자-visible 상태를 변경할 수 있다.",
+    ),
     MEMBER_DATA_EXPOSURE(
         GeneratedBridgeProtocolContract.THREAT_MEMBER_DATA_EXPOSURE,
         "멤버 스냅샷이 방 참여자 식별자/닉네임을 호출자에게 노출한다.",

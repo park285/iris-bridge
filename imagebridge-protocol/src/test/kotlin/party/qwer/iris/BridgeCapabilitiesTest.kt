@@ -16,6 +16,7 @@ class BridgeCapabilitiesTest {
                 ImageBridgeProtocol.ACTION_HEALTH,
                 ImageBridgeProtocol.ACTION_INSPECT_CHATROOM,
                 ImageBridgeProtocol.ACTION_OPEN_CHATROOM,
+                ImageBridgeProtocol.ACTION_MARK_CHATROOM_READ,
                 ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS,
                 ImageBridgeProtocol.ACTION_FETCH_MEMBER_PROFILES,
             )
@@ -71,6 +72,7 @@ class BridgeCapabilitiesTest {
                 ImageBridgeProtocol.ACTION_SEND_TEXT,
                 ImageBridgeProtocol.ACTION_SEND_MARKDOWN,
                 ImageBridgeProtocol.ACTION_OPEN_CHATROOM,
+                ImageBridgeProtocol.ACTION_MARK_CHATROOM_READ,
             ),
             sideEffectWireNames,
         )

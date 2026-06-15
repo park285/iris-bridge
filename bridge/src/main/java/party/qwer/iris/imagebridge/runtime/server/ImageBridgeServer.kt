@@ -31,6 +31,7 @@ internal class ImageBridgeServer(
     internal val textSendCapability: AtomicReference<KakaoTextSendCapability?> = AtomicReference(null),
     internal val textBridgeSendTextEnabled: AtomicBoolean = AtomicBoolean(false),
     internal val textBridgeSendMarkdownEnabled: AtomicBoolean = AtomicBoolean(false),
+    internal val notificationActionSupported: AtomicBoolean = AtomicBoolean(false),
     private val peerIdentityValidator: BridgePeerIdentityValidator = BridgePeerIdentityValidator(),
     internal val bridgeMetrics: BridgeMetrics = BridgeMetrics(),
     internal val bridgeCoreUnavailable: AtomicBoolean = AtomicBoolean(false),
@@ -70,6 +71,7 @@ internal class ImageBridgeServer(
     ) {
         if (bridgeCore == null) {
             bridgeCoreUnavailable.set(true)
+            notificationActionSupported.set(false)
             Log.e(TAG, "bridge-core unavailable — refusing to start mux server (fail-closed)")
             return
         }
@@ -85,6 +87,7 @@ internal class ImageBridgeServer(
         lastRegistryError.set(registryError)
         textBridgeSendTextEnabled.set(isTextBridgeSendTextEnabled())
         textBridgeSendMarkdownEnabled.set(isTextBridgeSendMarkdownEnabled())
+        notificationActionSupported.set(isNotificationActionSupported(context, registry))
         val components =
             buildBridgeRequestHandlerComponents(
                 context,

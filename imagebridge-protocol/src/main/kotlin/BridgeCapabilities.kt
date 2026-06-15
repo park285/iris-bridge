@@ -55,6 +55,13 @@ enum class BridgeCapability(
         requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_OPEN_CHATROOM_REQUIRES_AUTH_TOKEN,
         threats = setOf(BridgeThreat.NAVIGATION_HIJACK),
     ),
+    MARK_CHATROOM_READ(
+        GeneratedBridgeProtocolContract.CAPABILITY_MARK_CHATROOM_READ,
+        "KakaoTalk 알림 action을 통해 지정한 방을 읽음 처리한다.",
+        hasSideEffect = GeneratedBridgeProtocolContract.ACTION_MARK_CHATROOM_READ_HAS_SIDE_EFFECT,
+        requiresAuthToken = GeneratedBridgeProtocolContract.ACTION_MARK_CHATROOM_READ_REQUIRES_AUTH_TOKEN,
+        threats = setOf(BridgeThreat.NOTIFICATION_ACTION),
+    ),
     INSPECT_CHATROOM(
         GeneratedBridgeProtocolContract.CAPABILITY_INSPECT_CHATROOM,
         "방 식별·상태 메타데이터를 조회한다.",
@@ -98,6 +105,7 @@ enum class BridgeAction(
     SEND_TEXT(ImageBridgeProtocol.ACTION_SEND_TEXT, BridgeCapability.SEND_TEXT_REPLY),
     SEND_MARKDOWN(ImageBridgeProtocol.ACTION_SEND_MARKDOWN, BridgeCapability.SEND_MARKDOWN_REPLY),
     OPEN_CHATROOM(ImageBridgeProtocol.ACTION_OPEN_CHATROOM, BridgeCapability.OPEN_CHATROOM),
+    MARK_CHATROOM_READ(ImageBridgeProtocol.ACTION_MARK_CHATROOM_READ, BridgeCapability.MARK_CHATROOM_READ),
     INSPECT_CHATROOM(ImageBridgeProtocol.ACTION_INSPECT_CHATROOM, BridgeCapability.INSPECT_CHATROOM),
     SNAPSHOT_CHATROOM_MEMBERS(
         ImageBridgeProtocol.ACTION_SNAPSHOT_CHATROOM_MEMBERS,

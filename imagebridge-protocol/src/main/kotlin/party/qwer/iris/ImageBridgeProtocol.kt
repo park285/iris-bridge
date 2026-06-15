@@ -13,6 +13,7 @@ object ImageBridgeProtocol :
     const val ACTION_HEALTH = GeneratedBridgeProtocolContract.ACTION_HEALTH
     const val ACTION_INSPECT_CHATROOM = GeneratedBridgeProtocolContract.ACTION_INSPECT_CHATROOM
     const val ACTION_OPEN_CHATROOM = GeneratedBridgeProtocolContract.ACTION_OPEN_CHATROOM
+    const val ACTION_MARK_CHATROOM_READ = GeneratedBridgeProtocolContract.ACTION_MARK_CHATROOM_READ
     const val ACTION_SNAPSHOT_CHATROOM_MEMBERS = GeneratedBridgeProtocolContract.ACTION_SNAPSHOT_CHATROOM_MEMBERS
     const val ACTION_FETCH_MEMBER_PROFILES = GeneratedBridgeProtocolContract.ACTION_FETCH_MEMBER_PROFILES
     const val HANDSHAKE_HELLO = GeneratedBridgeProtocolContract.HANDSHAKE_FRAME_TYPE_HELLO

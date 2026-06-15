@@ -1193,6 +1193,7 @@ class BridgeCoreRuntimeTest {
                     registryAvailable = true,
                     registryError = null,
                     specReady = true,
+                    notificationActionSupported = true,
                     textSupported = true,
                     textReady = true,
                     textReason = null,
@@ -1203,6 +1204,7 @@ class BridgeCoreRuntimeTest {
 
         assertTrue(envelope.isOk, "capabilities must be generated: ${envelope.errorMessage}")
         assertTrue(assertNotNull(envelope.bool("inspectChatRoomReady")))
+        assertTrue(assertNotNull(envelope.bool("markChatRoomReadReady")))
         assertFalse(assertNotNull(envelope.bool("sendTextReady")))
         assertEquals("text bridge send_text disabled", envelope.string("sendTextReason"))
         assertTrue(assertNotNull(envelope.bool("sendMarkdownReady")))

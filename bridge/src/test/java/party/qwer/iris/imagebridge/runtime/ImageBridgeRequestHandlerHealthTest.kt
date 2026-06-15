@@ -12,6 +12,7 @@ import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitiesSnapsho
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeCapabilitySnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeHealthSnapshot
 import party.qwer.iris.imagebridge.runtime.server.ImageBridgeRequestHandler
+import party.qwer.iris.imagebridge.runtime.server.buildImageBridgeHealthSnapshot
 import party.qwer.iris.imagebridge.runtime.server.toJson
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,6 +49,7 @@ class ImageBridgeRequestHandlerHealthTest {
                     ImageBridgeCapabilitiesSnapshot(
                         inspectChatRoom = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
                         openChatRoom = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
+                        markChatRoomRead = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
                         snapshotChatRoomMembers = ImageBridgeCapabilitySnapshot(supported = true, ready = true),
                         sendText =
                             ImageBridgeCapabilitySnapshot(
@@ -84,12 +86,39 @@ class ImageBridgeRequestHandlerHealthTest {
         assertEquals(1, response.checks.size)
         assertEquals(1, response.discovery?.hooks?.size)
         assertTrue(response.capabilities?.openChatRoom?.ready == true)
+        assertTrue(response.capabilities?.markChatRoomRead?.ready == true)
         assertTrue(response.capabilities?.snapshotChatRoomMembers?.ready == true)
         assertFalse(response.capabilities?.sendText?.supported == true)
         assertEquals("text sender unavailable", response.capabilities?.sendText?.reason)
         val jsonCapabilities = healthSnapshot.toJson().getJSONObject("capabilities")
+        assertTrue(jsonCapabilities.getJSONObject("markChatRoomRead").getBoolean("ready"))
         assertFalse(jsonCapabilities.getJSONObject("sendText").getBoolean("supported"))
         assertFalse(jsonCapabilities.getJSONObject("sendMarkdown").getBoolean("ready"))
         assertFalse(jsonCapabilities.has("karingAot"))
+    }
+
+    @Test
+    fun `health capability reports mark read unavailable when notification action service is missing`() {
+        val snapshot =
+            buildImageBridgeHealthSnapshot(
+                running = true,
+                specStatus = BridgeSpecStatus(ready = true, checkedAtEpochMs = 1L, checks = emptyList()),
+                registryAvailable = true,
+                lastRegistryError = null,
+                textSendCapability = null,
+                textBridgeSendTextEnabled = true,
+                textBridgeSendMarkdownEnabled = true,
+                notificationActionSupported = false,
+                metrics = ImageBridgeProtocol.ImageBridgeMetrics(),
+                restartCount = 0,
+                lastCrashMessage = null,
+            )
+
+        assertFalse(snapshot.capabilities.markChatRoomRead.supported)
+        assertFalse(snapshot.capabilities.markChatRoomRead.ready)
+        assertEquals(
+            "Kakao notification action service unavailable",
+            snapshot.capabilities.markChatRoomRead.reason,
+        )
     }
 }

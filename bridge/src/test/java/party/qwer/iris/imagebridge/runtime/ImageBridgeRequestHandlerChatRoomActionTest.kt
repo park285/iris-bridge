@@ -118,6 +118,52 @@ class ImageBridgeRequestHandlerChatRoomActionTest {
     }
 
     @Test
+    fun `mark chatroom read action delegates to notification starter and returns ok`() {
+        var markedRoomId: Long? = null
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                chatRoomReadMarker = { roomId -> markedRoomId = roomId },
+                handshakeValidator = developmentHandshakeValidator(),
+            )
+
+        val response =
+            handler.handle(
+                ImageBridgeProtocol.buildMarkChatRoomReadRequest(
+                    roomId = 77L,
+                    requestId = "read-request",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_OK, response.status)
+        assertEquals(77L, markedRoomId)
+        assertEquals("read-request", response.requestId)
+    }
+
+    @Test
+    fun `mark chatroom read action fails when marker is unavailable`() {
+        val handler =
+            ImageBridgeRequestHandler(
+                imageSender = { error("should not be called") },
+                healthProvider = { readyHealthSnapshot() },
+                handshakeValidator = developmentHandshakeValidator(),
+                logError = { _, _, _ -> },
+            )
+
+        val response =
+            handler.handle(
+                ImageBridgeProtocol.buildMarkChatRoomReadRequest(
+                    roomId = 77L,
+                    requestId = "read-request",
+                ),
+            )
+
+        assertEquals(ImageBridgeProtocol.STATUS_FAILED, response.status)
+        assertEquals("chatroom read marker unavailable", response.error)
+    }
+
+    @Test
     fun `snapshot chatroom members action returns payload`() {
         val handler =
             ImageBridgeRequestHandler(

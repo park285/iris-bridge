@@ -34,6 +34,7 @@ internal data class ImageBridgeCapabilitySnapshot(
 internal data class ImageBridgeCapabilitiesSnapshot(
     val inspectChatRoom: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
     val openChatRoom: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
+    val markChatRoomRead: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
     val snapshotChatRoomMembers: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
     val sendText: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
     val sendMarkdown: ImageBridgeCapabilitySnapshot = ImageBridgeCapabilitySnapshot(),
