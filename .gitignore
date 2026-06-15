@@ -24,6 +24,7 @@ __pycache__/
 # Assistant local state
 .claude/
 .codex/
+.omc/
 .omx/
 .tasklists/
 .cursor/
