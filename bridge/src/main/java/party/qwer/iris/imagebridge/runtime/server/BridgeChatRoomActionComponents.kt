@@ -5,7 +5,6 @@ import party.qwer.iris.imagebridge.runtime.kakao.KakaoClassRegistry
 import party.qwer.iris.imagebridge.runtime.kakao.KakaoTalkTarget
 import party.qwer.iris.imagebridge.runtime.notification.KakaoNotificationActionStarter
 import party.qwer.iris.imagebridge.runtime.notification.isKakaoNotificationMarkReadAvailable
-import party.qwer.iris.imagebridge.runtime.room.ChatRoomIntentMetadataResolver
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomOpener
 import party.qwer.iris.imagebridge.runtime.room.ChatRoomResolver
 
@@ -26,17 +25,11 @@ internal fun isNotificationActionSupported(
 internal fun buildChatRoomOpener(
     context: Context,
     registry: KakaoClassRegistry?,
-    chatRoomResolver: ChatRoomResolver?,
-): ChatRoomOpener {
-    val metadataResolver =
-        ChatRoomIntentMetadataResolver { roomId ->
-            chatRoomResolver?.resolve(roomId)
-        }
-    return ChatRoomOpener(
+    @Suppress("UNUSED_PARAMETER") chatRoomResolver: ChatRoomResolver?,
+): ChatRoomOpener =
+    ChatRoomOpener(
         context,
         kakaoPackage = kakaoPackage(registry),
-        chatRoomTypeResolver = metadataResolver::resolveChatRoomType,
     )
-}
 
 private fun kakaoPackage(registry: KakaoClassRegistry?): String = registry?.target?.packageName ?: KakaoTalkTarget.OFFICIAL_PACKAGE
