@@ -136,7 +136,6 @@ class BridgeRequestDeduperTest {
                 deduper.execute("send:req-fail") { error("boom") }
                 fail("execute must rethrow the block failure")
             } catch (expected: IllegalStateException) {
-                // 실패 응답도 future에 캐시되는 기존 의미론 — core ledger도 동일하게 완료돼야 한다.
             }
 
             val state = core.dedupeAdmit("send:req-fail", 1_001L).dedupeState()
