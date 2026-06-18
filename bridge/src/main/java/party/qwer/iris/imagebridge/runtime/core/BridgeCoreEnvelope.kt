@@ -32,6 +32,13 @@ class BridgeCoreEnvelope private constructor(
 
     fun long(key: String): Long? = if (json.has(key) && !json.isNull(key)) json.optLong(key) else null
 
+    fun int(key: String): Int? = if (json.has(key) && !json.isNull(key)) json.optInt(key) else null
+
+    fun intList(key: String): List<Int>? {
+        val array = if (json.has(key) && !json.isNull(key)) json.optJSONArray(key) else null
+        return array?.let { values -> List(values.length()) { index -> values.optInt(index) } }
+    }
+
     fun stringList(key: String): List<String>? {
         val array = if (json.has(key) && !json.isNull(key)) json.optJSONArray(key) else null
         return array?.let { values -> List(values.length()) { index -> values.optString(index) } }

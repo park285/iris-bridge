@@ -11,6 +11,7 @@ mod lease;
 mod member_extraction;
 mod mentions_hash;
 mod mux_session;
+mod op;
 mod protocol_contract;
 mod reply_attachment_text;
 mod reply_hook;
@@ -18,17 +19,13 @@ mod reply_leverage_attachment;
 mod reply_mention_attachment;
 mod request_validation;
 mod restart_policy;
-
-use iris_bridge_core::server::token::validate_request;
-use serde_json::json;
+mod token;
 
 pub use capabilities::dispatch_current_bridge_capabilities;
 pub use dedupe::{dispatch_dedupe_admit, dispatch_dedupe_complete};
 #[cfg(test)]
 pub use discovery_hooks::dispatch_send_block_reason;
-pub use discovery_hooks::{
-    DISCOVERY_HOOK_SNAPSHOT_INVALID_REASON, dispatch_send_block_reason_from_snapshot,
-};
+pub use discovery_hooks::dispatch_send_block_reason_from_snapshot;
 pub use handshake::{dispatch_handshake_on_client_proof, dispatch_handshake_on_hello};
 pub use kakao_link_attachment::{
     dispatch_kakao_chat_log_attachment_crypto, dispatch_kakao_link_attachments_match,
@@ -75,39 +72,15 @@ pub use request_validation::{
 };
 pub use restart_policy::dispatch_restart_delay_ms;
 
-use crate::handles::{BridgeCoreContext, with_context};
-
-use decode::TokenRequest;
+pub use envelope::json_catch_unwind;
 #[cfg(test)]
-pub use envelope::DispatchResult;
-use envelope::bad_request;
-pub use envelope::{invalid_handle_envelope, json_catch_unwind};
+pub use envelope::{DispatchResult, invalid_handle_envelope};
 pub use mentions_hash::{dispatch_mentions_hash_from_attachment, dispatch_mentions_hash_from_json};
+pub use op::dispatch_op;
 pub use protocol_contract::dispatch_bridge_protocol_contract_json;
 pub use reply_mention_attachment::{
     dispatch_merge_reply_mention_attachment, dispatch_reply_mention_attachment_or_null,
 };
-
-pub fn dispatch_validate_request_token(context: &BridgeCoreContext, request_json: &str) -> String {
-    json_catch_unwind(|| {
-        let request: TokenRequest =
-            serde_json::from_str(request_json).map_err(|_| bad_request("request JSON invalid"))?;
-        validate_request(
-            context.security_mode,
-            &context.bridge_token,
-            request.token.as_deref(),
-            request.protocol_version.unwrap_or_default(),
-            request.action.as_deref(),
-        )?;
-        Ok(json!({}))
-    })
-}
-
-pub fn dispatch_validate_request_token_handle(handle: i64, request_json: &str) -> String {
-    match with_context(handle, |context| {
-        dispatch_validate_request_token(context, request_json)
-    }) {
-        Ok(envelope) => envelope,
-        Err(rejection) => json_catch_unwind(|| Err(rejection)),
-    }
-}
+#[cfg(test)]
+pub use token::dispatch_validate_request_token;
+pub use token::dispatch_validate_request_token_handle;

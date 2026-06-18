@@ -1,16 +1,12 @@
-use iris_bridge_core::server::reply_hook::{
-    REPLY_HOOK_TTL_MS, markdown_pending_context_request, mention_pending_context_request,
-    sign_prepared, verify as reply_verify,
+use iris_bridge_core_lib::server::reply_hook::{
+    REPLY_HOOK_TTL_MS, ReplyHookVerifyInput, markdown_pending_context_request,
+    mention_pending_context_request, sign_prepared, verify as reply_verify,
 };
-use iris_bridge_core::server::{ERROR_BAD_REQUEST, Rejection};
+use iris_bridge_core_lib::server::{ERROR_BAD_REQUEST, Rejection};
 use serde_json::{Value, json};
 
 use super::envelope::json_catch_unwind;
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Kotlin ReplyHookSignatureProtocol.verify와 동결된 인자 계약"
-)]
 pub fn dispatch_reply_hook_sign(
     bridge_token: &str,
     room_id: i64,
@@ -29,31 +25,8 @@ pub fn dispatch_reply_hook_sign(
     )
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "Kotlin ReplyHookSignatureProtocol.verify와 동결된 인자 계약"
-)]
-pub fn dispatch_reply_hook_verify(
-    bridge_token: &str,
-    room_id: i64,
-    message_text: &str,
-    session_id: Option<&str>,
-    created_at_epoch_ms: Option<i64>,
-    mentions_hash: Option<&str>,
-    signature: Option<&str>,
-    now_epoch_ms: i64,
-) -> bool {
-    reply_verify(
-        bridge_token,
-        room_id,
-        message_text,
-        session_id,
-        created_at_epoch_ms,
-        mentions_hash,
-        signature,
-        now_epoch_ms,
-        REPLY_HOOK_TTL_MS,
-    )
+pub fn dispatch_reply_hook_verify(input: &ReplyHookVerifyInput<'_>) -> bool {
+    reply_verify(input, REPLY_HOOK_TTL_MS)
 }
 
 pub fn dispatch_reply_markdown_pending_context(request_json: &str) -> String {

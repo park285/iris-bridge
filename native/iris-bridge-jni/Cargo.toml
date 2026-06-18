@@ -5,18 +5,37 @@ edition.workspace = true
 rust-version.workspace = true
 publish = false
 
+[features]
+bench = []
+
 [lib]
 name = "iris_bridge_core"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 doc = false
 
 [dependencies]
+foldhash.workspace = true
 getrandom.workspace = true
 hex.workspace = true
-iris-bridge-core = { path = "../iris-bridge-core" }
+iris-bridge-core-lib = { package = "iris-bridge-core", path = "../iris-bridge-core" }
 jni = "0.21"
+parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile.workspace = true
+
+[[bench]]
+name = "dispatch_op"
+harness = false
+required-features = ["bench"]
+
+[[bench]]
+name = "handle_registry"
+harness = false
+required-features = ["bench"]
 
 [lints.rust]
 unsafe_code = "deny"

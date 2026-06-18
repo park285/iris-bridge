@@ -1,4 +1,4 @@
-use iris_bridge_core::server::discovery_hooks::{
+use iris_bridge_core_lib::server::discovery_hooks::{
     DiscoveryHookStatus as CoreDiscoveryHookStatus, send_block_reason,
 };
 #[cfg(test)]

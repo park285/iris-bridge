@@ -1,6 +1,6 @@
-use iris_bridge_core::mux_session::{MuxCommand, MuxSessionCore};
-use iris_bridge_core::protocol::mux::parse_mux_frame_summary;
-use iris_bridge_core::server::Rejection;
+use iris_bridge_core_lib::mux_session::{MuxCommand, MuxSessionCore};
+use iris_bridge_core_lib::protocol::mux::parse_mux_frame_summary;
+use iris_bridge_core_lib::server::Rejection;
 use serde_json::{Value, json};
 
 use crate::mux_handles::{drop_mux_session_handle, into_mux_session_handle, with_mux_session};

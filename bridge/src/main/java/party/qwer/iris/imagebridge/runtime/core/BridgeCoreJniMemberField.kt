@@ -1,13 +1,35 @@
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONObject
+
 internal object BridgeCoreJniMemberField {
-    external fun nativeMemberExtractionEvaluate(requestJson: String): String
+    fun nativeMemberExtractionEvaluate(requestJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "member.extractionEvaluate",
+            JSONObject().put("requestJson", requestJson),
+        )
 
-    external fun nativeMemberEnrichmentMissingNicknames(requestJson: String): String
+    fun nativeMemberEnrichmentMissingNicknames(requestJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "member.enrichmentMissingNicknames",
+            JSONObject().put("requestJson", requestJson),
+        )
 
-    external fun nativeMemberEnrichmentMerge(requestJson: String): String
+    fun nativeMemberEnrichmentMerge(requestJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "member.enrichmentMerge",
+            JSONObject().put("requestJson", requestJson),
+        )
 
-    external fun nativeMemberProfileUserIds(requestJson: String): String
+    fun nativeMemberProfileUserIds(requestJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "member.profileUserIds",
+            JSONObject().put("requestJson", requestJson),
+        )
 
-    external fun nativeMemberProfilePayload(requestJson: String): String
+    fun nativeMemberProfilePayload(requestJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "member.profilePayload",
+            JSONObject().put("requestJson", requestJson),
+        )
 }

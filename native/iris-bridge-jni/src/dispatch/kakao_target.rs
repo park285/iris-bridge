@@ -1,5 +1,5 @@
-use iris_bridge_core::kakao_target::resolve_target;
-use iris_bridge_core::server::{ERROR_BAD_REQUEST, Rejection};
+use iris_bridge_core_lib::kakao_target::resolve_target;
+use iris_bridge_core_lib::server::{ERROR_BAD_REQUEST, Rejection};
 use serde_json::json;
 
 use super::envelope::json_catch_unwind;

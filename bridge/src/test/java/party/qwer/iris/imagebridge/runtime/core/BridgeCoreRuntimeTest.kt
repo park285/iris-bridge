@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 class BridgeCoreRuntimeTest {
     @Test
     fun `ABI version includes current bridge core JNI surface`() {
-        assertEquals(39, BridgeCore.EXPECTED_ABI_VERSION)
+        assertEquals(40, BridgeCore.EXPECTED_ABI_VERSION)
     }
 
     private fun muxRequestFrame(correlationId: String): String =

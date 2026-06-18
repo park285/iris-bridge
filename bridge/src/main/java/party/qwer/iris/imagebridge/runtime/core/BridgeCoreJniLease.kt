@@ -1,29 +1,65 @@
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONObject
+
 internal object BridgeCoreJniLease {
-    external fun nativeVerifyLeases(
+    fun nativeVerifyLeases(
         handle: Long,
         roomId: Long,
         requestId: String,
         leasesJson: String,
         factsJson: String,
         nowMs: Long,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "lease.verify",
+            JSONObject()
+                .put("handle", handle)
+                .put("roomId", roomId)
+                .put("requestId", requestId)
+                .put("leasesJson", leasesJson)
+                .put("factsJson", factsJson)
+                .put("nowMs", nowMs),
+        )
 
-    external fun nativeBuildImageLeaseFacts(canonicalPathsJson: String): String
+    fun nativeBuildImageLeaseFacts(canonicalPathsJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "lease.buildImageFacts",
+            JSONObject().put("canonicalPathsJson", canonicalPathsJson),
+        )
 
-    external fun nativeImageLeaseRejectionIsStateError(message: String): Boolean
+    fun nativeImageLeaseRejectionIsStateError(message: String): Boolean =
+        BridgeCoreJniDispatcher.booleanValue(
+            "lease.rejectionIsStateError",
+            JSONObject().put("message", message),
+        )
 
-    external fun nativeDedupeAdmit(
+    fun nativeDedupeAdmit(
         handle: Long,
         key: String,
         nowMs: Long,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "lease.dedupeAdmit",
+            JSONObject()
+                .put("handle", handle)
+                .put("key", key)
+                .put("nowMs", nowMs),
+        )
 
-    external fun nativeDedupeComplete(
+    fun nativeDedupeComplete(
         handle: Long,
         key: String,
         responseJson: String,
         nowMs: Long,
-    )
+    ) {
+        BridgeCoreJniDispatcher.envelope(
+            "lease.dedupeComplete",
+            JSONObject()
+                .put("handle", handle)
+                .put("key", key)
+                .put("responseJson", responseJson)
+                .put("nowMs", nowMs),
+        )
+    }
 }

@@ -1,4 +1,4 @@
-use iris_bridge_core::server::mentions_hash::{
+use iris_bridge_core_lib::server::mentions_hash::{
     mention_attachment_or_null, merge_mention_attachment,
 };
 

@@ -47,6 +47,6 @@ class GeneratedBridgeProtocolContractTest {
 
     @Test
     fun `generated abi version is the bridge core SSOT value`() {
-        assertEquals(39, GeneratedBridgeProtocolContract.ABI_VERSION)
+        assertEquals(40, GeneratedBridgeProtocolContract.ABI_VERSION)
     }
 }

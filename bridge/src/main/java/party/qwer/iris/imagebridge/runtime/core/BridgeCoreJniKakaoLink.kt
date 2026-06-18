@@ -1,5 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONObject
+
 internal object BridgeCoreJniKakaoLink {
     internal fun encryptKakaoChatLogAttachmentEnvelope(
         encType: Int,
@@ -25,37 +27,87 @@ internal object BridgeCoreJniKakaoLink {
             userId = userId,
         )
 
-    private external fun nativeKakaoChatLogAttachmentCrypto(
+    private fun nativeKakaoChatLogAttachmentCrypto(
         encrypt: Boolean,
         encType: Int,
         payload: String,
         userId: Long,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "kakaoLink.chatLogAttachmentCrypto",
+            JSONObject()
+                .put("encrypt", encrypt)
+                .put("encType", encType)
+                .put("payload", payload)
+                .put("userId", userId),
+        )
 
-    external fun nativeKakaoLinkAttachmentsMatch(
+    fun nativeKakaoLinkAttachmentsMatch(
         expectedRawAttachment: String,
         committedRawAttachment: String,
-    ): Boolean
+    ): Boolean =
+        BridgeCoreJniDispatcher.booleanValue(
+            "kakaoLink.attachmentsMatch",
+            JSONObject()
+                .put("expectedRawAttachment", expectedRawAttachment)
+                .put("committedRawAttachment", committedRawAttachment),
+        )
 
-    external fun nativeKakaoLinkPendingCleanupAttachmentsMatch(
+    fun nativeKakaoLinkPendingCleanupAttachmentsMatch(
         expectedRawAttachment: String,
         pendingRawAttachment: String,
-    ): Boolean
+    ): Boolean =
+        BridgeCoreJniDispatcher.booleanValue(
+            "kakaoLink.pendingCleanupAttachmentsMatch",
+            JSONObject()
+                .put("expectedRawAttachment", expectedRawAttachment)
+                .put("pendingRawAttachment", pendingRawAttachment),
+        )
 
-    external fun nativeKakaoLinkLeverageEncryptionType(value: String): Int
+    fun nativeKakaoLinkLeverageEncryptionType(value: String): Int =
+        BridgeCoreJniDispatcher.intValue(
+            "kakaoLink.leverageEncryptionType",
+            JSONObject().put("value", value),
+        )
 
-    external fun nativeKakaoLinkHasExplicitTemplateArgs(rawAttachment: String): Boolean
+    fun nativeKakaoLinkHasExplicitTemplateArgs(rawAttachment: String): Boolean =
+        BridgeCoreJniDispatcher.booleanValue(
+            "kakaoLink.hasExplicitTemplateArgs",
+            JSONObject().put("rawAttachment", rawAttachment),
+        )
 
-    external fun nativeKakaoLinkHasResolvedIrisTemplate(rawAttachment: String): Boolean
+    fun nativeKakaoLinkHasResolvedIrisTemplate(rawAttachment: String): Boolean =
+        BridgeCoreJniDispatcher.booleanValue(
+            "kakaoLink.hasResolvedIrisTemplate",
+            JSONObject().put("rawAttachment", rawAttachment),
+        )
 
-    external fun nativeKakaoLinkExtractAppKey(rawAttachment: String): String?
+    fun nativeKakaoLinkExtractAppKey(rawAttachment: String): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "kakaoLink.extractAppKey",
+            JSONObject().put("rawAttachment", rawAttachment),
+        )
 
-    external fun nativeBuildKakaoLinkV4EncodedQuery(rawAttachment: String): String?
+    fun nativeBuildKakaoLinkV4EncodedQuery(rawAttachment: String): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "kakaoLink.buildV4EncodedQuery",
+            JSONObject().put("rawAttachment", rawAttachment),
+        )
 
-    external fun nativeBuildKakaoLinkSpecSendAttachment(rawAttachment: String): String?
+    fun nativeBuildKakaoLinkSpecSendAttachment(rawAttachment: String): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "kakaoLink.buildSpecSendAttachment",
+            JSONObject().put("rawAttachment", rawAttachment),
+        )
 
-    external fun nativePatchKakaoLinkDisplayAttachment(
+    fun nativePatchKakaoLinkDisplayAttachment(
         committedAttachment: String?,
         rawAttachment: String,
-    ): String?
+    ): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "kakaoLink.patchDisplayAttachment",
+            JSONObject()
+                .putNullable("committedAttachment", committedAttachment)
+                .put("rawAttachment", rawAttachment),
+        )
 }

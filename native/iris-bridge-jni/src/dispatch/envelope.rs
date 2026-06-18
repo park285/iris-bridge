@@ -1,6 +1,6 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use iris_bridge_core::server::{ERROR_BAD_REQUEST, Rejection};
+use iris_bridge_core_lib::server::{ERROR_BAD_REQUEST, Rejection};
 use serde_json::{Value, json};
 
 const ERROR_PANIC: &str = "PANIC";

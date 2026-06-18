@@ -1,16 +1,28 @@
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONObject
+
 internal object BridgeCoreJniReply {
-    external fun nativeReplyHookSign(
+    fun nativeReplyHookSign(
         bridgeToken: String,
         roomId: Long,
         messageText: String,
         sessionId: String,
         createdAtEpochMs: Long,
         mentionsHash: String?,
-    ): String?
+    ): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "reply.sign",
+            JSONObject()
+                .put("bridgeToken", bridgeToken)
+                .put("roomId", roomId)
+                .put("messageText", messageText)
+                .put("sessionId", sessionId)
+                .put("createdAtEpochMs", createdAtEpochMs)
+                .putNullable("mentionsHash", mentionsHash),
+        )
 
-    external fun nativeReplyHookVerify(
+    fun nativeReplyHookVerify(
         bridgeToken: String,
         roomId: Long,
         messageText: String,
@@ -19,29 +31,81 @@ internal object BridgeCoreJniReply {
         mentionsHash: String?,
         signature: String?,
         nowEpochMs: Long,
-    ): Boolean
+    ): Boolean =
+        BridgeCoreJniDispatcher.booleanValue(
+            "reply.verify",
+            JSONObject()
+                .put("bridgeToken", bridgeToken)
+                .put("roomId", roomId)
+                .put("messageText", messageText)
+                .putNullable("sessionId", sessionId)
+                .put("createdAtEpochMs", createdAtEpochMs)
+                .putNullable("mentionsHash", mentionsHash)
+                .putNullable("signature", signature)
+                .put("nowEpochMs", nowEpochMs),
+        )
 
-    external fun nativeMentionsHashFromJson(mentionsJson: String?): String?
+    fun nativeMentionsHashFromJson(mentionsJson: String?): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "reply.mentionsHashFromJson",
+            JSONObject().putNullable("mentionsJson", mentionsJson),
+        )
 
-    external fun nativeMentionsHashFromAttachment(attachmentText: String?): String?
+    fun nativeMentionsHashFromAttachment(attachmentText: String?): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "reply.mentionsHashFromAttachment",
+            JSONObject().putNullable("attachmentText", attachmentText),
+        )
 
-    external fun nativeReplyMentionAttachmentOrNull(attachmentText: String): String?
+    fun nativeReplyMentionAttachmentOrNull(attachmentText: String): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "reply.mentionAttachmentOrNull",
+            JSONObject().put("attachmentText", attachmentText),
+        )
 
-    external fun nativeMergeReplyMentionAttachment(
+    fun nativeMergeReplyMentionAttachment(
         targetAttachmentText: String,
         mentionAttachmentText: String,
-    ): String?
+    ): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "reply.mergeMentionAttachment",
+            JSONObject()
+                .put("targetAttachmentText", targetAttachmentText)
+                .put("mentionAttachmentText", mentionAttachmentText),
+        )
 
-    external fun nativeMergeReplyLeverageAttachment(
+    fun nativeMergeReplyLeverageAttachment(
         generatedAttachment: String?,
         rawAttachment: String,
-    ): String?
+    ): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "reply.mergeLeverageAttachment",
+            JSONObject()
+                .putNullable("generatedAttachment", generatedAttachment)
+                .put("rawAttachment", rawAttachment),
+        )
 
-    external fun nativeReplyAttachmentTextLooksLike(value: String): Boolean
+    fun nativeReplyAttachmentTextLooksLike(value: String): Boolean =
+        BridgeCoreJniDispatcher.booleanValue(
+            "reply.attachmentTextLooksLike",
+            JSONObject().put("value", value),
+        )
 
-    external fun nativeReplyAttachmentSessionId(attachmentText: String): String?
+    fun nativeReplyAttachmentSessionId(attachmentText: String): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "reply.attachmentSessionId",
+            JSONObject().put("attachmentText", attachmentText),
+        )
 
-    external fun nativeReplyMarkdownPendingContext(requestJson: String): String
+    fun nativeReplyMarkdownPendingContext(requestJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "reply.markdownPendingContext",
+            JSONObject().put("requestJson", requestJson),
+        )
 
-    external fun nativeReplyMentionPendingContext(requestJson: String): String
+    fun nativeReplyMentionPendingContext(requestJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "reply.mentionPendingContext",
+            JSONObject().put("requestJson", requestJson),
+        )
 }

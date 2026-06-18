@@ -1,4 +1,4 @@
-use iris_bridge_core::protocol::bridge_protocol_contract_json;
+use iris_bridge_core_lib::protocol::bridge_protocol_contract_json;
 use serde_json::json;
 
 use super::envelope::json_catch_unwind;

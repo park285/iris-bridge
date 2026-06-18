@@ -1,13 +1,15 @@
-use iris_bridge_core::server::Rejection;
-use iris_bridge_core::server::bridge_flags::is_truthy_flag;
-use iris_bridge_core::server::error_classification::{classify_error_code, failure_metric_bucket};
-use iris_bridge_core::server::image_path::{
+use iris_bridge_core_lib::server::Rejection;
+use iris_bridge_core_lib::server::bridge_flags::is_truthy_flag;
+use iris_bridge_core_lib::server::error_classification::{
+    classify_error_code, failure_metric_bucket,
+};
+use iris_bridge_core_lib::server::image_path::{
     MaterializedImagePath, image_path_under_allowed_root, materialize_image_path,
     revalidate_image_path_snapshot, validate_image_paths,
 };
-use iris_bridge_core::server::peer_identity::allowed_peer_uids;
-use iris_bridge_core::server::text_request::{TextRequestInput, validate_text_request};
-use iris_bridge_core::server::token::{SecurityMode, canonical_security_mode_raw};
+use iris_bridge_core_lib::server::peer_identity::allowed_peer_uids;
+use iris_bridge_core_lib::server::text_request::{TextRequestInput, validate_text_request};
+use iris_bridge_core_lib::server::token::{SecurityMode, canonical_security_mode_raw};
 use serde_json::json;
 
 use super::envelope::{bad_request, json_catch_unwind};
@@ -22,10 +24,11 @@ pub use media_content::{
 
 pub fn dispatch_request_admission(action: &str, request_id: Option<&str>) -> String {
     json_catch_unwind(|| {
-        iris_bridge_core::server::admission::validate_request_id(action, request_id)?;
-        let requires_request_id = iris_bridge_core::server::admission::requires_request_id(action);
+        iris_bridge_core_lib::server::admission::validate_request_id(action, request_id)?;
+        let requires_request_id =
+            iris_bridge_core_lib::server::admission::requires_request_id(action);
         let dedupe_key =
-            iris_bridge_core::server::admission::request_dedupe_key(action, request_id);
+            iris_bridge_core_lib::server::admission::request_dedupe_key(action, request_id);
         Ok(json!({
             "requiresRequestId": requires_request_id,
             "dedupeKey": dedupe_key,
@@ -33,12 +36,13 @@ pub fn dispatch_request_admission(action: &str, request_id: Option<&str>) -> Str
     })
 }
 
+#[must_use]
 pub fn dispatch_request_requires_request_id(action: &str) -> bool {
-    iris_bridge_core::server::admission::requires_request_id(action)
+    iris_bridge_core_lib::server::admission::requires_request_id(action)
 }
 
 pub fn dispatch_request_dedupe_key(action: &str, request_id: Option<&str>) -> Option<String> {
-    iris_bridge_core::server::admission::request_dedupe_key(action, request_id)
+    iris_bridge_core_lib::server::admission::request_dedupe_key(action, request_id)
 }
 
 pub fn dispatch_is_truthy_flag(raw: &str) -> bool {

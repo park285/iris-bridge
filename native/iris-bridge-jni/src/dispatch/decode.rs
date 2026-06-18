@@ -1,4 +1,4 @@
-use iris_bridge_core::server::{PathFacts, Rejection};
+use iris_bridge_core_lib::server::{PathFacts, Rejection};
 use serde::Deserialize;
 
 use super::envelope::bad_request;

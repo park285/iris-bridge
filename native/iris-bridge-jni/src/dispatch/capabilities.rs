@@ -1,45 +1,13 @@
-use iris_bridge_core::server::capabilities::{
-    BridgeCapabilitiesInput, BridgeReadinessInput, CapabilitySnapshot, TextBridgeRollout,
-    TextCapability, current_bridge_capabilities,
+use iris_bridge_core_lib::server::capabilities::{
+    BridgeCapabilitiesInput, CapabilitySnapshot, current_bridge_capabilities,
 };
 use serde_json::{Map, Value, json};
 
 use super::envelope::json_catch_unwind;
 
-#[allow(
-    clippy::fn_params_excessive_bools,
-    clippy::too_many_arguments,
-    reason = "Kotlin capability snapshot input is a flat JNI boundary"
-)]
-pub fn dispatch_current_bridge_capabilities(
-    registry_available: bool,
-    registry_error: Option<&str>,
-    spec_ready: bool,
-    notification_action_supported: bool,
-    text_supported: bool,
-    text_ready: bool,
-    text_reason: Option<&str>,
-    send_text_enabled: bool,
-    send_markdown_enabled: bool,
-) -> String {
+pub fn dispatch_current_bridge_capabilities(input: &BridgeCapabilitiesInput) -> String {
     json_catch_unwind(|| {
-        let capabilities = current_bridge_capabilities(&BridgeCapabilitiesInput {
-            readiness: BridgeReadinessInput {
-                registry_available,
-                registry_error: registry_error.map(str::to_owned),
-                spec_ready,
-            },
-            notification_action_supported,
-            text_send_capability: Some(TextCapability {
-                supported: text_supported,
-                ready: text_ready,
-                reason: text_reason.map(str::to_owned),
-            }),
-            rollout: TextBridgeRollout {
-                send_text_enabled,
-                send_markdown_enabled,
-            },
-        });
+        let capabilities = current_bridge_capabilities(input);
         let mut fields = Map::new();
         insert_capability_fields(
             &mut fields,

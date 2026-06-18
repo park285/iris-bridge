@@ -1,6 +1,6 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use iris_bridge_core::server::Admit;
+use iris_bridge_core_lib::server::Admit;
 use serde_json::json;
 
 use crate::handles::BridgeCoreContext;

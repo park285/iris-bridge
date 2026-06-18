@@ -1,11 +1,17 @@
 use super::*;
 use crate::handles::MAX_HANDSHAKE_SESSIONS;
-use iris_bridge_core::handshake::{HandshakeFrame, client_proof, server_proof};
-use iris_bridge_core::lease::{ImageLease, ImageLeasePayload};
+use crate::mux_handles::{drop_mux_session_handle, into_mux_session_handle, with_mux_session};
+use iris_bridge_core_lib::handshake::{HandshakeFrame, client_proof, server_proof};
+use iris_bridge_core_lib::lease::{ImageLease, ImageLeasePayload};
+use iris_bridge_core_lib::mux_session::MuxSessionCore;
+use iris_bridge_core_lib::server::capabilities::{
+    BridgeCapabilitiesInput, BridgeReadinessInput, TextBridgeRollout, TextCapability,
+};
+use iris_bridge_core_lib::server::reply_hook::ReplyHookVerifyInput;
 use serde_json::{Value, json};
 use std::fs;
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
+use tempfile::TempDir;
 
 const TOKEN: &str = "bridge-token";
 const SHA256_EMPTY: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -15,18 +21,35 @@ const GOLDEN_MENTIONS_HASH: &str =
 const GOLDEN_SIGNATURE: &str = "79d5a2a35924c010f1984eb53ad492aea6421150afa648e015ca841f2f82431a";
 const CREATED_AT: i64 = 1_700_000_000_000;
 
-fn temp_dir(name: &str) -> PathBuf {
-    let id = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system clock after epoch")
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!("{name}-{}-{id}", std::process::id()));
-    fs::create_dir(&dir).expect("create temp dir");
-    dir
+fn temp_dir(name: &str) -> TempDir {
+    tempfile::Builder::new()
+        .prefix(name)
+        .tempdir()
+        .expect("create temp dir")
 }
 
 fn context() -> BridgeCoreContext {
     BridgeCoreContext::new(Some("production"), TOKEN, Some("true"))
+}
+
+fn capabilities_input() -> BridgeCapabilitiesInput {
+    BridgeCapabilitiesInput {
+        readiness: BridgeReadinessInput {
+            registry_available: true,
+            registry_error: None,
+            spec_ready: true,
+        },
+        notification_action_supported: true,
+        text_send_capability: Some(TextCapability {
+            supported: true,
+            ready: true,
+            reason: None,
+        }),
+        rollout: TextBridgeRollout {
+            send_text_enabled: true,
+            send_markdown_enabled: true,
+        },
+    }
 }
 
 fn parse_envelope(raw: &str) -> Value {
@@ -54,7 +77,7 @@ fn protocol_contract_dispatch_returns_core_contract_json() {
         .expect("contractJson string");
     assert_eq!(
         contract_json,
-        iris_bridge_core::protocol::bridge_protocol_contract_json()
+        iris_bridge_core_lib::protocol::bridge_protocol_contract_json()
     );
 }
 
@@ -539,6 +562,83 @@ fn member_extraction_dispatch_returns_snapshot_envelope() {
 }
 
 #[test]
+fn member_extraction_dispatch_uses_public_bad_request_message() {
+    assert_error(
+        &dispatch_member_extraction_evaluate("not-json"),
+        "BAD_REQUEST",
+        "member extraction request invalid",
+    );
+}
+
+#[test]
+fn dispatch_op_routes_context_and_request_operations() {
+    let created = assert_ok(&dispatch_op(
+        "context.create",
+        r#"{"mode":"production","token":"bridge-token","requireHandshakeRaw":"true"}"#,
+    ));
+    let handle = created["handle"].as_i64().expect("context handle");
+    assert_eq!(created["requireHandshake"], true);
+
+    let request_json =
+        json!({"action":"send_text","protocolVersion":1,"token":"bridge-token"}).to_string();
+    assert_ok(&dispatch_op(
+        "request.validateToken",
+        &json!({
+            "handle": handle,
+            "requestJson": request_json,
+        })
+        .to_string(),
+    ));
+
+    assert_error(
+        &dispatch_op(
+            "request.validateToken",
+            r#"{"handle":0,"requestJson":"{\"action\":\"health\",\"protocolVersion\":1}"}"#,
+        ),
+        "INVALID_HANDLE",
+        "invalid BridgeCoreContext handle",
+    );
+
+    assert_ok(&dispatch_op(
+        "context.destroy",
+        &json!({ "handle": handle }).to_string(),
+    ));
+}
+
+#[test]
+fn dispatch_op_rejects_unknown_or_malformed_payloads() {
+    let created = assert_ok(&dispatch_op(
+        "context.create",
+        r#"{"mode":"production","token":"bridge-token","requireHandshakeRaw":"true"}"#,
+    ));
+    let handle = created["handle"].as_i64().expect("context handle");
+
+    assert_error(
+        &dispatch_op("request.requiresRequestId", "not-json"),
+        "BAD_REQUEST",
+        "dispatch payload JSON invalid",
+    );
+    assert_error(
+        &dispatch_op(
+            "request.validateAdmission",
+            &json!({ "handle": handle }).to_string(),
+        ),
+        "BAD_REQUEST",
+        "dispatch payload invalid",
+    );
+    assert_error(
+        &dispatch_op("future.op", "{}"),
+        "BAD_REQUEST",
+        "unknown bridge core dispatch op",
+    );
+
+    assert_ok(&dispatch_op(
+        "context.destroy",
+        &json!({ "handle": handle }).to_string(),
+    ));
+}
+
+#[test]
 fn reply_mention_attachment_dispatch_matches_core_merge_policy() {
     let attachment = dispatch_reply_mention_attachment_or_null(
         r#"{"callingPkg":"com.kakao.talk","mentions":[{"user_id":"text-user","at":[1],"len":3}]}"#,
@@ -620,9 +720,9 @@ fn reply_attachment_text_dispatch_matches_core_policy() {
 
 #[test]
 fn current_bridge_capabilities_dispatch_reports_rollout_and_readiness_reasons() {
-    let envelope = assert_ok(&dispatch_current_bridge_capabilities(
-        true, None, true, true, true, true, None, false, true,
-    ));
+    let mut input = capabilities_input();
+    input.rollout.send_text_enabled = false;
+    let envelope = assert_ok(&dispatch_current_bridge_capabilities(&input));
 
     assert_eq!(envelope["inspectChatRoomSupported"], true);
     assert_eq!(envelope["inspectChatRoomReady"], true);
@@ -634,25 +734,18 @@ fn current_bridge_capabilities_dispatch_reports_rollout_and_readiness_reasons() 
     assert_eq!(envelope["sendMarkdownReady"], true);
     assert_eq!(envelope.get("sendMarkdownReason"), None);
 
-    let unavailable = assert_ok(&dispatch_current_bridge_capabilities(
-        false,
-        Some("registry unavailable"),
-        true,
-        true,
-        true,
-        true,
-        None,
-        true,
-        true,
-    ));
+    let mut input = capabilities_input();
+    input.readiness.registry_available = false;
+    input.readiness.registry_error = Some("registry unavailable".to_owned());
+    let unavailable = assert_ok(&dispatch_current_bridge_capabilities(&input));
 
     assert_eq!(unavailable["inspectChatRoomSupported"], false);
     assert_eq!(unavailable["inspectChatRoomReason"], "registry unavailable");
     assert_eq!(unavailable["sendTextReason"], "registry unavailable");
 
-    let notification_unavailable = assert_ok(&dispatch_current_bridge_capabilities(
-        true, None, true, false, true, true, None, true, true,
-    ));
+    let mut input = capabilities_input();
+    input.notification_action_supported = false;
+    let notification_unavailable = assert_ok(&dispatch_current_bridge_capabilities(&input));
     assert_eq!(notification_unavailable["markChatRoomReadSupported"], false);
     assert_eq!(notification_unavailable["markChatRoomReadReady"], false);
     assert_eq!(
@@ -793,10 +886,10 @@ fn validate_image_paths_reports_static_path_policy() {
 
 #[test]
 fn materialize_image_path_dispatch_returns_snapshot_and_revalidates_changes() {
-    let root = temp_dir("iris-jni-image-path-root");
-    let file = root.join("image.png");
+    let root_dir = temp_dir("iris-jni-image-path-root");
+    let file = root_dir.path().join("image.png");
     fs::write(&file, b"x").expect("write image");
-    let root = root.canonicalize().expect("canonical root");
+    let root = root_dir.path().canonicalize().expect("canonical root");
     let allowed_roots_json = json!([root.to_string_lossy()]).to_string();
     let path = file.to_string_lossy();
 
@@ -820,14 +913,12 @@ fn materialize_image_path_dispatch_returns_snapshot_and_revalidates_changes() {
         "PATH_VALIDATION_FAILED",
         &format!("image file changed before send: {canonical}"),
     );
-
-    fs::remove_dir_all(&root).expect("cleanup temp dir");
 }
 
 #[test]
 fn image_lease_facts_dispatch_hashes_file_bytes_and_reports_missing_files() {
     let root = temp_dir("iris-jni-lease-facts-root");
-    let file = root.join("image.png");
+    let file = root.path().join("image.png");
     fs::write(&file, b"abc").expect("write image");
     let path = file.to_string_lossy().into_owned();
     let paths_json = json!([path]).to_string();
@@ -847,13 +938,17 @@ fn image_lease_facts_dispatch_hashes_file_bytes_and_reports_missing_files() {
     assert_eq!(facts[0]["byte_length"], 3);
     assert!(facts[0]["last_modified_epoch_ms"].as_i64().expect("mtime") > 0);
 
-    let missing = root.join("missing.png").to_string_lossy().into_owned();
+    let missing = root
+        .path()
+        .join("missing.png")
+        .to_string_lossy()
+        .into_owned();
     assert_error(
         &dispatch_image_lease_facts_json(&json!([missing]).to_string()),
         "PATH_VALIDATION_FAILED",
         &format!(
             "image file not found: {}",
-            root.join("missing.png").to_string_lossy()
+            root.path().join("missing.png").to_string_lossy()
         ),
     );
     assert_error(
@@ -861,7 +956,6 @@ fn image_lease_facts_dispatch_hashes_file_bytes_and_reports_missing_files() {
         "BAD_REQUEST",
         "image lease paths JSON invalid",
     );
-    fs::remove_dir_all(&root).expect("cleanup temp dir");
 }
 
 #[test]
@@ -1238,16 +1332,16 @@ fn reply_hook_sign_and_verify_match_core_golden() {
         dispatch_reply_hook_sign(TOKEN, 42, "hello **world**", "req-7", CREATED_AT, None)
             .expect("signable");
     assert_eq!(signature, GOLDEN_SIGNATURE);
-    assert!(dispatch_reply_hook_verify(
-        TOKEN,
-        42,
-        "hello **world**",
-        Some("req-7"),
-        Some(CREATED_AT),
-        None,
-        Some(GOLDEN_SIGNATURE),
-        CREATED_AT + 120_000,
-    ));
+    assert!(dispatch_reply_hook_verify(&ReplyHookVerifyInput {
+        bridge_token: TOKEN,
+        room_id: 42,
+        message_text: "hello **world**",
+        session_id: Some("req-7"),
+        created_at_epoch_ms: Some(CREATED_AT),
+        mentions_hash: None,
+        signature: Some(GOLDEN_SIGNATURE),
+        now_epoch_ms: CREATED_AT + 120_000,
+    }));
 }
 
 #[test]
@@ -1400,6 +1494,44 @@ fn concurrent_with_context_dispatch_on_shared_handle_all_succeed() {
 }
 
 #[test]
+fn concurrent_lookup_many_handles_all_succeed() {
+    let handles: Vec<_> = (0..64).map(|_| into_handle(context())).collect();
+    let handles = std::sync::Arc::new(handles);
+    let threads = 8;
+    let calls_per_thread = 256;
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(threads));
+
+    let workers: Vec<_> = (0..threads)
+        .map(|thread_index| {
+            let barrier = std::sync::Arc::clone(&barrier);
+            let handles = std::sync::Arc::clone(&handles);
+            std::thread::spawn(move || {
+                barrier.wait();
+                for call_index in 0..calls_per_thread {
+                    let handle = handles[(thread_index * 31 + call_index) % handles.len()];
+                    let envelope = with_context(handle, |ctx| {
+                        dispatch_dedupe_admit(
+                            ctx,
+                            &format!("send:req-{thread_index}-{call_index}"),
+                            i64::try_from(call_index).expect("call index fits i64"),
+                        )
+                    })
+                    .expect("many handle dispatches under read lock");
+                    assert_ok(&envelope);
+                }
+            })
+        })
+        .collect();
+
+    for worker in workers {
+        worker.join().expect("worker thread");
+    }
+    for handle in handles.iter() {
+        drop_handle(*handle);
+    }
+}
+
+#[test]
 fn drop_handle_during_in_flight_call_keeps_context_alive() {
     let handle = into_handle(context());
 
@@ -1430,8 +1562,79 @@ fn drop_handle_during_in_flight_call_keeps_context_alive() {
 }
 
 #[test]
+fn drop_handle_returns_before_in_flight_body_completes() {
+    let handle = into_handle(context());
+
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+
+    let worker = std::thread::spawn(move || {
+        with_context(handle, |_ctx| {
+            entered_tx.send(()).expect("signal entered body");
+            release_rx.recv().expect("await release");
+        })
+        .expect("in-flight dispatch holds cloned Arc");
+    });
+
+    entered_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("await body entry");
+
+    let dropper = std::thread::spawn(move || {
+        drop_handle(handle);
+        done_tx.send(()).expect("signal drop complete");
+    });
+
+    done_rx
+        .recv_timeout(Duration::from_millis(100))
+        .expect("drop_handle must not wait for in-flight body completion");
+
+    release_tx.send(()).expect("release in-flight body");
+    worker.join().expect("in-flight worker");
+    dropper.join().expect("dropper thread");
+}
+
+#[test]
+fn drop_mux_session_handle_returns_before_in_flight_body_completes() {
+    let handle = into_mux_session_handle(MuxSessionCore::new(1));
+
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+
+    let worker = std::thread::spawn(move || {
+        with_mux_session(handle, |_session| {
+            entered_tx.send(()).expect("signal entered body");
+            release_rx.recv().expect("await release");
+        })
+        .expect("in-flight mux dispatch holds cloned Arc");
+    });
+
+    entered_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("await mux body entry");
+
+    let dropper = std::thread::spawn(move || {
+        drop_mux_session_handle(handle);
+        done_tx.send(()).expect("signal mux drop complete");
+    });
+
+    done_rx
+        .recv_timeout(Duration::from_millis(100))
+        .expect("drop_mux_session_handle must not wait for in-flight body completion");
+
+    release_tx.send(()).expect("release in-flight mux body");
+    worker.join().expect("in-flight mux worker");
+    dropper.join().expect("mux dropper thread");
+}
+
+#[test]
 fn jni_abi_version_is_sourced_from_bridge_core_protocol() {
-    assert_eq!(crate::ABI_VERSION, iris_bridge_core::protocol::ABI_VERSION);
+    assert_eq!(
+        crate::ABI_VERSION,
+        iris_bridge_core_lib::protocol::ABI_VERSION
+    );
 }
 
 #[test]
@@ -1448,4 +1651,44 @@ fn dispatch_after_destroy_is_rejected_as_invalid_handle() {
         Err(rejection) => invalid_handle_envelope(&rejection),
     };
     assert_error(&stale, "INVALID_HANDLE", "invalid BridgeCoreContext handle");
+}
+
+#[test]
+fn mux_dispatch_after_destroy_is_rejected_as_invalid_handle() {
+    let handle = into_mux_session_handle(MuxSessionCore::new(1));
+    assert_ok(&dispatch_mux_session_is_cancelled(handle, "missing"));
+
+    drop_mux_session_handle(handle);
+
+    assert_error(
+        &dispatch_mux_session_is_cancelled(handle, "missing"),
+        "INVALID_HANDLE",
+        "invalid MuxSessionCore handle",
+    );
+}
+
+#[test]
+fn wrong_registry_handle_is_rejected() {
+    let context_handle = into_handle(context());
+    assert_error(
+        &dispatch_mux_session_is_cancelled(context_handle, "missing"),
+        "INVALID_HANDLE",
+        "invalid MuxSessionCore handle",
+    );
+
+    let mux_handle = into_mux_session_handle(MuxSessionCore::new(1));
+    let context_result = match with_context(mux_handle, |ctx| {
+        dispatch_dedupe_admit(ctx, "send:wrong-registry", 1)
+    }) {
+        Ok(envelope) => envelope,
+        Err(rejection) => invalid_handle_envelope(&rejection),
+    };
+    assert_error(
+        &context_result,
+        "INVALID_HANDLE",
+        "invalid BridgeCoreContext handle",
+    );
+
+    drop_handle(context_handle);
+    drop_mux_session_handle(mux_handle);
 }

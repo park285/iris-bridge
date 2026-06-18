@@ -1,5 +1,5 @@
-use iris_bridge_core::server::Rejection;
-use iris_bridge_core::server::image_path::{
+use iris_bridge_core_lib::server::Rejection;
+use iris_bridge_core_lib::server::image_path::{
     MediaContentTypeLease, MediaMessageKind, normalize_media_content_types,
     normalize_media_content_types_from_leases, select_media_message_kind,
     validate_share_manager_image_media,

@@ -1,20 +1,44 @@
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONObject
+
 internal object BridgeCoreJniMedia {
-    external fun nativeNormalizeMediaContentTypes(
+    fun nativeNormalizeMediaContentTypes(
         imageCount: Int,
         contentTypesJson: String,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "media.normalizeContentTypes",
+            JSONObject()
+                .put("imageCount", imageCount)
+                .put("contentTypesJson", contentTypesJson),
+        )
 
-    external fun nativeNormalizeMediaContentTypesFromLeases(
+    fun nativeNormalizeMediaContentTypesFromLeases(
         imageCount: Int,
         leasesJson: String,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "media.normalizeContentTypesFromLeases",
+            JSONObject()
+                .put("imageCount", imageCount)
+                .put("leasesJson", leasesJson),
+        )
 
-    external fun nativeMediaMessageKind(
+    fun nativeMediaMessageKind(
         imageCount: Int,
         contentTypesJson: String,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "media.messageKind",
+            JSONObject()
+                .put("imageCount", imageCount)
+                .put("contentTypesJson", contentTypesJson),
+        )
 
-    external fun nativeValidateShareManagerImageMedia(contentTypesJson: String): String
+    fun nativeValidateShareManagerImageMedia(contentTypesJson: String): String =
+        BridgeCoreJniDispatcher.envelope(
+            "media.validateShareManagerImage",
+            JSONObject().put("contentTypesJson", contentTypesJson),
+        )
 }

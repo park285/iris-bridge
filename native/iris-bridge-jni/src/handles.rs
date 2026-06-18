@@ -1,17 +1,21 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, OnceLock};
 
-use iris_bridge_core::handshake::should_require_bridge_handshake;
-use iris_bridge_core::server::{
+use foldhash::fast::RandomState as FastHashBuilder;
+use iris_bridge_core_lib::handshake::should_require_bridge_handshake;
+use iris_bridge_core_lib::server::{
     DedupeLedger, HandshakeServer, LeaseLedger, Rejection, SecurityMode,
 };
+use parking_lot::{Mutex, RwLock};
 
 pub const ERROR_INVALID_HANDLE: &str = "INVALID_HANDLE";
 
 pub const MAX_HANDSHAKE_SESSIONS: usize = 64;
 
 pub type NonceProvider = fn() -> String;
+type Handle = i64;
+type ContextRegistry = HashMap<Handle, Arc<BridgeCoreContext>, FastHashBuilder>;
 
 fn random_nonce() -> String {
     let mut bytes = [0_u8; 32];
@@ -98,54 +102,48 @@ impl BridgeCoreContext {
             Ok(())
         } else {
             Err(Rejection::new(
-                iris_bridge_core::server::ERROR_UNAUTHORIZED,
-                iris_bridge_core::handshake::AUTHENTICATION_FAILED,
+                iris_bridge_core_lib::server::ERROR_UNAUTHORIZED,
+                iris_bridge_core_lib::handshake::AUTHENTICATION_FAILED,
             ))
         }
     }
 
-    fn lock_sessions(&self) -> std::sync::MutexGuard<'_, Vec<HandshakeServer<NonceProvider>>> {
-        self.handshake_sessions
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    fn lock_sessions(&self) -> parking_lot::MutexGuard<'_, Vec<HandshakeServer<NonceProvider>>> {
+        self.handshake_sessions.lock()
     }
 }
 
 // 핸들은 raw pointer가 아니라 레지스트리 키다. destroy 이후의 dispatch는
 // "not found" 거부가 되고, in-flight 호출은 Arc가 수명을 보장하므로
 // use-after-free가 구조적으로 불가능하다 (unsafe-closeout 게이트 준수).
-fn registry() -> &'static RwLock<HashMap<i64, Arc<BridgeCoreContext>>> {
-    static REGISTRY: OnceLock<RwLock<HashMap<i64, Arc<BridgeCoreContext>>>> = OnceLock::new();
-    REGISTRY.get_or_init(|| RwLock::new(HashMap::new()))
+fn registry() -> &'static RwLock<ContextRegistry> {
+    static REGISTRY: OnceLock<RwLock<ContextRegistry>> = OnceLock::new();
+    REGISTRY.get_or_init(|| RwLock::new(ContextRegistry::with_hasher(FastHashBuilder::default())))
 }
 
 static NEXT_HANDLE: AtomicI64 = AtomicI64::new(1);
 
-pub fn allocate_handle() -> i64 {
+pub fn allocate_handle() -> Handle {
     NEXT_HANDLE.fetch_add(1, Ordering::Relaxed)
 }
 
-fn read_registry() -> std::sync::RwLockReadGuard<'static, HashMap<i64, Arc<BridgeCoreContext>>> {
-    registry()
-        .read()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+fn read_registry() -> parking_lot::RwLockReadGuard<'static, ContextRegistry> {
+    registry().read()
 }
 
-fn write_registry() -> std::sync::RwLockWriteGuard<'static, HashMap<i64, Arc<BridgeCoreContext>>> {
-    registry()
-        .write()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+fn write_registry() -> parking_lot::RwLockWriteGuard<'static, ContextRegistry> {
+    registry().write()
 }
 
 #[must_use]
-pub fn into_handle(context: BridgeCoreContext) -> i64 {
+pub fn into_handle(context: BridgeCoreContext) -> Handle {
     let handle = allocate_handle();
     write_registry().insert(handle, Arc::new(context));
     handle
 }
 
 pub fn with_context<R>(
-    handle: i64,
+    handle: Handle,
     body: impl FnOnce(&BridgeCoreContext) -> R,
 ) -> Result<R, Rejection> {
     let context = read_registry()
@@ -155,6 +153,6 @@ pub fn with_context<R>(
     Ok(body(&context))
 }
 
-pub fn drop_handle(handle: i64) {
+pub fn drop_handle(handle: Handle) {
     write_registry().remove(&handle);
 }

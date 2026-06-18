@@ -1,5 +1,5 @@
-use iris_bridge_core::server::PathFacts;
-use iris_bridge_core::server::lease_verdict::{
+use iris_bridge_core_lib::server::PathFacts;
+use iris_bridge_core_lib::server::lease_verdict::{
     image_lease_rejection_is_state_error, path_facts_for_files,
 };
 use serde_json::json;

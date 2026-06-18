@@ -1,8 +1,8 @@
-use iris_bridge_core::server::kakao_chat_log_crypto::{decrypt_attachment, encrypt_attachment};
-use iris_bridge_core::server::kakao_link_attachment::{
+use iris_bridge_core_lib::server::kakao_chat_log_crypto::{decrypt_attachment, encrypt_attachment};
+use iris_bridge_core_lib::server::kakao_link_attachment::{
     attachments_match, leverage_encryption_type, pending_cleanup_attachments_match,
 };
-use iris_bridge_core::server::{ERROR_BAD_REQUEST, Rejection};
+use iris_bridge_core_lib::server::{ERROR_BAD_REQUEST, Rejection};
 use serde_json::json;
 
 use super::envelope::json_catch_unwind;

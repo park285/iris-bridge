@@ -1,27 +1,61 @@
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONObject
+
 internal object BridgeCoreJniMuxSession {
-    external fun nativeCreateMuxSession(maxInFlight: Int): String
+    fun nativeCreateMuxSession(maxInFlight: Int): String =
+        BridgeCoreJniDispatcher.envelope(
+            "mux.create",
+            JSONObject().put("maxInFlight", maxInFlight),
+        )
 
-    external fun nativeDestroyMuxSession(handle: Long): String
+    fun nativeDestroyMuxSession(handle: Long): String =
+        BridgeCoreJniDispatcher.envelope(
+            "mux.destroy",
+            JSONObject().put("handle", handle),
+        )
 
-    external fun nativeMuxSessionOnFrame(
+    fun nativeMuxSessionOnFrame(
         handle: Long,
         frameJson: String,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "mux.onFrame",
+            JSONObject()
+                .put("handle", handle)
+                .put("frameJson", frameJson),
+        )
 
-    external fun nativeMuxSessionOnExecutorRejected(
+    fun nativeMuxSessionOnExecutorRejected(
         handle: Long,
         correlationId: String,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "mux.onExecutorRejected",
+            JSONObject()
+                .put("handle", handle)
+                .put("correlationId", correlationId),
+        )
 
-    external fun nativeMuxSessionOnRequestCompleted(
+    fun nativeMuxSessionOnRequestCompleted(
         handle: Long,
         correlationId: String,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "mux.onRequestCompleted",
+            JSONObject()
+                .put("handle", handle)
+                .put("correlationId", correlationId),
+        )
 
-    external fun nativeMuxSessionIsCancelled(
+    fun nativeMuxSessionIsCancelled(
         handle: Long,
         correlationId: String,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "mux.isCancelled",
+            JSONObject()
+                .put("handle", handle)
+                .put("correlationId", correlationId),
+        )
 }

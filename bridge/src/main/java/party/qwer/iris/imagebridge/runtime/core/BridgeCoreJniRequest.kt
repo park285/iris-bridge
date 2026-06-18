@@ -1,18 +1,33 @@
 package party.qwer.iris.imagebridge.runtime.core
 
+import org.json.JSONObject
+
 internal object BridgeCoreJniRequest {
-    external fun nativeValidateRequestToken(
+    fun nativeValidateRequestToken(
         handle: Long,
         requestJson: String,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "request.validateToken",
+            JSONObject()
+                .put("handle", handle)
+                .put("requestJson", requestJson),
+        )
 
-    external fun nativeValidateRequestAdmission(
+    fun nativeValidateRequestAdmission(
         handle: Long,
         action: String,
         requestId: String?,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "request.validateAdmission",
+            JSONObject()
+                .put("handle", handle)
+                .put("action", action)
+                .putNullable("requestId", requestId),
+        )
 
-    external fun nativeValidateTextRequest(
+    fun nativeValidateTextRequest(
         handle: Long,
         hasRoomId: Boolean,
         roomId: Long,
@@ -20,26 +35,65 @@ internal object BridgeCoreJniRequest {
         markdown: Boolean,
         attachmentJson: String?,
         mentionsJson: String?,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "request.validateText",
+            JSONObject()
+                .put("handle", handle)
+                .apply {
+                    if (hasRoomId) put("roomId", roomId) else put("roomId", JSONObject.NULL)
+                }.putNullable("message", message)
+                .put("markdown", markdown)
+                .putNullable("attachmentJson", attachmentJson)
+                .putNullable("mentionsJson", mentionsJson),
+        )
 
-    external fun nativeValidateImagePaths(
+    fun nativeValidateImagePaths(
         handle: Long,
         imagePathsJson: String,
         maxPathCount: Int,
         maxPathLength: Int,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "request.validateImagePaths",
+            JSONObject()
+                .put("handle", handle)
+                .put("imagePathsJson", imagePathsJson)
+                .put("maxPathCount", maxPathCount)
+                .put("maxPathLength", maxPathLength),
+        )
 
-    external fun nativeClassifyErrorCode(
+    fun nativeClassifyErrorCode(
         message: String,
         isIllegalArgument: Boolean,
-    ): String
+    ): String =
+        BridgeCoreJniDispatcher.envelope(
+            "request.classifyErrorCode",
+            JSONObject()
+                .put("message", message)
+                .put("isIllegalArgument", isIllegalArgument),
+        )
 
-    external fun nativeFailureMetricBucket(errorCode: String): String
+    fun nativeFailureMetricBucket(errorCode: String): String =
+        BridgeCoreJniDispatcher.stringValue(
+            "request.failureMetricBucket",
+            JSONObject().put("errorCode", errorCode),
+        )
 
-    external fun nativeRequestRequiresRequestId(action: String): Boolean
+    fun nativeRequestRequiresRequestId(action: String): Boolean =
+        BridgeCoreJniDispatcher.booleanValue(
+            "request.requiresRequestId",
+            JSONObject().put("action", action),
+        )
 
-    external fun nativeRequestDedupeKey(
+    fun nativeRequestDedupeKey(
         action: String,
         requestId: String?,
-    ): String?
+    ): String? =
+        BridgeCoreJniDispatcher.optionalStringValue(
+            "request.dedupeKey",
+            JSONObject()
+                .put("action", action)
+                .putNullable("requestId", requestId),
+        )
 }

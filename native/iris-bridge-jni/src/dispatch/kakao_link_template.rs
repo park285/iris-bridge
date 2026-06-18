@@ -1,4 +1,4 @@
-use iris_bridge_core::server::kakao_link_template::{
+use iris_bridge_core_lib::server::kakao_link_template::{
     build_spec_send_attachment, build_v4_encoded_query, extract_app_key,
     has_explicit_template_args, has_resolved_iris_template, patch_display_attachment,
 };
