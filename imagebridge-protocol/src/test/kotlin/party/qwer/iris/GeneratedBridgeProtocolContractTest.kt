@@ -44,4 +44,9 @@ class GeneratedBridgeProtocolContractTest {
     fun `generated capability ids are the Kotlin capability ids`() {
         assertEquals(GeneratedBridgeProtocolContract.CAPABILITY_IDS, BridgeCapability.entries.map { it.id })
     }
+
+    @Test
+    fun `generated abi version is the bridge core SSOT value`() {
+        assertEquals(39, GeneratedBridgeProtocolContract.ABI_VERSION)
+    }
 }

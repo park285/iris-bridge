@@ -13,7 +13,7 @@ use crate::dispatch::*;
 #[cfg(test)]
 use crate::handles::{BridgeCoreContext, drop_handle, into_handle, with_context};
 
-pub const ABI_VERSION: jint = 39;
+pub const ABI_VERSION: jint = iris_bridge_core::protocol::ABI_VERSION;
 
 #[cfg(test)]
 #[path = "tests/lib.rs"]

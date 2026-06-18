@@ -12,7 +12,10 @@ import party.qwer.iris.ImageBridgeHandshakeProtocol
 import party.qwer.iris.ImageBridgeMuxProtocol
 import party.qwer.iris.ImageBridgeProtocol
 import party.qwer.iris.LengthPrefixedFrameCodec
+import party.qwer.iris.generated.GeneratedBridgeProtocolContract
 import party.qwer.iris.imagebridge.runtime.core.BridgeCore
+import party.qwer.iris.imagebridge.runtime.core.BridgeCoreJniContext
+import party.qwer.iris.imagebridge.runtime.core.loadOrNull
 import party.qwer.iris.imagebridge.runtime.core.protocolContractJson
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -62,6 +65,21 @@ class BridgeProtocolContractParityTest {
             assertEquals(capability.hasSideEffect, contractAction.getBoolean("hasSideEffect"))
             assertEquals(capability.requiresAuthToken, contractAction.getBoolean("requiresAuthToken"))
             assertEquals(capability.threats.map { it.id }.toSet(), contractAction.getJSONArray("threatIds").strings().toSet())
+        }
+    }
+
+    @Test
+    fun `native abi version matches generated contract and bridge core expectation`() {
+        val runtime =
+            assertNotNull(
+                BridgeCore.loadOrNull(securityMode = "production", bridgeToken = "bridge-token", requireHandshakeRaw = "true"),
+                "host .so must load via java.library.path in unit tests",
+            )
+        try {
+            assertEquals(GeneratedBridgeProtocolContract.ABI_VERSION, BridgeCore.EXPECTED_ABI_VERSION)
+            assertEquals(GeneratedBridgeProtocolContract.ABI_VERSION, BridgeCoreJniContext.nativeAbiVersion())
+        } finally {
+            runtime.close()
         }
     }
 

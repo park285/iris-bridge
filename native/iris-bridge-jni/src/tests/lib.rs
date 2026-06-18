@@ -1430,6 +1430,11 @@ fn drop_handle_during_in_flight_call_keeps_context_alive() {
 }
 
 #[test]
+fn jni_abi_version_is_sourced_from_bridge_core_protocol() {
+    assert_eq!(crate::ABI_VERSION, iris_bridge_core::protocol::ABI_VERSION);
+}
+
+#[test]
 fn dispatch_after_destroy_is_rejected_as_invalid_handle() {
     let handle = into_handle(context());
     let live = with_context(handle, |ctx| dispatch_dedupe_admit(ctx, "send:req-live", 1))
