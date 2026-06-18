@@ -3,13 +3,10 @@ agp = "9.2.1"
 kotlin = "2.3.21"
 kotlinxCoroutines = "1.10.2"
 kotlinxSerializationJson = "1.11.0"
-ktorVersion = "3.4.3"
 libxposedApi = "101.0.1"
 
 jacoco = "0.8.14"
 ktlint = "14.2.0"
-slf4j = "2.0.17"
-okhttp = "5.3.2"
 orgJson = "20251224"
 robolectric = "4.16.1"
 sqliteJdbc = "3.53.1.0"
@@ -17,15 +14,7 @@ sqliteJdbc = "3.53.1.0"
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
-kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
-ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktorVersion" }
-ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktorVersion" }
-ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktorVersion" }
-ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktorVersion" }
-ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktorVersion" }
-okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 org-json = { module = "org.json:json", version.ref = "orgJson" }
-slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "slf4j" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqliteJdbc" }
 libxposed-api = { module = "io.github.libxposed:api", version.ref = "libxposedApi" }
