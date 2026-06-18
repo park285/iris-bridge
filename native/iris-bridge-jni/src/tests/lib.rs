@@ -1066,7 +1066,7 @@ fn kakao_chat_log_attachment_crypto_dispatch_reports_bad_request_for_unknown_enc
     assert_error(
         &dispatch_kakao_chat_log_attachment_crypto(true, 30, "test", 438_562_408),
         "BAD_REQUEST",
-        "unsupported Kakao attachment encType=30",
+        "kakao chat log attachment crypto request invalid",
     );
 }
 

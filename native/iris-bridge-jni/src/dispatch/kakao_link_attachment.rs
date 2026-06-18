@@ -16,14 +16,21 @@ pub fn dispatch_kakao_chat_log_attachment_crypto(
     json_catch_unwind(|| {
         if encrypt {
             let attachment = encrypt_attachment(enc_type, payload, user_id)
-                .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error.to_string()))?;
+                .map_err(public_kakao_chat_log_crypto_error)?;
             Ok(json!({ "attachment": attachment }))
         } else {
             let plaintext = decrypt_attachment(enc_type, payload, user_id)
-                .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error.to_string()))?;
+                .map_err(public_kakao_chat_log_crypto_error)?;
             Ok(json!({ "plaintext": plaintext }))
         }
     })
+}
+
+fn public_kakao_chat_log_crypto_error(_: impl std::fmt::Display) -> Rejection {
+    Rejection::new(
+        ERROR_BAD_REQUEST,
+        "kakao chat log attachment crypto request invalid",
+    )
 }
 
 pub fn dispatch_kakao_link_attachments_match(
