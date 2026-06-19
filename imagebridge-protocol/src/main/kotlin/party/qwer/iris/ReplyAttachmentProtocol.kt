@@ -23,11 +23,10 @@ object ReplyAttachmentProtocol {
             }.toString()
     }
 
-    private fun parseMentions(
-        mentionsJson: String?,
-    ) = mentionsJson
-        ?.takeUnless { it.isBlank() }
-        ?.let { raw -> runCatching { JSONObject(raw) }.getOrNull() }
-        ?.optJSONArray("mentions")
-        ?.takeIf { mentions -> mentions.length() > 0 }
+    private fun parseMentions(mentionsJson: String?) =
+        mentionsJson
+            ?.takeUnless { it.isBlank() }
+            ?.let { raw -> runCatching { JSONObject(raw) }.getOrNull() }
+            ?.optJSONArray("mentions")
+            ?.takeIf { mentions -> mentions.length() > 0 }
 }

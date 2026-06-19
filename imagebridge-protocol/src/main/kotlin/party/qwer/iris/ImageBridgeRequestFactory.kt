@@ -67,7 +67,12 @@ interface ImageBridgeRequestFactory {
             markdown = true,
         )
 
-    fun buildHealthRequest(token: String? = null): ImageBridgeRequest = ImageBridgeRequest(action = ImageBridgeProtocol.ACTION_HEALTH, protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION, token = token)
+    fun buildHealthRequest(token: String? = null): ImageBridgeRequest =
+        ImageBridgeRequest(
+            action = ImageBridgeProtocol.ACTION_HEALTH,
+            protocolVersion = ImageBridgeProtocol.PROTOCOL_VERSION,
+            token = token,
+        )
 
     fun buildInspectChatRoomRequest(
         roomId: Long,
