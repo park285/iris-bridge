@@ -115,7 +115,7 @@ fn lease_fixture() -> (String, String) {
 fn validate_request_token_returns_success_envelope() {
     let envelope = assert_ok(&dispatch_validate_request_token(
         &context(),
-        r#"{"action":"send_text","protocolVersion":1,"token":"bridge-token"}"#,
+        r#"{"action":"send_text","protocolVersion":2,"token":"bridge-token"}"#,
     ));
     assert_eq!(envelope.as_object().expect("object").len(), 1);
 }
@@ -124,7 +124,7 @@ fn validate_request_token_returns_success_envelope() {
 fn validate_request_token_allows_token_exempt_health_without_token() {
     let envelope = assert_ok(&dispatch_validate_request_token(
         &context(),
-        r#"{"action":"health","protocolVersion":1}"#,
+        r#"{"action":"health","protocolVersion":2}"#,
     ));
     assert_eq!(envelope.as_object().expect("object").len(), 1);
 }
@@ -134,7 +134,7 @@ fn validate_request_token_serializes_core_rejection_without_rewriting() {
     assert_error(
         &dispatch_validate_request_token(
             &context(),
-            r#"{"action":"send_text","protocolVersion":1,"token":"wrong"}"#,
+            r#"{"action":"send_text","protocolVersion":2,"token":"wrong"}"#,
         ),
         "UNAUTHORIZED",
         "unauthorized bridge token",
@@ -146,7 +146,7 @@ fn validate_request_token_requires_token_for_unknown_actions() {
     assert_error(
         &dispatch_validate_request_token(
             &context(),
-            r#"{"action":"future_side_effect","protocolVersion":1}"#,
+            r#"{"action":"future_side_effect","protocolVersion":2}"#,
         ),
         "UNAUTHORIZED",
         "unauthorized bridge token",
@@ -167,7 +167,7 @@ fn handle_dispatch_rejects_zero_handle() {
     assert_error(
         &dispatch_validate_request_token_handle(
             0,
-            r#"{"action":"health","protocolVersion":1,"token":"bridge-token"}"#,
+            r#"{"action":"health","protocolVersion":2,"token":"bridge-token"}"#,
         ),
         "INVALID_HANDLE",
         "invalid BridgeCoreContext handle",
@@ -580,7 +580,7 @@ fn dispatch_op_routes_context_and_request_operations() {
     assert_eq!(created["requireHandshake"], true);
 
     let request_json =
-        json!({"action":"send_text","protocolVersion":1,"token":"bridge-token"}).to_string();
+        json!({"action":"send_text","protocolVersion":2,"token":"bridge-token"}).to_string();
     assert_ok(&dispatch_op(
         "request.validateToken",
         &json!({
@@ -593,7 +593,7 @@ fn dispatch_op_routes_context_and_request_operations() {
     assert_error(
         &dispatch_op(
             "request.validateToken",
-            r#"{"handle":0,"requestJson":"{\"action\":\"health\",\"protocolVersion\":1}"}"#,
+            r#"{"handle":0,"requestJson":"{\"action\":\"health\",\"protocolVersion\":2}"}"#,
         ),
         "INVALID_HANDLE",
         "invalid BridgeCoreContext handle",
@@ -1271,7 +1271,7 @@ fn allowed_peer_uids_match_core_security_mode_policy() {
 #[test]
 fn handshake_server_proof_binds_caller_socket_name() {
     let ctx = context();
-    let hello = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-1","socketName":"iris-image-bridge-mux","timestampMs":1}"#;
+    let hello = r#"{"type":"hello","protocolVersion":2,"clientNonce":"client-1","socketName":"iris-image-bridge-mux","timestampMs":1}"#;
     let response = assert_ok(&dispatch_handshake_on_hello(
         &ctx,
         hello,
@@ -1293,8 +1293,8 @@ fn handshake_server_proof_binds_caller_socket_name() {
 #[test]
 fn handshake_registry_keeps_concurrent_sessions_independent() {
     let ctx = context();
-    let hello_1 = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-1","socketName":"@mux","timestampMs":1}"#;
-    let hello_2 = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-2","socketName":"@mux","timestampMs":2}"#;
+    let hello_1 = r#"{"type":"hello","protocolVersion":2,"clientNonce":"client-1","socketName":"@mux","timestampMs":1}"#;
+    let hello_2 = r#"{"type":"hello","protocolVersion":2,"clientNonce":"client-2","socketName":"@mux","timestampMs":2}"#;
 
     let response_1 = assert_ok(&dispatch_handshake_on_hello(&ctx, hello_1, 1, "@mux"));
     let frame_1: HandshakeFrame =
@@ -1312,7 +1312,7 @@ fn handshake_registry_keeps_concurrent_sessions_independent() {
     );
     assert_ok(&dispatch_handshake_on_client_proof(
         &ctx,
-        &format!(r#"{{"type":"client_proof","protocolVersion":1,"proof":"{proof_2}"}}"#),
+        &format!(r#"{{"type":"client_proof","protocolVersion":2,"proof":"{proof_2}"}}"#),
     ));
 
     let proof_1 = client_proof(
@@ -1322,7 +1322,7 @@ fn handshake_registry_keeps_concurrent_sessions_independent() {
     );
     assert_ok(&dispatch_handshake_on_client_proof(
         &ctx,
-        &format!(r#"{{"type":"client_proof","protocolVersion":1,"proof":"{proof_1}"}}"#),
+        &format!(r#"{{"type":"client_proof","protocolVersion":2,"proof":"{proof_1}"}}"#),
     ));
 }
 
@@ -1435,7 +1435,7 @@ fn require_handshake_reflects_resolved_policy() {
 #[test]
 fn handshake_registry_evicts_oldest_session_beyond_capacity() {
     let ctx = context();
-    let oldest_hello = r#"{"type":"hello","protocolVersion":1,"clientNonce":"client-oldest","socketName":"@mux","timestampMs":1}"#;
+    let oldest_hello = r#"{"type":"hello","protocolVersion":2,"clientNonce":"client-oldest","socketName":"@mux","timestampMs":1}"#;
     let oldest = assert_ok(&dispatch_handshake_on_hello(&ctx, oldest_hello, 1, "@mux"));
     let oldest_frame: HandshakeFrame =
         serde_json::from_str(oldest["frameJson"].as_str().expect("frame json"))
@@ -1443,7 +1443,7 @@ fn handshake_registry_evicts_oldest_session_beyond_capacity() {
 
     for index in 0..MAX_HANDSHAKE_SESSIONS {
         let hello = format!(
-            r#"{{"type":"hello","protocolVersion":1,"clientNonce":"client-{index}","socketName":"@mux","timestampMs":2}}"#
+            r#"{{"type":"hello","protocolVersion":2,"clientNonce":"client-{index}","socketName":"@mux","timestampMs":2}}"#
         );
         assert_ok(&dispatch_handshake_on_hello(&ctx, &hello, 2, "@mux"));
     }
@@ -1456,7 +1456,7 @@ fn handshake_registry_evicts_oldest_session_beyond_capacity() {
     assert_error(
         &dispatch_handshake_on_client_proof(
             &ctx,
-            &format!(r#"{{"type":"client_proof","protocolVersion":1,"proof":"{oldest_proof}"}}"#),
+            &format!(r#"{{"type":"client_proof","protocolVersion":2,"proof":"{oldest_proof}"}}"#),
         ),
         "UNAUTHORIZED",
         "bridge authentication failed",
