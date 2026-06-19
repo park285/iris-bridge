@@ -54,12 +54,30 @@ internal object ReplyMarkdownSendingLogAccess {
         threadId: Long,
         threadScope: Int,
     ) {
-        val sendingLogClass = sendingLog.javaClass
         // scope/threadId setter 메서드명은 KakaoTalk 버전마다 밀린다(26.4.2 J1/L1 → 26.5.2 L1/N1). 26.5.2에서
         // H1(int)가 multiUploadSequence setter로 새로 생겨 시그니처가 우연히 맞으면 scope가 엉뚱한 필드에 써진 채
         // 예외 없이 "성공"해 thread reply가 누락된다. 필드명 Z(scope)/V0(threadId)는 버전 간 안정적이라 직접 write한다.
-        sendingLogClass.getDeclaredField("Z").apply { isAccessible = true }.setInt(sendingLog, threadScope)
-        sendingLogClass.getDeclaredField("V0").apply { isAccessible = true }.set(sendingLog, java.lang.Long.valueOf(threadId))
+        setThreadField(sendingLog, "Z", threadScope)
+        setThreadField(sendingLog, "V0", java.lang.Long.valueOf(threadId))
+    }
+
+    private fun setThreadField(
+        sendingLog: Any,
+        fieldName: String,
+        value: Any,
+    ) {
+        var cls: Class<*>? = sendingLog.javaClass
+        while (cls != null) {
+            try {
+                cls.getDeclaredField(fieldName).apply { isAccessible = true }.set(sendingLog, value)
+                return
+            } catch (_: NoSuchFieldException) {
+                cls = cls.superclass
+            }
+        }
+        throw NoSuchFieldException(
+            "ChatSendingLog thread field '$fieldName' absent in ${sendingLog.javaClass.name} hierarchy",
+        )
     }
 
     fun writeMessageType(

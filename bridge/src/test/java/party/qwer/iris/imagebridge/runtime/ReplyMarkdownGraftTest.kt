@@ -16,6 +16,7 @@ import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionPendingContextStore
 import party.qwer.iris.imagebridge.runtime.reply.ReplyMentionSendingLogAccess
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -490,6 +491,28 @@ class ReplyMarkdownSendingLogAccessTest {
     }
 
     @Test
+    fun `writes thread metadata to inherited Z and V0 fields`() {
+        val log = FakeSendingLogWithInheritedFields()
+
+        ReplyMarkdownSendingLogAccess.writeThreadMetadata(log, threadId = 777L, threadScope = 4)
+
+        assertEquals(777L, log.V0)
+        assertEquals(4, log.Z)
+    }
+
+    @Test
+    fun `throws naming the missing field when thread field is absent`() {
+        val log = FakeSendingLogWithoutThreadFields()
+
+        val error =
+            assertFailsWith<NoSuchFieldException> {
+                ReplyMarkdownSendingLogAccess.writeThreadMetadata(log, threadId = 1L, threadScope = 1)
+            }
+
+        assertTrue(error.message!!.contains("Z"))
+    }
+
+    @Test
     fun `reads session id from string attachment`() {
         val log = FakeSendingLogWithAttachmentField("""{"callingPkg":"com.kakao.talk","irisSessionId":"session-1"}""")
 
@@ -667,6 +690,20 @@ private class FakeSendingLogWithFields {
 
     @Suppress("PropertyName")
     var Z: Int = 0
+}
+
+private open class FakeSendingLogThreadFieldBase {
+    @Suppress("PropertyName")
+    var V0: Long? = null
+
+    @Suppress("PropertyName")
+    var Z: Int = 0
+}
+
+private class FakeSendingLogWithInheritedFields : FakeSendingLogThreadFieldBase()
+
+private class FakeSendingLogWithoutThreadFields {
+    var unrelated: Int = 0
 }
 
 private class FakeSendingLogWithAttachmentField(
