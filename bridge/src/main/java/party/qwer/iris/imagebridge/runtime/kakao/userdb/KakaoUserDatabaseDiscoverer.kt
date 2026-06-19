@@ -50,12 +50,20 @@ private const val USER_DATABASE_DATA_SOURCE_FILE_NAME = "UserDatabaseDataSource.
 private val USER_DATABASE_DATA_SOURCE_NAMES =
     arrayOf(
         USER_DATABASE_DATA_SOURCE_CLASS_NAME,
+        "C40.C2865n2",
+        "C40.n2",
         "X20.C36045r2",
         "X20.r2",
     )
 
-private val KNOWN_OBFUSCATED_USER_DATABASE_DATA_SOURCE_NAMES = setOf("X20.C36045r2", "X20.r2")
-private val OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAMES = setOf("t", "m113412t")
+private val KNOWN_OBFUSCATED_USER_DATABASE_DATA_SOURCE_NAMES =
+    setOf(
+        "C40.C2865n2",
+        "C40.n2",
+        "X20.C36045r2",
+        "X20.r2",
+    )
+private val OBFUSCATED_GET_USER_BY_ID_V2_METHOD_NAMES = setOf("t", "m9598t", "m113412t")
 
 private fun discoverUserDatabaseDataSourceClass(
     classLoader: ClassLoader,

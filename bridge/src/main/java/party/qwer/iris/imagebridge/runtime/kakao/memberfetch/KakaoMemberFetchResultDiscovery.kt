@@ -15,6 +15,7 @@ internal fun discoverMemberFetchResultClass(
             arrayOf(
                 "com.kakao.talk.core.loco.LocoResult",
                 "com.kakao.talk.core.loco.f",
+                "com.kakao.talk.core.loco.C52513f",
             ),
         label = "MemberFetchResult",
         signatureMatcher = ::matchesMemberFetchResult,

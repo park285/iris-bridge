@@ -21,8 +21,9 @@ internal fun discoverKakaoMemberFetchAccess(classLoader: ClassLoader): KakaoMemb
                 scanner = scanner,
                 lastKnownNames =
                     arrayOf(
-                        "p306Er.C7625d",
+                        "As.d",
                         "Er.d",
+                        "p306Er.C7625d",
                         "com.kakao.talk.core.loco.Loco",
                         "com.kakao.talk.core.loco.d",
                         "com.kakao.talk.core.loco.C52511d",
@@ -84,7 +85,15 @@ private fun hasMemberFetchSingletonCandidate(clazz: Class<*>): Boolean =
 
 internal fun findFetchMembersMethodForTest(clazz: Class<*>): java.lang.reflect.Method? = findFetchMembersMethod(clazz)
 
-private val REQUESTED_MEMBER_FETCH_METHOD_NAMES = listOf("Y", "m22152Y", "S0", "m189027S0")
+private val REQUESTED_MEMBER_FETCH_METHOD_NAMES =
+    listOf(
+        "Y",
+        "m22152Y",
+        "m3128Y",
+        "S0",
+        "m189027S0",
+        "m185516S0",
+    )
 
 private fun findFetchMembersMethod(clazz: Class<*>): java.lang.reflect.Method? =
     findSuspendRequestedMembersMethod(clazz)

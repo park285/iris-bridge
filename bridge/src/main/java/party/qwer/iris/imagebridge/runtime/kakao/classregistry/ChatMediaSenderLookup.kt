@@ -80,7 +80,7 @@ internal fun resolveChatMediaSendMethods(
                 allMethods.filter { method ->
                     isMultiSendMethod(method, messageTypeClass)
                 },
-            preferredNames = setOf("p"),
+            preferredNames = setOf("m", "p"),
         )
     return singleSend to multiSend
 }
