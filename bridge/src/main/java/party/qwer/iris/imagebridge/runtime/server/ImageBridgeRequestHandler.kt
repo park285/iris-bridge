@@ -14,7 +14,13 @@ internal class ImageBridgeRequestHandler(
     private val chatRoomInspector: ((Long) -> String)? = null,
     private val chatRoomOpener: ((Long) -> Unit)? = null,
     private val chatRoomReadMarker: ((Long) -> Unit)? = null,
-    private val chatRoomMemberSnapshotProvider: ((Long, List<ImageBridgeProtocol.ChatRoomMemberHint>, ImageBridgeProtocol.ChatRoomMemberExtractionPlan?) -> ImageBridgeProtocol.ChatRoomMembersSnapshot)? = null,
+    private val chatRoomMemberSnapshotProvider: (
+        (
+            Long,
+            List<ImageBridgeProtocol.ChatRoomMemberHint>,
+            ImageBridgeProtocol.ChatRoomMemberExtractionPlan?,
+        ) -> ImageBridgeProtocol.ChatRoomMembersSnapshot
+    )? = null,
     private val memberProfileFetcher: ((Long, List<Long>) -> Map<Long, UpstreamMemberProfile>)? = null,
     private val handshakeValidator: BridgeHandshakeValidator = BridgeHandshakeValidator(),
     private val serialExecutor: RoomThreadSerialExecutor = RoomThreadSerialExecutor(),
@@ -83,7 +89,8 @@ internal class ImageBridgeRequestHandler(
                 )
         }
 
-    private fun handleSendImage(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse = imageActionHandler.handle(request, healthProvider())
+    private fun handleSendImage(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =
+        imageActionHandler.handle(request, healthProvider())
 
     private fun handleSendText(
         request: ImageBridgeProtocol.ImageBridgeRequest,

@@ -8,9 +8,7 @@ internal data class ExpectedMemberHints(
     val mentionUserIds: Map<Long, String>,
 )
 
-internal fun expectedMemberHintsFrom(
-    hints: Collection<ImageBridgeProtocol.ChatRoomMemberHint>,
-): ExpectedMemberHints =
+internal fun expectedMemberHintsFrom(hints: Collection<ImageBridgeProtocol.ChatRoomMemberHint>): ExpectedMemberHints =
     ExpectedMemberHints(
         ids = hints.map { it.userId }.toSet(),
         nicknames =

@@ -1,6 +1,7 @@
 package party.qwer.iris.imagebridge.runtime.core
 
-fun BridgeCore.imageLeaseRejectionIsStateError(message: String): Boolean = imageLeaseRejectionIsStateError(message, ::nativeImageLeaseRejectionIsStateError)
+fun BridgeCore.imageLeaseRejectionIsStateError(message: String): Boolean =
+    imageLeaseRejectionIsStateError(message, ::nativeImageLeaseRejectionIsStateError)
 
 internal fun BridgeCore.imageLeaseRejectionIsStateError(
     message: String,

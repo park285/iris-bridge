@@ -365,6 +365,8 @@ internal class FakeOuterTextRequest {
     }
 }
 
+// G/Z/V0는 KakaoTalk SendingLog 난독화 필드명 — production이 getDeclaredField로 조회하므로 rename 불가.
+@Suppress("ktlint:standard:property-naming")
 internal class FakeTextSendingLog private constructor(
     private val roomId: Long,
     private val message: String,
@@ -443,6 +445,8 @@ internal class FakeTextSendingLog private constructor(
     }
 }
 
+// G/Z/V0는 KakaoTalk SendingLog 난독화 필드명 — production이 getDeclaredField로 조회하므로 rename 불가.
+@Suppress("ktlint:standard:property-naming")
 internal class ModernFakeTextSendingLog private constructor(
     private val roomId: Long,
     private val message: String,

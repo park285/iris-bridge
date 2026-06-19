@@ -40,9 +40,7 @@ internal object ReplyMarkdownSendingLogAccess {
         return null
     }
 
-    fun readAttachmentSessionId(
-        sendingLog: Any,
-    ): String? = ReplySendingLogAttachmentAccess.readSessionId(sendingLog)
+    fun readAttachmentSessionId(sendingLog: Any): String? = ReplySendingLogAttachmentAccess.readSessionId(sendingLog)
 
     fun readAttachmentText(sendingLog: Any): String? = ReplySendingLogAttachmentAccess.readAttachmentText(sendingLog)
 

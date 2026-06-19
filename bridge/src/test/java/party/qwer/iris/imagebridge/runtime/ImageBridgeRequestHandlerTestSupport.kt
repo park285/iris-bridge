@@ -164,7 +164,8 @@ internal fun sendMarkdownRequest(
     return request.copy(attachmentJson = attachmentJson)
 }
 
-internal fun healthRequest(token: String? = null): ImageBridgeProtocol.ImageBridgeRequest = ImageBridgeProtocol.buildHealthRequest(token = token)
+internal fun healthRequest(token: String? = null): ImageBridgeProtocol.ImageBridgeRequest =
+    ImageBridgeProtocol.buildHealthRequest(token = token)
 
 internal fun inspectChatRoomRequest(
     roomId: Long,

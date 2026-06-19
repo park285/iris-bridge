@@ -44,7 +44,10 @@ internal fun buildBridgeRequestHandlerComponents(
     kakaoClassLoader: ClassLoader = context.classLoader,
 ): BridgeRequestHandlerComponents {
     val imageSender = registry?.let { KakaoImageSender(context, it, hookInstaller) }
-    val textSender = registry?.let { KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts) }
+    val textSender =
+        registry?.let {
+            KakaoTextSender(context, it, mentionPendingContexts, leveragePendingContexts, leverageCommitPendingContexts)
+        }
     val chatRoomResolver = registry?.let { ChatRoomResolver(it) }
     val chatRoomOpener = buildChatRoomOpener(context, registry, chatRoomResolver)
     val notificationActionStarter = buildNotificationActionStarter(context, registry)
@@ -58,8 +61,12 @@ internal fun buildBridgeRequestHandlerComponents(
     return BridgeRequestHandlerComponents(
         requestHandler =
             ImageBridgeRequestHandler(
-                imageSender = { request -> requireNotNull(imageSender) { "KakaoClassRegistry not available: ${registryError ?: "unknown error"}" }.send(request) },
-                textSender = { request -> requireNotNull(textSender) { "Kakao text sender not available: ${registryError ?: "unknown error"}" }.send(request) },
+                imageSender = { request ->
+                    requireNotNull(imageSender) { "KakaoClassRegistry not available: ${registryError ?: "unknown error"}" }.send(request)
+                },
+                textSender = { request ->
+                    requireNotNull(textSender) { "Kakao text sender not available: ${registryError ?: "unknown error"}" }.send(request)
+                },
                 healthProvider = healthProvider,
                 chatRoomInspector = { roomId -> inspectChatRoom(chatRoomResolver, registryError, roomId) },
                 chatRoomOpener = chatRoomOpener::open,

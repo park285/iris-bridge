@@ -587,7 +587,11 @@ class ChatRoomMemberExtractorTest {
                 expectedMemberIds = setOf(7L, 9L),
             )
 
-        assertEquals(true, result.confidence == ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM || result.confidence == ImageBridgeProtocol.ChatRoomSnapshotConfidence.HIGH)
+        assertEquals(
+            true,
+            result.confidence == ImageBridgeProtocol.ChatRoomSnapshotConfidence.MEDIUM ||
+                result.confidence == ImageBridgeProtocol.ChatRoomSnapshotConfidence.HIGH,
+        )
     }
 
     @Test

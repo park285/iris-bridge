@@ -585,7 +585,10 @@ class KakaoLinkSpecSenderTest {
                 .has("L"),
         )
         assertEquals("133220", JSONObject(kakaoLinkSpecCommitVerificationAttachment(attachment)).getJSONObject("K").getString("ti"))
-        assertEquals(listOf(JSONObject(attachment).toString()), kakaoLinkSpecPatchMatchAttachments(attachment).map { JSONObject(it).toString() })
+        assertEquals(
+            listOf(JSONObject(attachment).toString()),
+            kakaoLinkSpecPatchMatchAttachments(attachment).map { JSONObject(it).toString() },
+        )
     }
 
     @Test

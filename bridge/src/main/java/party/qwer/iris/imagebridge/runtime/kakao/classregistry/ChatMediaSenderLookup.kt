@@ -45,7 +45,8 @@ private fun isModernChatMediaSenderConstructor(
         isThreadIdParameterType(parameterTypes[1]) &&
         parameterTypes[2] == function1Class
 
-private fun isThreadIdParameterType(parameterType: Class<*>): Boolean = parameterType == java.lang.Long::class.java || parameterType == java.lang.Long.TYPE
+private fun isThreadIdParameterType(parameterType: Class<*>): Boolean =
+    parameterType == java.lang.Long::class.java || parameterType == java.lang.Long.TYPE
 
 internal fun resolveChatMediaSendMethods(
     chatMediaSenderClass: Class<*>,

@@ -342,7 +342,11 @@ class ImageBridgeRequestHandlerDiscoveryTest {
                                 installAttempted = true,
                                 hooks =
                                     listOf(
-                                        DiscoveryHookStatus(name = HOOK_SHARE_MANAGER_IMAGE_DISPATCH, installed = true, invocationCount = 0),
+                                        DiscoveryHookStatus(
+                                            name = HOOK_SHARE_MANAGER_IMAGE_DISPATCH,
+                                            installed = true,
+                                            invocationCount = 0,
+                                        ),
                                         DiscoveryHookStatus(name = HOOK_SEND_THREADED_ENTRY, installed = false, invocationCount = 0),
                                         DiscoveryHookStatus(name = HOOK_SEND_THREADED_INJECT, installed = false, invocationCount = 0),
                                     ),

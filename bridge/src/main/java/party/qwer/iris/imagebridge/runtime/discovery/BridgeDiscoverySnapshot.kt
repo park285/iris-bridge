@@ -20,7 +20,8 @@ internal data class BridgeDiscoverySnapshot(
     val hooks: List<DiscoveryHookStatus>,
 )
 
-internal fun BridgeDiscoverySnapshot.sendBlockReason(imageCount: Int): String? = sendBlockReason(imageCount, threadId = null, threadScope = null)
+internal fun BridgeDiscoverySnapshot.sendBlockReason(imageCount: Int): String? =
+    sendBlockReason(imageCount, threadId = null, threadScope = null)
 
 internal fun BridgeDiscoverySnapshot.sendBlockReason(
     imageCount: Int,

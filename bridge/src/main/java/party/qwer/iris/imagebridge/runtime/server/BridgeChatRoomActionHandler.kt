@@ -6,7 +6,13 @@ internal class BridgeChatRoomActionHandler(
     private val inspector: ((Long) -> String)?,
     private val opener: ((Long) -> Unit)?,
     private val readMarker: ((Long) -> Unit)?,
-    private val memberSnapshotProvider: ((Long, List<ImageBridgeProtocol.ChatRoomMemberHint>, ImageBridgeProtocol.ChatRoomMemberExtractionPlan?) -> ImageBridgeProtocol.ChatRoomMembersSnapshot)?,
+    private val memberSnapshotProvider: (
+        (
+            Long,
+            List<ImageBridgeProtocol.ChatRoomMemberHint>,
+            ImageBridgeProtocol.ChatRoomMemberExtractionPlan?,
+        ) -> ImageBridgeProtocol.ChatRoomMembersSnapshot
+    )?,
 ) {
     fun handleInspect(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse {
         val roomId = roomId(request)
@@ -14,9 +20,11 @@ internal class BridgeChatRoomActionHandler(
         return ImageBridgeProtocol.ImageBridgeResponse(status = ImageBridgeProtocol.STATUS_OK, inspectionJson = inspect(roomId))
     }
 
-    fun handleOpen(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse = handleUnitAction(request, opener, "chatroom opener unavailable")
+    fun handleOpen(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =
+        handleUnitAction(request, opener, "chatroom opener unavailable")
 
-    fun handleMarkRead(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse = handleUnitAction(request, readMarker, "chatroom read marker unavailable")
+    fun handleMarkRead(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =
+        handleUnitAction(request, readMarker, "chatroom read marker unavailable")
 
     fun handleSnapshotMembers(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse {
         val roomId = roomId(request)

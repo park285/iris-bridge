@@ -89,9 +89,7 @@ internal class FakeLatestMemberFetchClient {
             ),
         )
 
-    suspend fun D(
-        chatId: Long,
-    ): FakeLocoResult =
+    suspend fun D(chatId: Long): FakeLocoResult =
         FakeLocoResult(
             FakeMemberResponse(
                 members =
@@ -132,9 +130,7 @@ internal class FakeRoomOnlyMemberFetchClient {
         memberIds: List<Long>,
     ): FakeLocoResult = FakeLocoResult(FakeMemberResponse(memberIds.map { memberId -> FakeMember(memberId, "Member $memberId") }))
 
-    suspend fun D(
-        chatId: Long,
-    ): FakeLocoResult =
+    suspend fun D(chatId: Long): FakeLocoResult =
         FakeLocoResult(
             FakeMemberResponse(
                 members =

@@ -22,7 +22,10 @@ class BridgeCoreRuntime internal constructor(
     private val destroyed = AtomicBoolean(false)
     private val lifecycle = ReentrantReadWriteLock()
 
-    fun validateRequestToken(requestJson: String): BridgeCoreEnvelope = dispatch { BridgeCoreJniRequest.nativeValidateRequestToken(handle, requestJson) }
+    fun validateRequestToken(requestJson: String): BridgeCoreEnvelope =
+        dispatch {
+            BridgeCoreJniRequest.nativeValidateRequestToken(handle, requestJson)
+        }
 
     fun validateRequestAdmission(
         action: String,
@@ -68,7 +71,10 @@ class BridgeCoreRuntime internal constructor(
         socketName: String,
     ): BridgeCoreEnvelope = dispatch { BridgeCoreJniContext.nativeHandshakeOnHello(handle, frameJson, nowMs, socketName) }
 
-    fun handshakeOnClientProof(frameJson: String): BridgeCoreEnvelope = dispatch { BridgeCoreJniContext.nativeHandshakeOnClientProof(handle, frameJson) }
+    fun handshakeOnClientProof(frameJson: String): BridgeCoreEnvelope =
+        dispatch {
+            BridgeCoreJniContext.nativeHandshakeOnClientProof(handle, frameJson)
+        }
 
     fun verifyLeases(
         roomId: Long,

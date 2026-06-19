@@ -59,7 +59,8 @@ internal fun selectTextWriteType(): Any? =
     // Kakao ShareManager 일반 텍스트 경로는 writeType enum이 아니라 null을 넘긴다.
     null
 
-internal fun selectLeverageSchemeWriteType(registry: KakaoClassRegistry): Any? = selectConnectWriteType(registry) ?: selectWriteTypeByName(registry, "LeverageScheme")
+internal fun selectLeverageSchemeWriteType(registry: KakaoClassRegistry): Any? =
+    selectConnectWriteType(registry) ?: selectWriteTypeByName(registry, "LeverageScheme")
 
 internal fun selectConnectWriteType(registry: KakaoClassRegistry): Any? = selectWriteTypeByName(registry, "Connect")
 

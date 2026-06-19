@@ -52,7 +52,15 @@ internal class KakaoChatLogDbCommitVerifier(
         var db: SQLiteDatabase? = null
         try {
             repeat(COMMIT_ATTEMPTS) { attempt ->
-                if (!sleepBeforeKakaoLinkRetry(sleeper, COMMIT_RETRY_DELAY_MS, requestId, roomId, "kakaolink commit check interrupted", logInfo)) {
+                if (!sleepBeforeKakaoLinkRetry(
+                        sleeper,
+                        COMMIT_RETRY_DELAY_MS,
+                        requestId,
+                        roomId,
+                        "kakaolink commit check interrupted",
+                        logInfo,
+                    )
+                ) {
                     return false
                 }
                 val committed =

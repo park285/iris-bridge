@@ -79,7 +79,8 @@ private fun matchesMemberFetchFacade(clazz: Class<*>): Boolean {
 
 internal fun matchesMemberFetchFacadeForTest(clazz: Class<*>): Boolean = matchesMemberFetchFacade(clazz)
 
-private fun hasMemberFetchSingletonCandidate(clazz: Class<*>): Boolean = clazz.declaredFields.any { field -> Modifier.isStatic(field.modifiers) && field.type == clazz } || hasSelfReturningAccessor(clazz)
+private fun hasMemberFetchSingletonCandidate(clazz: Class<*>): Boolean =
+    clazz.declaredFields.any { field -> Modifier.isStatic(field.modifiers) && field.type == clazz } || hasSelfReturningAccessor(clazz)
 
 internal fun findFetchMembersMethodForTest(clazz: Class<*>): java.lang.reflect.Method? = findFetchMembersMethod(clazz)
 

@@ -81,7 +81,9 @@ class ImageBridgeRequestHandlerSendTest {
                 .createTempFile("iris-bridge", ".mp4")
                 .toFile()
                 .apply {
-                    writeBytes(byteArrayOf(0x00, 0x00, 0x00, 0x18, 'f'.code.toByte(), 't'.code.toByte(), 'y'.code.toByte(), 'p'.code.toByte()))
+                    writeBytes(
+                        byteArrayOf(0x00, 0x00, 0x00, 0x18, 'f'.code.toByte(), 't'.code.toByte(), 'y'.code.toByte(), 'p'.code.toByte()),
+                    )
                 }
         val rootDir = file.parentFile ?: error("temp file parent missing")
         val handler =

@@ -42,7 +42,19 @@ internal fun trySendWithLeveragePaths(
         error("Karing template send did not create chat log")
     }
     if (resolvedIrisTemplate) {
-        if (sendWithShareManagerLeveragePath(binding, chatRoom, roomId, message, threadId, threadScope, rawAttachment, requestId, leveragePendingContexts, logInfo)) {
+        if (sendWithShareManagerLeveragePath(
+                binding,
+                chatRoom,
+                roomId,
+                message,
+                threadId,
+                threadScope,
+                rawAttachment,
+                requestId,
+                leveragePendingContexts,
+                logInfo,
+            )
+        ) {
             return true
         }
         return sendWithLeverageSchemePath(binding, chatRoom, roomId, message, threadId, threadScope, rawAttachment, requestId, logInfo)
@@ -66,7 +78,19 @@ internal fun trySendWithLeveragePaths(
     ) {
         return true
     }
-    if (sendWithShareManagerLeveragePath(binding, chatRoom, roomId, message, threadId, threadScope, rawAttachment, requestId, leveragePendingContexts, logInfo)) {
+    if (sendWithShareManagerLeveragePath(
+            binding,
+            chatRoom,
+            roomId,
+            message,
+            threadId,
+            threadScope,
+            rawAttachment,
+            requestId,
+            leveragePendingContexts,
+            logInfo,
+        )
+    ) {
         return true
     }
     return sendWithLeverageSchemePath(binding, chatRoom, roomId, message, threadId, threadScope, rawAttachment, requestId, logInfo)

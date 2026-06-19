@@ -4,7 +4,8 @@ import party.qwer.iris.imagebridge.runtime.core.BridgeCore
 import party.qwer.iris.imagebridge.runtime.core.buildKakaoLinkSpecSendAttachment as coreBuildKakaoLinkSpecSendAttachment
 import party.qwer.iris.imagebridge.runtime.core.patchKakaoLinkDisplayAttachment as corePatchKakaoLinkDisplayAttachment
 
-internal fun kakaoLinkSpecSendAttachment(rawAttachment: String): String = kakaoLinkSpecSendAttachment(rawAttachment, BridgeCore::coreBuildKakaoLinkSpecSendAttachment)
+internal fun kakaoLinkSpecSendAttachment(rawAttachment: String): String =
+    kakaoLinkSpecSendAttachment(rawAttachment, BridgeCore::coreBuildKakaoLinkSpecSendAttachment)
 
 internal fun kakaoLinkSpecSendAttachment(
     rawAttachment: String,

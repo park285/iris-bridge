@@ -144,9 +144,11 @@ internal class ImageBridgeServer(
         bridgeCore = null
     }
 
-    internal fun isTextBridgeSendTextEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_TEXT_ENABLED")): Boolean = textBridgeSendTextEnabled(raw)
+    internal fun isTextBridgeSendTextEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_TEXT_ENABLED")): Boolean =
+        textBridgeSendTextEnabled(raw)
 
-    internal fun isTextBridgeSendMarkdownEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_MARKDOWN_ENABLED")): Boolean = textBridgeSendMarkdownEnabled(raw)
+    internal fun isTextBridgeSendMarkdownEnabled(raw: String? = System.getenv("IRIS_TEXT_BRIDGE_SEND_MARKDOWN_ENABLED")): Boolean =
+        textBridgeSendMarkdownEnabled(raw)
 
     private fun newClientExecutor(): ThreadPoolExecutor = newBridgeClientExecutor()
 }

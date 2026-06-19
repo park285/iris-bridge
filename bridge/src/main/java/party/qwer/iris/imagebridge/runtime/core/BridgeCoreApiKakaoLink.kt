@@ -54,7 +54,8 @@ private fun nativeKakaoLinkPendingCleanupAttachmentsMatch(
     }
 }
 
-fun BridgeCore.kakaoLinkLeverageEncryptionType(value: String): Int = kakaoLinkLeverageEncryptionType(value, ::nativeKakaoLinkLeverageEncryptionType)
+fun BridgeCore.kakaoLinkLeverageEncryptionType(value: String): Int =
+    kakaoLinkLeverageEncryptionType(value, ::nativeKakaoLinkLeverageEncryptionType)
 
 internal fun BridgeCore.kakaoLinkLeverageEncryptionType(
     value: String,
@@ -73,7 +74,8 @@ private fun nativeKakaoLinkLeverageEncryptionType(value: String): Int? {
     }
 }
 
-fun BridgeCore.hasKakaoLinkExplicitTemplateArgs(rawAttachment: String): Boolean = hasKakaoLinkExplicitTemplateArgs(rawAttachment, ::nativeKakaoLinkHasExplicitTemplateArgs)
+fun BridgeCore.hasKakaoLinkExplicitTemplateArgs(rawAttachment: String): Boolean =
+    hasKakaoLinkExplicitTemplateArgs(rawAttachment, ::nativeKakaoLinkHasExplicitTemplateArgs)
 
 internal fun BridgeCore.hasKakaoLinkExplicitTemplateArgs(
     rawAttachment: String,

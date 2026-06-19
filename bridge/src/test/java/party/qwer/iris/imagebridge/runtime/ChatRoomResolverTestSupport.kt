@@ -17,7 +17,9 @@ internal object FakeChatRuntime {
 
 internal class FakeMasterDatabase {
     companion object {
+        // INSTANCE는 Kakao 난독화 싱글톤 필드명 — KakaoCoroutineInterop가 이름으로 조회하므로 rename 불가.
         @JvmField
+        @Suppress("ktlint:standard:property-naming")
         var INSTANCE: FakeMasterDatabase? = FakeMasterDatabase()
     }
 

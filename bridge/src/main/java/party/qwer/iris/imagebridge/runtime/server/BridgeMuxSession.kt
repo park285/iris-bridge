@@ -144,9 +144,7 @@ internal class BridgeMuxSession(
         )
     }
 
-    private fun handleRequestSafely(
-        request: ImageBridgeProtocol.ImageBridgeRequest,
-    ): ImageBridgeProtocol.ImageBridgeResponse =
+    private fun handleRequestSafely(request: ImageBridgeProtocol.ImageBridgeRequest): ImageBridgeProtocol.ImageBridgeResponse =
         try {
             handler.handle(request)
         } catch (error: Exception) {
@@ -188,7 +186,8 @@ internal class BridgeMuxSession(
         close()
     }
 
-    private fun Throwable.isMuxIdleTimeout(): Boolean = this is FrameReadTimeoutException && stage == FrameReadStage.LENGTH && bytesRead == 0
+    private fun Throwable.isMuxIdleTimeout(): Boolean =
+        this is FrameReadTimeoutException && stage == FrameReadStage.LENGTH && bytesRead == 0
 
     private companion object {
         private const val TAG = "IrisBridge"

@@ -333,9 +333,12 @@ private class RecordingXposedInterface : io.github.libxposed.api.XposedInterface
 
     override fun deoptimize(executable: java.lang.reflect.Executable): Boolean = unsupported()
 
-    override fun getInvoker(method: java.lang.reflect.Method): io.github.libxposed.api.XposedInterface.Invoker<*, java.lang.reflect.Method> = unsupported()
+    override fun getInvoker(
+        method: java.lang.reflect.Method,
+    ): io.github.libxposed.api.XposedInterface.Invoker<*, java.lang.reflect.Method> = unsupported()
 
-    override fun <T> getInvoker(constructor: java.lang.reflect.Constructor<T>): io.github.libxposed.api.XposedInterface.CtorInvoker<T> = unsupported()
+    override fun <T> getInvoker(constructor: java.lang.reflect.Constructor<T>): io.github.libxposed.api.XposedInterface.CtorInvoker<T> =
+        unsupported()
 
     override fun log(
         priority: Int,
@@ -376,7 +379,9 @@ internal class RecordingHookBuilder(
 
     override fun setPriority(priority: Int): io.github.libxposed.api.XposedInterface.HookBuilder = this
 
-    override fun setExceptionMode(mode: io.github.libxposed.api.XposedInterface.ExceptionMode): io.github.libxposed.api.XposedInterface.HookBuilder {
+    override fun setExceptionMode(
+        mode: io.github.libxposed.api.XposedInterface.ExceptionMode,
+    ): io.github.libxposed.api.XposedInterface.HookBuilder {
         this.exceptionMode = mode
         return this
     }

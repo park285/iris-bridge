@@ -40,7 +40,8 @@ private fun constructorSignatures(candidates: List<SenderConstructorBinding>): S
         ) { parameterType -> parameterType.name }
     }
 
-internal fun isThreadIdParameterType(parameterType: Class<*>): Boolean = parameterType == java.lang.Long::class.java || parameterType == java.lang.Long.TYPE
+internal fun isThreadIdParameterType(parameterType: Class<*>): Boolean =
+    parameterType == java.lang.Long::class.java || parameterType == java.lang.Long.TYPE
 
 internal fun normalizedThreadIdArgument(
     parameterType: Class<*>,
