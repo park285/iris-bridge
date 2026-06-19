@@ -210,10 +210,10 @@ class BridgeCoreRuntimeTest {
                 BridgeCore.loadOrNull(securityMode = "production", bridgeToken = "bridge-token", requireHandshakeRaw = "true"),
             )
         try {
-            val ok = runtime.validateRequestToken("""{"protocolVersion":1,"token":"bridge-token"}""")
+            val ok = runtime.validateRequestToken("""{"protocolVersion":2,"token":"bridge-token"}""")
             assertTrue(ok.isOk, "matching token must validate: ${ok.errorMessage}")
 
-            val bad = runtime.validateRequestToken("""{"protocolVersion":1,"token":"wrong"}""")
+            val bad = runtime.validateRequestToken("""{"protocolVersion":2,"token":"wrong"}""")
             assertFalse(bad.isOk)
             assertEquals("unauthorized bridge token", bad.errorMessage)
         } finally {
@@ -229,15 +229,20 @@ class BridgeCoreRuntimeTest {
             )
         runtime.close()
 
-        val token = runtime.validateRequestToken("""{"protocolVersion":1,"token":"bridge-token"}""")
+        val token = runtime.validateRequestToken("""{"protocolVersion":2,"token":"bridge-token"}""")
         assertFalse(token.isOk, "token validation must fail closed after close")
         assertEquals("BRIDGE_CORE_CLOSED", token.errorCode)
 
-        val hello = runtime.handshakeOnHello("""{"type":"hello","protocolVersion":1,"clientNonce":"aa","socketName":"@iris-image-bridge-mux","timestampMs":1}""", 1L, "@iris-image-bridge-mux")
+        val hello =
+            runtime.handshakeOnHello(
+                """{"type":"hello","protocolVersion":2,"clientNonce":"aa","socketName":"@iris-image-bridge-mux","timestampMs":1}""",
+                1L,
+                "@iris-image-bridge-mux",
+            )
         assertFalse(hello.isOk)
         assertEquals("BRIDGE_CORE_CLOSED", hello.errorCode)
 
-        val proof = runtime.handshakeOnClientProof("""{"type":"client_proof","protocolVersion":1,"proof":"ff"}""")
+        val proof = runtime.handshakeOnClientProof("""{"type":"client_proof","protocolVersion":2,"proof":"ff"}""")
         assertFalse(proof.isOk)
         assertEquals("BRIDGE_CORE_CLOSED", proof.errorCode)
 
@@ -1219,7 +1224,7 @@ class BridgeCoreRuntimeTest {
             )
         try {
             val helloFrame =
-                """{"type":"hello","protocolVersion":1,"clientNonce":"client-nonce","socketName":"@iris-image-bridge-mux","timestampMs":1}"""
+                """{"type":"hello","protocolVersion":2,"clientNonce":"client-nonce","socketName":"@iris-image-bridge-mux","timestampMs":1}"""
             val helloEnvelope =
                 BridgeCoreEnvelope.parse(
                     BridgeCoreJniContext.nativeHandshakeOnHello(
@@ -1239,7 +1244,7 @@ class BridgeCoreRuntimeTest {
                     clientNonce = "client-nonce",
                     serverNonce = serverNonce,
                 )
-            val proofFrame = """{"type":"client_proof","protocolVersion":1,"proof":"$proof"}"""
+            val proofFrame = """{"type":"client_proof","protocolVersion":2,"proof":"$proof"}"""
             val proofEnvelope =
                 BridgeCoreEnvelope.parse(
                     BridgeCoreJniContext.nativeHandshakeOnClientProof(runtime.handle, proofFrame),
