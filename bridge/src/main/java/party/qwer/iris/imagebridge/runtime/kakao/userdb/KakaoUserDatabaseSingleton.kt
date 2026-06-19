@@ -3,6 +3,7 @@
 package party.qwer.iris.imagebridge.runtime.kakao.userdb
 
 import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
 internal fun resolveUserDatabaseSingleton(
@@ -11,6 +12,7 @@ internal fun resolveUserDatabaseSingleton(
 ): Any? {
     val failures = mutableListOf<String>()
     resolveSelfSingleton(clazz, failures)?.let { return it }
+    resolveStaticAccessorSingleton(clazz, failures)?.let { return it }
     resolveHolderSingleton(clazz, dependencies, failures)?.let { return it }
     logKnownSingletonFailure(clazz, failures)
     return null
@@ -33,6 +35,28 @@ private fun resolveSelfSingleton(
                 "self field ${field.name} was null"
             } else {
                 "self field ${field.name} failed ${describeThrowable(checkNotNull(result.exceptionOrNull()))}"
+            }
+    }
+    return null
+}
+
+private fun resolveStaticAccessorSingleton(
+    clazz: Class<*>,
+    failures: MutableList<String>,
+): Any? {
+    for (method in clazz.declaredMethods) {
+        if (!Modifier.isStatic(method.modifiers) || method.parameterCount != 0 || method.returnType != clazz) continue
+        val result =
+            runCatching {
+                method.isAccessible = true
+                method.invoke(null)
+            }
+        result.getOrNull()?.let { return it }
+        failures +=
+            if (result.isSuccess) {
+                "static accessor ${methodSignature(method)} returned null"
+            } else {
+                "static accessor ${methodSignature(method)} failed ${describeThrowable(checkNotNull(result.exceptionOrNull()))}"
             }
     }
     return null

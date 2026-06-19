@@ -104,4 +104,10 @@ internal fun describeThrowable(error: Throwable): String {
 }
 
 private val METHOD_DIAGNOSTIC_NAMES = setOf("getUserByIdV2", "getUserByIdV2-gIAlu-s", "t", "m113412t", "s", "m113411s")
-private val KNOWN_SINGLETON_DIAGNOSTIC_CLASS_NAMES = setOf("X20.r2", "X20.C36045r2")
+private val KNOWN_SINGLETON_DIAGNOSTIC_CLASS_NAMES =
+    setOf(
+        "C40.n2",
+        "C40.C2865n2",
+        "X20.r2",
+        "X20.C36045r2",
+    )

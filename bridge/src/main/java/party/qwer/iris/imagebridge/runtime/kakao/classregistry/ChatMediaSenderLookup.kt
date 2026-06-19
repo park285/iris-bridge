@@ -70,7 +70,7 @@ internal fun resolveChatMediaSendMethods(
             selectMethodCandidate(
                 label = "ChatMediaSender single send on ${chatMediaSenderClass.name}",
                 candidates = candidates,
-                preferredNames = setOf("n"),
+                preferredNames = setOf("k", "n"),
             )
         }
     val multiSend =

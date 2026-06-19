@@ -81,6 +81,45 @@ internal class FakePolymorphicMediaSender(
     }
 }
 
+internal class ChatMediaSender26_5_2(
+    chatRoom: FakeChatRoom,
+    threadId: Long?,
+    attachmentDecorator: (JSONObject) -> JSONObject?,
+) {
+    init {
+        check(attachmentDecorator(JSONObject()) != null)
+    }
+
+    fun k(
+        mediaItem: FakeMediaItem,
+        suppressAnimation: Boolean,
+    ) {
+        check(!suppressAnimation)
+    }
+
+    fun A(
+        mediaItem: FakeMediaItem,
+        suppressAnimation: Boolean,
+    ) {
+        check(suppressAnimation)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    fun m(
+        uris: List<Any>,
+        type: FakeMessageType,
+        message: String?,
+        attachment: JSONObject?,
+        forwardExtra: JSONObject?,
+        writeType: FakeWriteType,
+        shareOriginal: Boolean,
+        highQuality: Boolean,
+        listener: FakeListener?,
+    ) {
+        check(type == FakeMessageType.Photo)
+    }
+}
+
 internal class ExactPreferredMediaSender {
     companion object {
         var exactCalls = 0

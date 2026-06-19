@@ -191,6 +191,19 @@ class KakaoClassRegistryTest {
     }
 
     @Test
+    fun `chat media sender method resolver prefers k over A on 26_5_2`() {
+        val methods =
+            KakaoClassRegistry.resolveChatMediaSenderMethodsForTest(
+                chatMediaSenderClass = ChatMediaSender26_5_2::class.java,
+                mediaItemClass = FakeMediaItem::class.java,
+                messageTypeClass = FakeMessageType::class.java,
+            )
+
+        assertEquals("k", assertNotNull(methods.first).name)
+        assertEquals("m", methods.second.name)
+    }
+
+    @Test
     fun `chat media sender method resolver accepts inherited non public methods`() {
         val methods =
             KakaoClassRegistry.resolveChatMediaSenderMethodsForTest(

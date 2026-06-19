@@ -5,10 +5,19 @@ import java.lang.reflect.Modifier
 internal fun resolveMemberFetchSingleton(clazz: Class<*>): Any? {
     clazz.declaredFields
         .filter { field -> Modifier.isStatic(field.modifiers) && field.type == clazz }
+        .sortedBy { field -> if (field.name == "b") 0 else 1 }
         .forEach { field ->
             runCatching {
                 field.isAccessible = true
-                return field.get(null)
+                field.get(null)?.let { return it }
+            }
+        }
+    clazz.declaredMethods
+        .filter { method -> Modifier.isStatic(method.modifiers) && method.parameterCount == 0 && method.returnType == clazz }
+        .forEach { method ->
+            runCatching {
+                method.isAccessible = true
+                method.invoke(null)?.let { return it }
             }
         }
     clazz.declaredFields
