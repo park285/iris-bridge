@@ -55,27 +55,11 @@ internal object ReplyMarkdownSendingLogAccess {
         threadScope: Int,
     ) {
         val sendingLogClass = sendingLog.javaClass
-        val threadIdValue = java.lang.Long.valueOf(threadId)
-
-        runCatching {
-            sendingLogClass
-                .getMethod("H1", Int::class.javaPrimitiveType)
-                .apply { isAccessible = true }
-                .invoke(sendingLog, threadScope)
-        }.getOrElse {
-            val scopeField = sendingLogClass.getDeclaredField("Z").apply { isAccessible = true }
-            scopeField.setInt(sendingLog, threadScope)
-        }
-
-        runCatching {
-            sendingLogClass
-                .getMethod("J1", Long::class.javaObjectType)
-                .apply { isAccessible = true }
-                .invoke(sendingLog, threadIdValue)
-        }.getOrElse {
-            val threadField = sendingLogClass.getDeclaredField("V0").apply { isAccessible = true }
-            threadField.set(sendingLog, threadIdValue)
-        }
+        // scope/threadId setter 메서드명은 KakaoTalk 버전마다 밀린다(26.4.2 J1/L1 → 26.5.2 L1/N1). 26.5.2에서
+        // H1(int)가 multiUploadSequence setter로 새로 생겨 시그니처가 우연히 맞으면 scope가 엉뚱한 필드에 써진 채
+        // 예외 없이 "성공"해 thread reply가 누락된다. 필드명 Z(scope)/V0(threadId)는 버전 간 안정적이라 직접 write한다.
+        sendingLogClass.getDeclaredField("Z").apply { isAccessible = true }.setInt(sendingLog, threadScope)
+        sendingLogClass.getDeclaredField("V0").apply { isAccessible = true }.set(sendingLog, java.lang.Long.valueOf(threadId))
     }
 
     fun writeMessageType(

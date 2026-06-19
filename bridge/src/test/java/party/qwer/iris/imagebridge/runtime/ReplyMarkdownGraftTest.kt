@@ -469,13 +469,14 @@ class ReplyMarkdownSendingLogAccessTest {
     }
 
     @Test
-    fun `writes thread metadata through setters when available`() {
+    fun `writes thread metadata to stable fields ignoring version-shifted trap setter`() {
         val log = FakeSendingLogWithSetters()
 
         ReplyMarkdownSendingLogAccess.writeThreadMetadata(log, threadId = 123L, threadScope = 3)
 
-        assertEquals(123L, log.threadId)
-        assertEquals(3, log.scope)
+        assertEquals(123L, log.V0)
+        assertEquals(3, log.Z)
+        assertEquals(-1, log.multiUploadSequence)
     }
 
     @Test
@@ -620,21 +621,23 @@ class ReplyMarkdownRequestSelectorTest {
 private class FakeSendingLogWithSetters {
     var roomId: Long = 0L
     var message: String = ""
-    var threadId: Long? = null
-    var scope: Int = 0
+
+    @Suppress("PropertyName")
+    var V0: Long? = null
+
+    @Suppress("PropertyName")
+    var Z: Int = 0
+
+    var multiUploadSequence: Int = -1
 
     fun getChatRoomId(): Long = roomId
 
     fun f0(): String = message
 
+    // 26.5.2에서 H1(int)는 thread scope가 아니라 multiUploadSequence setter다 — writeThreadMetadata가 호출하면 안 된다.
     @Suppress("FunctionName")
     fun H1(value: Int) {
-        scope = value
-    }
-
-    @Suppress("FunctionName")
-    fun J1(value: Long?) {
-        threadId = value
+        multiUploadSequence = value
     }
 }
 
