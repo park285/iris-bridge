@@ -92,7 +92,6 @@ internal class BridgeImagePathValidator(
     }
 
     companion object {
-        internal const val LEGACY_OUTBOX_IMAGE_ROOT = "/sdcard/Android/data/com.kakao.talk/files/iris-outbox-images"
         internal const val MAX_IMAGE_PATH_COUNT = 8
         internal const val MAX_IMAGE_PATH_LENGTH = 4096
         internal val DEFAULT_ALLOWED_IMAGE_ROOTS: List<String>

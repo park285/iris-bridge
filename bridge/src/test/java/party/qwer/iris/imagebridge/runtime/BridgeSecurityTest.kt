@@ -369,7 +369,6 @@ class BridgeSecurityTest {
     @Test
     fun `default path validator allows native runtime reply image root`() {
         assertTrue(BridgeImagePathValidator.DEFAULT_ALLOWED_IMAGE_ROOTS.contains("/data/iris-tmp/reply-images"))
-        assertFalse(BridgeImagePathValidator.DEFAULT_ALLOWED_IMAGE_ROOTS.contains(BridgeImagePathValidator.LEGACY_OUTBOX_IMAGE_ROOT))
     }
 
     @Test
