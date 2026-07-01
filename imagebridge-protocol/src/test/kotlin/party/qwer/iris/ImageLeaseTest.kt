@@ -13,8 +13,8 @@ import kotlin.test.assertTrue
 class ImageLeaseTest {
     private val secret = "image-lease-signing-secret"
 
-    // Golden fixture mirrored verbatim from the native contract test
-    // (native/iris-runtime/tests/image_lease_contract_test.rs).
+    // native contract test(native/iris-runtime/tests/image_lease_contract_test.rs)에서
+    // 토씨 하나 다르지 않게 그대로 복제한 golden fixture.
     private val goldenCanonicalJson =
         "{" +
             "\"version\":1," +

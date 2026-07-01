@@ -297,9 +297,9 @@ tasks.withType<Test>().configureEach {
     // classloader와 일반 JUnit app classloader가 한 JVM을 공유하면 "already loaded in another
     // classloader" UnsatisfiedLinkError가 난다. 테스트 클래스마다 JVM을 분리해 회피한다.
     setForkEvery(1)
-    // Unit tests that are not lease-policy tests exercise leaseless image sends;
-    // accept the legacy raw path by default so they stay green. Lease-policy tests
-    // inject an explicit BridgeImageLeaseVerifier and ignore this env.
+    // lease-policy 테스트가 아닌 유닛 테스트들은 lease 없는 이미지 전송을 검증하므로,
+    // 기본값으로 legacy raw path를 허용해 green 상태를 유지시킨다. lease-policy 테스트는
+    // 명시적으로 BridgeImageLeaseVerifier를 주입하고 이 env를 무시한다.
     environment("IRIS_BRIDGE_ACCEPT_LEGACY_IMAGE_PATH", "1")
     extensions.configure(JacocoTaskExtension::class) {
         isIncludeNoLocationClasses = true

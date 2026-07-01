@@ -242,7 +242,7 @@ class BridgeSecurityTest {
             )
         try {
             val authenticator = BridgeSocketHandshakeAuthenticator(runtime)
-            // No frames are written; a required handshake would block on read. The skip returns immediately.
+            // 프레임을 하나도 쓰지 않는다. handshake가 필수라면 read에서 블록될 테지만, skip은 즉시 반환한다.
             authenticator.authenticate(ByteArrayInputStream(ByteArray(0)), ByteArrayOutputStream(), "iris-image-bridge-mux")
         } finally {
             runtime.close()
