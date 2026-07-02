@@ -1,4 +1,5 @@
 use super::*;
+use crate::handle_registry::{ERROR_INVALID_HANDLE, HandleRegistry};
 use crate::handles::MAX_HANDSHAKE_SESSIONS;
 use crate::mux_handles::{drop_mux_session_handle, into_mux_session_handle, with_mux_session};
 use iris_bridge_core_lib::handshake::{HandshakeFrame, client_proof, server_proof};
@@ -1691,6 +1692,103 @@ fn wrong_registry_handle_is_rejected() {
 
     drop_handle(context_handle);
     drop_mux_session_handle(mux_handle);
+}
+
+#[test]
+fn concurrent_registry_churn_rejects_removed_handles() {
+    let registry = std::sync::Arc::new(HandleRegistry::<usize>::new());
+    let threads = 8;
+    let churns_per_thread = 512;
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(threads));
+
+    let workers: Vec<_> = (0..threads)
+        .map(|thread_index| {
+            let registry = std::sync::Arc::clone(&registry);
+            let barrier = std::sync::Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                for churn_index in 0..churns_per_thread {
+                    let payload = thread_index * churns_per_thread + churn_index;
+                    let handle = registry.insert(payload);
+
+                    let observed = registry
+                        .with(handle, "invalid registry handle", |value| *value)
+                        .expect("live handle resolves to its own payload");
+                    assert_eq!(observed, payload, "with returned a foreign payload");
+
+                    registry.remove(handle);
+
+                    let rejection = registry
+                        .with(handle, "invalid registry handle", |value| *value)
+                        .expect_err("removed handle must not resolve");
+                    assert_eq!(rejection.error_code, ERROR_INVALID_HANDLE);
+                }
+            })
+        })
+        .collect();
+
+    for worker in workers {
+        worker.join().expect("churn worker must not panic or deadlock");
+    }
+}
+
+#[test]
+fn concurrent_registry_remove_during_lookup_keeps_value_alive() {
+    let registry = std::sync::Arc::new(HandleRegistry::<u64>::new());
+    let shared: Vec<i64> = (0_u64..128).map(|seed| registry.insert(seed)).collect();
+    let shared = std::sync::Arc::new(shared);
+
+    let reader_threads = 6;
+    let remover_threads = 2;
+    let lookups_per_reader = 4_096;
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(reader_threads + remover_threads));
+
+    let mut workers = Vec::new();
+
+    for reader_index in 0..reader_threads {
+        let registry = std::sync::Arc::clone(&registry);
+        let shared = std::sync::Arc::clone(&shared);
+        let barrier = std::sync::Arc::clone(&barrier);
+        workers.push(std::thread::spawn(move || {
+            barrier.wait();
+            for lookup_index in 0..lookups_per_reader {
+                let handle = shared[(reader_index * 31 + lookup_index) % shared.len()];
+                match registry.with(handle, "invalid registry handle", |value| {
+                    let observed = *value;
+                    std::thread::yield_now();
+                    observed == *value
+                }) {
+                    Ok(stable) => {
+                        assert!(stable, "cloned Arc payload changed under a concurrent remove");
+                    }
+                    Err(rejection) => assert_eq!(rejection.error_code, ERROR_INVALID_HANDLE),
+                }
+            }
+        }));
+    }
+
+    for remover_index in 0..remover_threads {
+        let registry = std::sync::Arc::clone(&registry);
+        let shared = std::sync::Arc::clone(&shared);
+        let barrier = std::sync::Arc::clone(&barrier);
+        workers.push(std::thread::spawn(move || {
+            barrier.wait();
+            for &handle in shared.iter().skip(remover_index).step_by(remover_threads) {
+                registry.remove(handle);
+            }
+        }));
+    }
+
+    for worker in workers {
+        worker.join().expect("registry worker must not panic or deadlock");
+    }
+
+    for &handle in shared.iter() {
+        let rejection = registry
+            .with(handle, "invalid registry handle", |_| ())
+            .expect_err("every shared handle is removed exactly once");
+        assert_eq!(rejection.error_code, ERROR_INVALID_HANDLE);
+    }
 }
 
 #[test]
