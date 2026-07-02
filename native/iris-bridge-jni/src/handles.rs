@@ -1,21 +1,16 @@
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
-use foldhash::fast::RandomState as FastHashBuilder;
 use iris_bridge_core_lib::handshake::should_require_bridge_handshake;
 use iris_bridge_core_lib::server::{
     DedupeLedger, HandshakeServer, LeaseLedger, Rejection, SecurityMode,
 };
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 
-pub const ERROR_INVALID_HANDLE: &str = "INVALID_HANDLE";
+use crate::handle_registry::{Handle, HandleRegistry};
 
 pub const MAX_HANDSHAKE_SESSIONS: usize = 64;
 
 pub type NonceProvider = fn() -> String;
-type Handle = i64;
-type ContextRegistry = HashMap<Handle, Arc<BridgeCoreContext>, FastHashBuilder>;
 
 fn random_nonce() -> String {
     let mut bytes = [0_u8; 32];
@@ -113,46 +108,23 @@ impl BridgeCoreContext {
     }
 }
 
-// 핸들은 raw pointer가 아니라 레지스트리 키다. destroy 이후의 dispatch는
-// "not found" 거부가 되고, in-flight 호출은 Arc가 수명을 보장하므로
-// use-after-free가 구조적으로 불가능하다 (unsafe-closeout 게이트 준수).
-fn registry() -> &'static RwLock<ContextRegistry> {
-    static REGISTRY: OnceLock<RwLock<ContextRegistry>> = OnceLock::new();
-    REGISTRY.get_or_init(|| RwLock::new(ContextRegistry::with_hasher(FastHashBuilder::default())))
-}
-
-static NEXT_HANDLE: AtomicI64 = AtomicI64::new(1);
-
-pub fn allocate_handle() -> Handle {
-    NEXT_HANDLE.fetch_add(1, Ordering::Relaxed)
-}
-
-fn read_registry() -> parking_lot::RwLockReadGuard<'static, ContextRegistry> {
-    registry().read()
-}
-
-fn write_registry() -> parking_lot::RwLockWriteGuard<'static, ContextRegistry> {
-    registry().write()
+fn registry() -> &'static HandleRegistry<BridgeCoreContext> {
+    static REGISTRY: OnceLock<HandleRegistry<BridgeCoreContext>> = OnceLock::new();
+    REGISTRY.get_or_init(HandleRegistry::new)
 }
 
 #[must_use]
 pub fn into_handle(context: BridgeCoreContext) -> Handle {
-    let handle = allocate_handle();
-    write_registry().insert(handle, Arc::new(context));
-    handle
+    registry().insert(context)
 }
 
 pub fn with_context<R>(
     handle: Handle,
     body: impl FnOnce(&BridgeCoreContext) -> R,
 ) -> Result<R, Rejection> {
-    let context = read_registry()
-        .get(&handle)
-        .cloned()
-        .ok_or_else(|| Rejection::new(ERROR_INVALID_HANDLE, "invalid BridgeCoreContext handle"))?;
-    Ok(body(&context))
+    registry().with(handle, "invalid BridgeCoreContext handle", body)
 }
 
 pub fn drop_handle(handle: Handle) {
-    write_registry().remove(&handle);
+    registry().remove(handle);
 }

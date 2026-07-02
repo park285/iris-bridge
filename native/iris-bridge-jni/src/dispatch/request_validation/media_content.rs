@@ -8,6 +8,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::super::envelope::{bad_request, json_catch_unwind};
+use super::super::json::parse_json;
 
 pub fn dispatch_normalize_media_content_types(
     image_count: i32,
@@ -55,14 +56,14 @@ fn image_count_usize(image_count: i32) -> Result<usize, Rejection> {
 }
 
 fn decode_content_types(content_types_json: &str) -> Result<Vec<String>, Rejection> {
-    serde_json::from_str(content_types_json).map_err(|_| bad_request("content types JSON invalid"))
+    parse_json(content_types_json, "content types JSON invalid")
 }
 
 fn decode_media_content_type_leases(
     leases_json: &str,
 ) -> Result<Vec<MediaContentTypeLease>, Rejection> {
-    let leases: Vec<MediaContentTypeLeaseWire> = serde_json::from_str(leases_json)
-        .map_err(|_| bad_request("lease content types JSON invalid"))?;
+    let leases: Vec<MediaContentTypeLeaseWire> =
+        parse_json(leases_json, "lease content types JSON invalid")?;
     Ok(leases
         .into_iter()
         .map(|lease| MediaContentTypeLease {

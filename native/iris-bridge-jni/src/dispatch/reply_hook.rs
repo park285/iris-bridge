@@ -29,18 +29,20 @@ pub fn dispatch_reply_hook_verify(input: &ReplyHookVerifyInput<'_>) -> bool {
     reply_verify(input, REPLY_HOOK_TTL_MS)
 }
 
-pub fn dispatch_reply_markdown_pending_context(request_json: &str) -> String {
+fn dispatch_pending_context(
+    request_json: &str,
+    parse: impl FnOnce(&str) -> Result<Option<Value>, String>,
+) -> String {
     json_catch_unwind(|| {
-        let context = markdown_pending_context_request(request_json)
-            .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error))?;
+        let context = parse(request_json).map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error))?;
         Ok(context.unwrap_or_else(|| json!({ "context": Value::Null })))
     })
 }
 
+pub fn dispatch_reply_markdown_pending_context(request_json: &str) -> String {
+    dispatch_pending_context(request_json, markdown_pending_context_request)
+}
+
 pub fn dispatch_reply_mention_pending_context(request_json: &str) -> String {
-    json_catch_unwind(|| {
-        let context = mention_pending_context_request(request_json)
-            .map_err(|error| Rejection::new(ERROR_BAD_REQUEST, error))?;
-        Ok(context.unwrap_or_else(|| json!({ "context": Value::Null })))
-    })
+    dispatch_pending_context(request_json, mention_pending_context_request)
 }

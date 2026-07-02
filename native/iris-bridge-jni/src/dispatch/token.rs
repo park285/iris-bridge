@@ -4,12 +4,12 @@ use serde_json::json;
 use crate::handles::{BridgeCoreContext, with_context};
 
 use super::decode::TokenRequest;
-use super::envelope::{bad_request, json_catch_unwind};
+use super::envelope::json_catch_unwind;
+use super::json::parse_json;
 
 pub fn dispatch_validate_request_token(context: &BridgeCoreContext, request_json: &str) -> String {
     json_catch_unwind(|| {
-        let request: TokenRequest =
-            serde_json::from_str(request_json).map_err(|_| bad_request("request JSON invalid"))?;
+        let request: TokenRequest = parse_json(request_json, "request JSON invalid")?;
         validate_request(
             context.security_mode,
             &context.bridge_token,

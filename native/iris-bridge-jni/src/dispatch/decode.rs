@@ -1,7 +1,7 @@
 use iris_bridge_core_lib::server::{PathFacts, Rejection};
 use serde::Deserialize;
 
-use super::envelope::bad_request;
+use super::json::parse_json;
 
 #[derive(Deserialize)]
 pub(super) struct TokenRequest {
@@ -20,8 +20,7 @@ struct PathFactsJson {
 }
 
 pub(super) fn decode_path_facts(facts_json: &str) -> Result<Vec<PathFacts>, Rejection> {
-    let raw: Vec<PathFactsJson> =
-        serde_json::from_str(facts_json).map_err(|_| bad_request("path facts JSON invalid"))?;
+    let raw: Vec<PathFactsJson> = parse_json(facts_json, "path facts JSON invalid")?;
     Ok(raw
         .into_iter()
         .map(|fact| PathFacts {

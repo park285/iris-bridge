@@ -4,6 +4,7 @@ mod dedupe;
 mod discovery_hooks;
 mod envelope;
 mod handshake;
+mod json;
 mod kakao_link_attachment;
 mod kakao_link_template;
 mod kakao_target;

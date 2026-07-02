@@ -2,6 +2,7 @@
 
 mod dispatch;
 mod exports;
+mod handle_registry;
 mod handles;
 mod marshal;
 mod mux_handles;

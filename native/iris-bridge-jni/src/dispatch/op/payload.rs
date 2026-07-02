@@ -4,10 +4,10 @@ use serde_json::{Value, json};
 use crate::handles::{BridgeCoreContext, with_context};
 
 use super::super::envelope::{bad_request, invalid_handle_envelope, json_catch_unwind};
+use super::super::json::parse_json;
 
 pub(super) fn parse_payload(payload: &str) -> Result<Value, Rejection> {
-    let value: Value =
-        serde_json::from_str(payload).map_err(|_| bad_request("dispatch payload JSON invalid"))?;
+    let value: Value = parse_json(payload, "dispatch payload JSON invalid")?;
     if value.is_object() {
         Ok(value)
     } else {

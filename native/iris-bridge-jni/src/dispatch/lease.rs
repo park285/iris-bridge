@@ -7,7 +7,8 @@ use serde_json::json;
 use crate::handles::BridgeCoreContext;
 
 use super::decode::decode_path_facts;
-use super::envelope::{bad_request, json_catch_unwind};
+use super::envelope::json_catch_unwind;
+use super::json::parse_json;
 
 pub fn dispatch_verify_leases(
     context: &BridgeCoreContext,
@@ -28,8 +29,8 @@ pub fn dispatch_verify_leases(
 
 pub fn dispatch_image_lease_facts_json(canonical_paths_json: &str) -> String {
     json_catch_unwind(|| {
-        let canonical_paths: Vec<String> = serde_json::from_str(canonical_paths_json)
-            .map_err(|_| bad_request("image lease paths JSON invalid"))?;
+        let canonical_paths: Vec<String> =
+            parse_json(canonical_paths_json, "image lease paths JSON invalid")?;
         let facts = path_facts_for_files(&canonical_paths)?;
         let facts_json = serde_json::to_string(
             &facts

@@ -12,7 +12,8 @@ use iris_bridge_core_lib::server::text_request::{TextRequestInput, validate_text
 use iris_bridge_core_lib::server::token::{SecurityMode, canonical_security_mode_raw};
 use serde_json::json;
 
-use super::envelope::{bad_request, json_catch_unwind};
+use super::envelope::json_catch_unwind;
+use super::json::parse_json;
 
 mod media_content;
 
@@ -89,8 +90,7 @@ pub fn dispatch_validate_image_paths(
     max_path_length: usize,
 ) -> String {
     json_catch_unwind(|| {
-        let image_paths: Vec<String> = serde_json::from_str(image_paths_json)
-            .map_err(|_| bad_request("image paths JSON invalid"))?;
+        let image_paths: Vec<String> = parse_json(image_paths_json, "image paths JSON invalid")?;
         validate_image_paths(&image_paths, max_path_count, max_path_length)?;
         Ok(json!({}))
     })
@@ -123,7 +123,7 @@ pub fn dispatch_revalidate_image_path_snapshot(
 }
 
 pub fn dispatch_image_path_under_allowed_root(path: &str, allowed_roots_json: &str) -> bool {
-    let Ok(allowed_roots) = serde_json::from_str::<Vec<String>>(allowed_roots_json) else {
+    let Ok(allowed_roots) = decode_allowed_roots(allowed_roots_json) else {
         return false;
     };
     image_path_under_allowed_root(path, &allowed_roots)
@@ -142,7 +142,7 @@ pub fn dispatch_failure_metric_bucket(error_code: &str) -> &'static str {
 }
 
 fn decode_allowed_roots(allowed_roots_json: &str) -> Result<Vec<String>, Rejection> {
-    serde_json::from_str(allowed_roots_json).map_err(|_| bad_request("allowed roots JSON invalid"))
+    parse_json(allowed_roots_json, "allowed roots JSON invalid")
 }
 
 fn materialized_image_path_json(materialized: &MaterializedImagePath) -> serde_json::Value {
