@@ -1692,3 +1692,27 @@ fn wrong_registry_handle_is_rejected() {
     drop_handle(context_handle);
     drop_mux_session_handle(mux_handle);
 }
+
+#[test]
+fn marshalled_dispatch_reports_error_when_argument_read_fails() {
+    let missing_op = crate::marshal::dispatch_marshalled(None, Some("{}".to_owned()), |_, _| {
+        panic!("dispatch must not run when a JNI argument read fails")
+    });
+    assert_error(&missing_op, "MARSHAL", "failed to read JNI string argument");
+
+    let missing_payload =
+        crate::marshal::dispatch_marshalled(Some("context.create".to_owned()), None, |_, _| {
+            panic!("dispatch must not run when a JNI argument read fails")
+        });
+    assert_error(&missing_payload, "MARSHAL", "failed to read JNI string argument");
+}
+
+#[test]
+fn marshalled_dispatch_forwards_successfully_read_arguments() {
+    let forwarded = crate::marshal::dispatch_marshalled(
+        Some("op".to_owned()),
+        Some("payload".to_owned()),
+        |op, payload| format!("{op}|{payload}"),
+    );
+    assert_eq!(forwarded, "op|payload");
+}
