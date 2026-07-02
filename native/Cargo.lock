@@ -456,7 +456,7 @@ dependencies = [
 [[package]]
 name = "iris-bridge-core"
 version = "0.1.0"
-source = "git+https://github.com/park285/Iris.git?rev=860cb2b8e25772f3bc2b04b91df89df479f3908b#860cb2b8e25772f3bc2b04b91df89df479f3908b"
+source = "git+https://github.com/park285/Iris.git?rev=fd0a64fe669676a299ffe9bc8c719a2ac5a5283c#fd0a64fe669676a299ffe9bc8c719a2ac5a5283c"
 dependencies = [
  "aes",
  "base64",

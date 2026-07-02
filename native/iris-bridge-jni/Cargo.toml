@@ -17,7 +17,7 @@ doc = false
 foldhash.workspace = true
 getrandom.workspace = true
 hex.workspace = true
-iris-bridge-core-lib = { package = "iris-bridge-core", git = "https://github.com/park285/Iris.git", rev = "860cb2b8e25772f3bc2b04b91df89df479f3908b" }
+iris-bridge-core-lib = { package = "iris-bridge-core", git = "https://github.com/park285/Iris.git", rev = "fd0a64fe669676a299ffe9bc8c719a2ac5a5283c" }
 jni.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
